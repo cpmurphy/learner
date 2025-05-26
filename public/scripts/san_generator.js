@@ -1,4 +1,4 @@
-import { Chess } from 'chess.js';
+import { Chess } from './3rdparty/chess.js/chess.js';
 
 /**
  * SanGenerator class takes a FEN string and move parameters to generate
