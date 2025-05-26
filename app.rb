@@ -46,6 +46,29 @@ configure do
         $game = nil
       else
         $game = games.first # We'll use the first game found in the PGN
+
+        # Adjust $201 annotations:
+        # If $201 is on move M, it semantically applies to move M+1.
+        # The parser might associate it with M. We shift it to M+1 here.
+        if $game && $game.moves && $game.moves.size > 1
+          ($game.moves.size - 1).times do |i|
+            current_move_obj = $game.moves[i]
+            next_move_obj = $game.moves[i+1]
+
+            if current_move_obj.annotation&.include?('$201')
+              # Remove $201 from the current move
+              current_move_obj.annotation.delete('$201')
+              # Clean up annotation array if it becomes empty
+              current_move_obj.annotation = nil if current_move_obj.annotation.empty?
+
+              # Add $201 to the next move
+              next_move_obj.annotation ||= []
+              next_move_obj.annotation << '$201' unless next_move_obj.annotation.include?('$201')
+              # puts "Debug: Shifted $201 from '#{current_move_obj.notation}' to '#{next_move_obj.notation}'"
+            end
+          end
+        end
+
         $current_move_index = 0 # Start at the beginning of the game
         puts "Game loaded successfully. Board positions available: #{$game.positions.size}"
       end
