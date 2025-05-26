@@ -34,8 +34,40 @@ document.addEventListener("DOMContentLoaded", () => {
             return false; 
         }
 
-        const userMoveSan = event.san;
-        console.log(`Critical Challenge - User attempted: ${userMoveSan}, Expected good move: ${goodMoveSanForChallenge}`);
+        let userMoveSan;
+        try {
+            // Assume board.chess is the chess.js instance used by cm-chessboard
+            // and board.chess.constructor is the Chess class constructor.
+            // We create a new Chess instance to avoid altering the board's internal state prematurely.
+            const chessInstance = new board.chess.constructor(fenAtCriticalPrompt); 
+            
+            const moveAttempt = {
+                from: event.squareFrom,
+                to: event.squareTo
+            };
+            // cm-chessboard's event.promotionPiece provides the piece type (e.g., 'q') if it's a promotion
+            if (event.promotionPiece) { 
+                moveAttempt.promotion = event.promotionPiece;
+            }
+
+            const moveResult = chessInstance.move(moveAttempt);
+
+            if (!moveResult) {
+                // This case should ideally be caught by cm-chessboard's own validation
+                // (event.legalMove would be false). If we reach here, it's an unexpected state
+                // or a discrepancy between cm-chessboard's validator and chess.js.
+                console.error("Critical Challenge - Move deemed legal by cm-chessboard but rejected by chess.js instance:", event);
+                moveInfoDisplay.textContent = "That move is not valid according to the rules. Try again!";
+                return false; // Reject the move
+            }
+            userMoveSan = moveResult.san;
+        } catch (e) {
+            console.error("Error generating SAN for move:", e);
+            moveInfoDisplay.textContent = "Error processing your move. Try again!";
+            return false; // Reject the move
+        }
+        
+        console.log(`Critical Challenge - User attempted: ${userMoveSan} (derived from ${event.squareFrom}-${event.squareTo}), Expected good move: ${goodMoveSanForChallenge}`);
 
         if (userMoveSan === goodMoveSanForChallenge) {
             moveInfoDisplay.textContent = `Correct! "${userMoveSan}" is a better move. Click 'Next Move' to continue the actual game.`;
