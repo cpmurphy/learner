@@ -25,6 +25,9 @@ document.addEventListener("DOMContentLoaded", () => {
      * @returns {boolean} - True if the move is allowed (correct), false otherwise.
      */
     async function handleCriticalMoveAttempt(event) {
+        if (event.type !== 'moveInputFinished' || !event.legalMove) {
+            return true;
+        }
         if (!inCriticalMomentChallenge || !goodMoveSanForChallenge) {
             // This should ideally not be reached if input is managed correctly
             console.warn("handleCriticalMoveAttempt called inappropriately.");
