@@ -50,24 +50,22 @@ configure do
         # Adjust $201 annotations:
         # If $201 is on move M, it semantically applies to move M+1.
         # The parser might associate it with M. We shift it to M+1 here.
+        # Iterate in reverse to avoid issues with modifying the array during iteration.
         if $game && $game.moves && $game.moves.size > 1
-          ($game.moves.size - 1).times do |i|
+          ($game.moves.size - 2).downto(0) do |i| # Iterate from second-to-last down to first move
             current_move_obj = $game.moves[i]
             next_move_obj = $game.moves[i+1]
 
             if current_move_obj.annotation&.include?('$201')
-              puts "*x*x*x* current_move_obj.annotation is #{current_move_obj.annotation.inspect}"
               # Remove $201 from the current move
               current_move_obj.annotation.delete('$201')
-              # Clean up annotation array if it becomes empty
-              current_move_obj.annotation = nil if current_move_obj.annotation.empty?
+              current_move_obj.annotation = nil if current_move_obj.annotation.empty? # Clean up if array becomes empty
 
               # Add $201 to the next move
-              puts "*x*x*x* next_move_obj.annotation is #{next_move_obj.annotation.inspect}"
-              next_move_obj.annotation ||= []
+              next_move_obj.annotation ||= [] # Initialize if nil
               next_move_obj.annotation << '$201' unless next_move_obj.annotation.include?('$201')
-              puts "Debug: Shifted $201 from '#{current_move_obj.notation}' to '#{next_move_obj.notation}'"
-              puts "*x*x*x* next_move_obj.annotation is NOW #{next_move_obj.annotation.inspect}"
+              # Optional: log the shift for debugging if needed, but removed for production
+              # puts "Debug: Shifted $201 from move #{i} ('#{current_move_obj.notation}') to move #{i+1} ('#{next_move_obj.notation}')"
             end
           end
         end
