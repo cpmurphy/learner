@@ -11,7 +11,7 @@
     "test_once": "vitest run",
     "coverage": "vitest run --coverage",
     "copy-assets": "copyfiles -u 3 \"node_modules/cm-chessboard/assets/**/*.{css,css.map,svg}\" public/3rdparty-assets/cm-chessboard",
-    "copy-js": "copyfiles -u 3 \"node_modules/cm-chessboard/src/**/*.js\" public/scripts/3rdparty",
+    "copy-js": "copyfiles -u 3 \"node_modules/cm-chessboard/src/**/*.js\" public/scripts/3rdparty/cm-chessboard",
     "copy-all": "npm run copy-assets && npm run copy-js",
     "prebuild": "npm run copy-all",
     "prestart": "npm run copy-all"
