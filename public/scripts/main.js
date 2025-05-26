@@ -11,7 +11,42 @@ document.addEventListener("DOMContentLoaded", () => {
     let board; // Chessboard instance, will be initialized after fetching initial FEN
     const assetsUrl = "/3rdparty-assets/cm-chessboard/"; // Path to cm-chessboard assets
     const moveInfoDisplay = document.getElementById("move-info-display");
+    const learnSideSelect = document.getElementById("learn-side");
 
+    let learningSide = 'white'; // Default, updated by selector
+    let inCriticalMomentChallenge = false;
+    let fenAtCriticalPrompt = null; // FEN before the bad move, for reverting
+    let goodMoveSanForChallenge = null; // SAN of the good alternative move
+
+    /**
+     * Handles the user's move attempt during a critical moment challenge.
+     * This function is passed to `board.enableMoveInput`.
+     * @param {object} event - The event object from cm-chessboard, contains `san`, `squareFrom`, `squareTo`, `piece`.
+     * @returns {boolean} - True if the move is allowed (correct), false otherwise.
+     */
+    async function handleCriticalMoveAttempt(event) {
+        if (!inCriticalMomentChallenge || !goodMoveSanForChallenge) {
+            // This should ideally not be reached if input is managed correctly
+            console.warn("handleCriticalMoveAttempt called inappropriately.");
+            return false; 
+        }
+
+        const userMoveSan = event.san;
+        console.log(`Critical Challenge - User attempted: ${userMoveSan}, Expected good move: ${goodMoveSanForChallenge}`);
+
+        if (userMoveSan === goodMoveSanForChallenge) {
+            moveInfoDisplay.textContent = `Correct! "${userMoveSan}" is a better move. Click 'Next Move' to continue the actual game.`;
+            board.disableMoveInput();
+            // board.addMarker(MARKER_TYPE.square, event.squareTo); // Optional: highlight the move
+            inCriticalMomentChallenge = false; // Challenge resolved
+            return true; // Allow cm-chessboard to make the move on the board
+        } else {
+            moveInfoDisplay.textContent = `"${userMoveSan}" is not the best move. Try again!`;
+            // Returning false prevents cm-chessboard from making the move, effectively reverting.
+            return false; 
+        }
+    }
+    
     /**
      * Updates the move information display area.
      * @param {object|null} lastMoveData - Data about the last move, or null.
@@ -21,20 +56,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (lastMoveData) {
             const lm = lastMoveData;
-            // Format: "1. e4" or "1... e5"
+            // This function is for displaying the *actual last game move* information,
+            // not for critical challenge prompts.
+            const lm = lastMoveData;
             let movePrefix = `${lm.number}${lm.turn === 'w' ? '.' : '...'}`;
             let displayText = `${movePrefix} ${lm.san}`;
 
             if (lm.comment && lm.comment.trim() !== "") {
                 displayText += ` {${lm.comment.trim()}}`;
             }
-            if (lm.nags && lm.nags.length > 0) {
-                displayText += ` ${lm.nags.join(' ')}`;
+            if (lm.annotation && lm.annotation.length > 0) { // Changed from nags to annotation for consistency with backend
+                displayText += ` ${lm.annotation.join(' ')}`;
+            }
+
+            // Add a note if it was a critical move by the opponent
+            if (lm.is_critical && lm.turn !== learningSide) {
+                displayText += ` (Opponent's blunder!)`;
             }
             moveInfoDisplay.textContent = displayText;
         } else {
-            // Initial position or no move info
-            moveInfoDisplay.textContent = "Game start.";
+            moveInfoDisplay.textContent = "Game start."; // Initial position or no move info
         }
     }
 
@@ -59,26 +100,54 @@ document.addEventListener("DOMContentLoaded", () => {
                 console.error(`Error from server ${url}: ${response.status} ${response.statusText}`, data.error || '');
                 if (data.error && data.error.includes("Game not loaded")) {
                     alert("Game data is not loaded on the server. Please check server logs and ensure a PGN_FILE environment variable was correctly set when starting the server.");
+                    if (moveInfoDisplay) moveInfoDisplay.textContent = "Error: Game not loaded on server.";
                 }
                 return null;
             }
 
-            if (data.fen) {
+            if (data.fen || (data.last_move && data.last_move.fen_before_move)) { // Ensure there's a FEN to display
+                const lastMoveData = data.last_move;
+                let setupChallenge = false;
+
+                // Check conditions for starting a critical moment challenge
+                if (lastMoveData && lastMoveData.is_critical && lastMoveData.turn === learningSide && lastMoveData.good_move_san && lastMoveData.fen_before_move) {
+                    setupChallenge = true;
+                    inCriticalMomentChallenge = true;
+                    fenAtCriticalPrompt = lastMoveData.fen_before_move;
+                    goodMoveSanForChallenge = lastMoveData.good_move_san;
+                } else {
+                    inCriticalMomentChallenge = false;
+                    if (board) board.disableMoveInput(); // Ensure input is disabled if not in challenge mode
+                }
+
+                const fenToDisplay = setupChallenge ? fenAtCriticalPrompt : data.fen;
+
                 if (!board) {
                     // Initialize board for the first time
                     const props = {
-                        position: data.fen,
-                        assetsUrl: assetsUrl
+                        position: fenToDisplay,
+                        assetsUrl: assetsUrl,
+                        style: {
+                            moveFromMarker: undefined, // Optional: clear markers
+                            moveToMarker: undefined,   // Optional: clear markers
+                        }
                     };
                     board = new Chessboard(boardContainer, props);
-                    console.log(`Chessboard initialized. FEN: ${data.fen}, Position index: ${data.move_index}, Total positions: ${data.total_positions}`);
+                    console.log(`Chessboard initialized. FEN: ${fenToDisplay}, Position index: ${data.move_index}, Total positions: ${data.total_positions}`);
                 } else {
                     // Update existing board
-                    board.setPosition(data.fen, true); // true for animation
-                    console.log(`Board updated. FEN: ${data.fen}, Position index: ${data.move_index}`);
+                    board.setPosition(fenToDisplay, true); // true for animation
+                    console.log(`Board updated. FEN: ${fenToDisplay}, Position index: ${data.move_index}`);
                 }
-                updateMoveInfoDisplay(data.last_move); // Update move display
 
+                if (setupChallenge) {
+                    moveInfoDisplay.textContent = `Critical moment! The game move was ${lastMoveData.san}. That was a poor choice. Try a better move for ${learningSide}.`;
+                    board.enableMoveInput(handleCriticalMoveAttempt, learningSide === 'w' ? 'white' : 'black');
+                } else {
+                    // Not a challenge, or challenge conditions not met. Display regular move info.
+                    updateMoveInfoDisplay(lastMoveData); // This will also note opponent's blunders
+                }
+                
                 if (data.message) { // Log server messages like "Already at last move"
                     console.log(`Server message: ${data.message}`);
                 }
@@ -125,11 +194,23 @@ document.addEventListener("DOMContentLoaded", () => {
     // Placeholder event listeners for other controls (unchanged)
     document.getElementById("next-critical")?.addEventListener("click", () => {
         console.log("Next critical moment clicked");
-        // TODO: Implement logic
+        // TODO: Implement logic for jumping to the next critical move.
+        // This would involve a new backend endpoint or modifying existing ones.
     });
 
-    document.getElementById("learn-side")?.addEventListener("change", (event) => {
-        console.log("Learn side changed to:", event.target.value);
-        // TODO: Implement logic
+    learnSideSelect?.addEventListener("change", (event) => {
+        learningSide = event.target.value;
+        console.log("Learning side changed to:", learningSide);
+        // If currently in a challenge, changing sides might be complex.
+        // For now, this change will apply to the next critical moment encountered.
+        // If a board is loaded and in a challenge, ideally, we might want to reset the challenge or re-evaluate.
+        // Simplest: if inCriticalMomentChallenge, changing side cancels it.
+        if (inCriticalMomentChallenge) {
+            console.log("Learning side changed during a critical challenge. Challenge cancelled.");
+            inCriticalMomentChallenge = false;
+            board.disableMoveInput();
+            // Re-fetch current game state to display normally without challenge
+            fetchAndUpdateBoard('/game/current_fen'); 
+        }
     });
 });

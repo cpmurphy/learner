@@ -76,19 +76,37 @@ helpers do
     data.to_json
   end
 
-  def get_last_move_info(move_index)
-    return nil if move_index == 0 || !game_loaded?
+  def get_last_move_info(current_position_index)
+    return nil if current_position_index == 0 || !game_loaded?
 
-    move = $game.moves[move_index - 1]
+    # The move that LED to the current_position_index
+    # $game.positions[0] is initial, $game.moves[0] is the 1st move, leading to $game.positions[1]
+    actual_move_index_in_game_array = current_position_index - 1
+    move = $game.moves[actual_move_index_in_game_array]
 
-    return nil unless move # Should exist if move_index > 0 and game is loaded
+    return nil unless move # Should exist if current_position_index > 0
+
+    fen_before_this_move = $game.positions[actual_move_index_in_game_array].to_fen.to_s
+
+    is_critical_moment = move.annotation&.include?('$201')
+    good_san = nil
+
+    if is_critical_moment && move.variations && !move.variations.empty?
+      first_variation = move.variations.first
+      if first_variation && first_variation.moves && !first_variation.moves.empty?
+        good_san = first_variation.moves.first.notation.to_s
+      end
+    end
 
     {
-      number: move_index,
-      turn: (move_index - 1) % 2 == 0 ? 'w' : 'b',
-      san: move.notation.to_s, # Standard Algebraic Notation (e.g., "e4", "Nf3")
-      comment: move.comment, # String or nil
-      annotation: move.annotation # Array of strings (e.g., ["$1", "$201"])
+      number: move.number, # Actual move number from PGN
+      turn: move.turn,     # Actual turn ('w' or 'b') from PGN
+      san: move.notation.to_s,
+      comment: move.comment,
+      annotation: move.annotation, # NAGs (Numeric Annotation Glyphs)
+      is_critical: is_critical_moment,
+      good_move_san: good_san,
+      fen_before_move: fen_before_this_move
     }
   end
 end
