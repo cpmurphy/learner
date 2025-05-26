@@ -55,7 +55,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!moveInfoDisplay) return;
 
         if (lastMoveData) {
-            const lm = lastMoveData;
             // This function is for displaying the *actual last game move* information,
             // not for critical challenge prompts.
             const lm = lastMoveData;
