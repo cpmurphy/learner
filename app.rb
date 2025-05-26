@@ -93,14 +93,14 @@ helpers do
 
     if is_critical_moment && move.variations && !move.variations.empty?
       first_variation = move.variations.first
-      if first_variation && first_variation.moves && !first_variation.moves.empty?
-        good_san = first_variation.moves.first.notation.to_s
+      if first_variation && !first_variation.empty?
+        good_san = first_variation.first.notation.to_s
       end
     end
 
     {
-      number: move.number, # Actual move number from PGN
-      turn: move.turn,     # Actual turn ('w' or 'b') from PGN
+      number: current_position_index,
+      turn: (current_position_index - 1) % 2 == 0 ? 'w' : 'b',
       san: move.notation.to_s,
       comment: move.comment,
       annotation: move.annotation, # NAGs (Numeric Annotation Glyphs)
