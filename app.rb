@@ -1,5 +1,5 @@
 require 'sinatra'
-require 'pgn2' # Corrected to use pgn2 gem
+require 'pgn'
 require 'json'
 
 # --- Global State ---
@@ -39,7 +39,7 @@ configure do
     puts "Loading PGN file: #{pgn_file_path}"
     begin
       pgn_content = File.read(pgn_file_path)
-      games = Pgn2.parse(pgn_content) # Corrected to use Pgn2.parse
+      games = PGN.parse(pgn_content)
 
       if games.empty?
         puts "ERROR: No games found in PGN file: #{pgn_file_path}"
