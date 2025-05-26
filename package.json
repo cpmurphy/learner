@@ -1,0 +1,22 @@
+{
+  "type": "module",
+  "devDependencies": {
+    "@vitest/coverage-v8": "^3.1.1",
+    "copyfiles": "^2.4.1",
+    "jsdom": "^25.0.1",
+    "vitest": "^3.1.1"
+  },
+  "scripts": {
+    "test": "vitest",
+    "test_once": "vitest run",
+    "coverage": "vitest run --coverage",
+    "copy-assets": "copyfiles -u 3 \"node_modules/cm-chessboard/assets/**/*.{css,css.map,svg}\" public/3rdparty-assets/cm-chessboard",
+    "copy-js": "copyfiles -u 3 \"node_modules/cm-chessboard/src/**/*.js\" public/scripts/3rdparty",
+    "copy-all": "npm run copy-assets && npm run copy-js",
+    "prebuild": "npm run copy-all",
+    "prestart": "npm run copy-all"
+  },
+  "dependencies": {
+    "cm-chessboard": "^8.7.4"
+  }
+}
