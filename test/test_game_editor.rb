@@ -129,6 +129,7 @@ class TestGameEditor < Minitest::Test
     game.moves << PGN::Move.new('m3', ['$201'])       # $201 to m4
     game.moves << PGN::Move.new('m4', ['$3', '$201']) # m4 gets $201, keeps $3, $201 (no dupe)
     game.moves << PGN::Move.new('m5')                 # m5 starts off clean
+    game.moves << PGN::Move.new('m6')                 # m6 should stay clean
 
     @editor.shift_critical_annotations(game)
 
@@ -139,5 +140,6 @@ class TestGameEditor < Minitest::Test
     assert_equal ['$3', '$201'].sort, game.moves[3].annotation.sort
     
     assert_equal ['$201'].sort, game.moves[4].annotation
+    assert_nil game.moves[5].annotation
   end
 end
