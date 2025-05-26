@@ -128,7 +128,7 @@ class TestPgnAnnotationShifter < Minitest::Test
     game.moves << PGN::Move.new('m2', ['$2'])         # m2 gets $201, keeps $2
     game.moves << PGN::Move.new('m3', ['$201'])       # $201 to m4
     game.moves << PGN::Move.new('m4', ['$3', '$201']) # m4 gets $201, keeps $3, $201 (no dupe)
-    game.moves << PGN::Move.new('m5')                 # m5 is clean
+    game.moves << PGN::Move.new('m5')                 # m5 starts off clean
 
     @shifter.shift_critical_annotations(game)
 
@@ -138,6 +138,6 @@ class TestPgnAnnotationShifter < Minitest::Test
     assert_nil game.moves[2].annotation
     assert_equal ['$3', '$201'].sort, game.moves[3].annotation.sort
     
-    assert_nil game.moves[4].annotation
+    assert_equal ['$201'].sort, game.moves[4].annotation
   end
 end
