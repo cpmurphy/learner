@@ -40,6 +40,7 @@ configure do
     begin
       pgn_content = File.read(pgn_file_path)
       games = PGN.parse(pgn_content)
+      p games
 
       if games.empty?
         puts "ERROR: No games found in PGN file: #{pgn_file_path}"
