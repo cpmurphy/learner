@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module PgnAnnotationShifter
+module GameEditor
   # Modifies a PGN::Game object in place.
   # If a $201 annotation (critical moment) is found on move M,
   # it is moved to move M+1, as semantically $201 applies to the *next* move.

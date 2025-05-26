@@ -2,7 +2,7 @@
 
 require 'minitest/autorun'
 require 'pgn' # Gem for PGN parsing, used to construct test objects
-require_relative '../lib/pgn_annotation_shifter'
+require_relative '../lib/game_editor'
 
 # Mock PGN::Move and PGN::Game classes for testing without full PGN parsing
 # This allows us to focus on the annotation shifting logic.
@@ -28,21 +28,21 @@ module PGN
   end
 end
 
-class TestPgnAnnotationShifter < Minitest::Test
+class TestGameEditor < Minitest::Test
   def setup
-    @shifter = PgnAnnotationShifter
+    @editor = GameEditor
   end
 
   def test_no_moves
     game = PGN::Game.new
-    @shifter.shift_critical_annotations(game)
+    @editor.shift_critical_annotations(game)
     assert_empty game.moves
   end
 
   def test_one_move_with_annotation
     game = PGN::Game.new
     game.moves << PGN::Move.new('e4', ['$201'])
-    @shifter.shift_critical_annotations(game)
+    @editor.shift_critical_annotations(game)
     assert_equal ['$201'], game.moves[0].annotation, "Annotation should remain on the only move"
   end
 
@@ -50,7 +50,7 @@ class TestPgnAnnotationShifter < Minitest::Test
     game = PGN::Game.new
     game.moves << PGN::Move.new('e4', ['$201'])
     game.moves << PGN::Move.new('e5')
-    @shifter.shift_critical_annotations(game)
+    @editor.shift_critical_annotations(game)
     assert_nil game.moves[0].annotation, "Annotation should be removed from the first move"
     assert_equal ['$201'], game.moves[1].annotation, "Annotation should be added to the second move"
   end
@@ -59,7 +59,7 @@ class TestPgnAnnotationShifter < Minitest::Test
     game = PGN::Game.new
     game.moves << PGN::Move.new('e4', ['$201'])
     game.moves << PGN::Move.new('e5', ['$1']) # Next move already has an annotation
-    @shifter.shift_critical_annotations(game)
+    @editor.shift_critical_annotations(game)
     assert_nil game.moves[0].annotation
     assert_includes game.moves[1].annotation, '$201'
     assert_includes game.moves[1].annotation, '$1'
@@ -70,7 +70,7 @@ class TestPgnAnnotationShifter < Minitest::Test
     game = PGN::Game.new
     game.moves << PGN::Move.new('Nf3', ['$1', '$201'])
     game.moves << PGN::Move.new('Nf6')
-    @shifter.shift_critical_annotations(game)
+    @editor.shift_critical_annotations(game)
     assert_equal ['$1'], game.moves[0].annotation, "Only $201 should be removed"
     assert_equal ['$201'], game.moves[1].annotation
   end
@@ -79,7 +79,7 @@ class TestPgnAnnotationShifter < Minitest::Test
     game = PGN::Game.new
     game.moves << PGN::Move.new('d4', ['$201'])
     game.moves << PGN::Move.new('d5')
-    @shifter.shift_critical_annotations(game)
+    @editor.shift_critical_annotations(game)
     assert_nil game.moves[0].annotation, "Annotation array should become nil if $201 was the only one"
     assert_equal ['$201'], game.moves[1].annotation
   end
@@ -92,7 +92,7 @@ class TestPgnAnnotationShifter < Minitest::Test
     game.moves << PGN::Move.new('Nc6')
     game.moves << PGN::Move.new('Bc4') # No annotation initially
 
-    @shifter.shift_critical_annotations(game)
+    @editor.shift_critical_annotations(game)
 
     assert_nil game.moves[0].annotation
     assert_equal ['$201'], game.moves[1].annotation
@@ -107,7 +107,7 @@ class TestPgnAnnotationShifter < Minitest::Test
     game = PGN::Game.new
     game.moves << PGN::Move.new('e4')
     game.moves << PGN::Move.new('e5', ['$201']) # $201 on the last move
-    @shifter.shift_critical_annotations(game)
+    @editor.shift_critical_annotations(game)
     assert_nil game.moves[0].annotation
     assert_equal ['$201'], game.moves[1].annotation, "$201 should remain on the last move if it's there"
   end
@@ -116,7 +116,7 @@ class TestPgnAnnotationShifter < Minitest::Test
     game = PGN::Game.new
     game.moves << PGN::Move.new('e4', ['$201'])
     game.moves << PGN::Move.new('e5', ['$201']) # Next move already has $201
-    @shifter.shift_critical_annotations(game)
+    @editor.shift_critical_annotations(game)
     assert_nil game.moves[0].annotation
     assert_equal ['$201'], game.moves[1].annotation, "$201 should not be duplicated"
     assert_equal 1, game.moves[1].annotation.size
@@ -130,7 +130,7 @@ class TestPgnAnnotationShifter < Minitest::Test
     game.moves << PGN::Move.new('m4', ['$3', '$201']) # m4 gets $201, keeps $3, $201 (no dupe)
     game.moves << PGN::Move.new('m5')                 # m5 starts off clean
 
-    @shifter.shift_critical_annotations(game)
+    @editor.shift_critical_annotations(game)
 
     assert_equal ['$1'], game.moves[0].annotation
     assert_equal ['$2', '$201'].sort, game.moves[1].annotation.sort

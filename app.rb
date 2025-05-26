@@ -1,7 +1,7 @@
 require 'sinatra'
 require 'pgn'
 require 'json'
-require_relative 'lib/pgn_annotation_shifter'
+require_relative 'lib/game_editor'
 
 # --- Global State ---
 # For simplicity in this skeleton, we use global variables.
@@ -47,7 +47,7 @@ configure do
         $game = nil
       else
         $game = games.first # We'll use the first game found in the PGN
-        PgnAnnotationShifter.shift_critical_annotations($game) # Use the refactored method
+        GameEditor.shift_critical_annotations($game) # Use the refactored method
         $current_move_index = 0 # Start at the beginning of the game
         puts "Game loaded successfully. Board positions available: #{$game.positions.size}"
       end
