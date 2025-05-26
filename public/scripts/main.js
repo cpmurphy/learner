@@ -1,5 +1,5 @@
 import { Chessboard } from "./3rdparty/cm-chessboard/Chessboard.js";
-import { FEN } from "./3rdparty/cm-chessboard/model/Position.js";
+// We no longer need to import FEN directly as the backend will provide it.
 
 document.addEventListener("DOMContentLoaded", () => {
     const boardContainer = document.getElementById("chessboard-container");
@@ -8,26 +8,88 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
     }
 
-    const props = {
-        position: FEN.start, // Initial position
-        assetsUrl: "/3rdparty-assets/cm-chessboard/" // Path to cm-chessboard assets (SVGs for pieces)
-                                                    // Assumes 'public' is served as the web root.
-    };
-    const board = new Chessboard(boardContainer, props);
+    let board; // Chessboard instance, will be initialized after fetching initial FEN
+    const assetsUrl = "/3rdparty-assets/cm-chessboard/"; // Path to cm-chessboard assets
 
-    console.log("Chessboard initialized.");
+    /**
+     * Fetches FEN from the backend and updates the chessboard.
+     * @param {string} url - The API endpoint to fetch from.
+     * @param {string} method - HTTP method (GET, POST, etc.).
+     * @param {object|null} body - The request body for POST requests.
+     */
+    async function fetchAndUpdateBoard(url, method = 'GET', body = null) {
+        try {
+            const options = { method };
+            if (body) {
+                // For POST requests, we might send data, though not used in current next/prev
+                // options.headers = { 'Content-Type': 'application/json' };
+                // options.body = JSON.stringify(body);
+            }
+            const response = await fetch(url, options);
+            const data = await response.json();
 
-    // Placeholder event listeners for controls
-    document.getElementById("prev-move")?.addEventListener("click", () => {
+            if (!response.ok) {
+                console.error(`Error from server ${url}: ${response.status} ${response.statusText}`, data.error || '');
+                if (data.error && data.error.includes("Game not loaded")) {
+                    alert("Game data is not loaded on the server. Please check server logs and ensure a PGN_FILE environment variable was correctly set when starting the server.");
+                }
+                return null;
+            }
+
+            if (data.fen) {
+                if (!board) {
+                    // Initialize board for the first time
+                    const props = {
+                        position: data.fen,
+                        assetsUrl: assetsUrl
+                    };
+                    board = new Chessboard(boardContainer, props);
+                    console.log(`Chessboard initialized. FEN: ${data.fen}, Move: ${data.move_index + 1}/${data.total_positions -1 }`);
+                } else {
+                    // Update existing board
+                    board.setPosition(data.fen, true); // true for animation
+                    console.log(`Board updated. FEN: ${data.fen}, Move index: ${data.move_index}`);
+                    if (data.message) {
+                        console.log(`Server message: ${data.message}`);
+                    }
+                }
+            } else if (data.error) {
+                 console.error("Error from server:", data.error);
+            }
+            return data;
+        } catch (error) {
+            console.error(`Network or other error fetching from ${url}:`, error);
+            // Display a more user-friendly error, e.g., in a status bar on the page
+            alert(`Could not connect to the server or an error occurred. Please check the console for details and ensure the backend server is running. Error: ${error.message}`);
+            return null;
+        }
+    }
+
+    // Fetch initial board position when the page loads
+    fetchAndUpdateBoard('/game/current_fen');
+
+    // Event listeners for controls
+    document.getElementById("prev-move")?.addEventListener("click", async () => {
         console.log("Previous move clicked");
-        // TODO: Implement logic
+        if (board) { // Ensure board is initialized
+            await fetchAndUpdateBoard('/game/prev_move', 'POST');
+        } else {
+            console.warn("Board not initialized yet. Cannot go to previous move.");
+            alert("Chessboard is not yet loaded. Please wait or check server status.");
+        }
     });
 
-    document.getElementById("next-move")?.addEventListener("click", () => {
+    document.getElementById("next-move")?.addEventListener("click", async () => {
         console.log("Next move clicked");
-        // TODO: Implement logic
+        if (board) { // Ensure board is initialized
+            await fetchAndUpdateBoard('/game/next_move', 'POST');
+        } else {
+            console.warn("Board not initialized yet. Cannot go to next move.");
+            alert("Chessboard is not yet loaded. Please wait or check server status.");
+        }
     });
 
+    // Placeholder event listeners for other controls (unchanged)
     document.getElementById("next-critical")?.addEventListener("click", () => {
         console.log("Next critical moment clicked");
         // TODO: Implement logic
