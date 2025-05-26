@@ -56,15 +56,18 @@ configure do
             next_move_obj = $game.moves[i+1]
 
             if current_move_obj.annotation&.include?('$201')
+              puts "*x*x*x* current_move_obj.annotation is #{current_move_obj.annotation.inspect}"
               # Remove $201 from the current move
               current_move_obj.annotation.delete('$201')
               # Clean up annotation array if it becomes empty
               current_move_obj.annotation = nil if current_move_obj.annotation.empty?
 
               # Add $201 to the next move
+              puts "*x*x*x* next_move_obj.annotation is #{next_move_obj.annotation.inspect}"
               next_move_obj.annotation ||= []
               next_move_obj.annotation << '$201' unless next_move_obj.annotation.include?('$201')
-              # puts "Debug: Shifted $201 from '#{current_move_obj.notation}' to '#{next_move_obj.notation}'"
+              puts "Debug: Shifted $201 from '#{current_move_obj.notation}' to '#{next_move_obj.notation}'"
+              puts "*x*x*x* next_move_obj.annotation is NOW #{next_move_obj.annotation.inspect}"
             end
           end
         end
