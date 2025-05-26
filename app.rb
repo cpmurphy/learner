@@ -79,17 +79,16 @@ helpers do
   def get_last_move_info(move_index)
     return nil if move_index == 0 || !game_loaded?
 
-    position = $game.positions[move_index]
-    move = position.previous_move # This is a PGN::Move object
+    move = $game.moves[move_index - 1]
 
     return nil unless move # Should exist if move_index > 0 and game is loaded
 
     {
-      number: move.number,
-      turn: move.turn, # 'w' or 'b'
+      number: move_index,
+      turn: (move_index - 1) % 2 == 0 ? 'w' : 'b',
       san: move.notation.to_s, # Standard Algebraic Notation (e.g., "e4", "Nf3")
       comment: move.comment, # String or nil
-      nags: move.nags # Array of strings (e.g., ["$1", "$201"])
+      annotation: move.annotation # Array of strings (e.g., ["$1", "$201"])
     }
   end
 end
