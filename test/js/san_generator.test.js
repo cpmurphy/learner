@@ -3,14 +3,16 @@ import { SanGenerator } from '../../public/scripts/san_generator.js';
 
 // Standard starting position FEN
 const startingFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-// FEN for testing promotion (White pawn on b7, can move to b8)
-const promotionFen = "rnbqk1nr/pPpp1ppp/8/4p3/8/8/PPP1PPPP/RNBQKBNR w KQkq - 0 1";
+// FEN for testing promotion (White pawn on b7, can move to b8, b8 is empty)
+// Original: rnbqk1nr (black N on b8) -> Corrected: r1bqk1nr (b8 is empty)
+const promotionFen = "r1bqk1nr/pPpp1ppp/8/4p3/8/8/PPP1PPPP/RNBQKBNR w KQkq - 0 1";
 // FEN for testing castling
 const castlingFenWhite = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1";
 // FEN for testing captures
 const captureFen = "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2"; // After 1. e4 d5
-// FEN for testing disambiguation (Knights on b1 and f3, both can move to d2)
-const disambiguationFen = "r1bqkbnr/pppppppp/8/8/8/5N2/PPPPPPPP/1N1QKB1R w Kkq - 0 1";
+// FEN for testing disambiguation (Knights on b1 and f3, both can move to d2, d2 is empty)
+// Original: PPPPPPPP (d2 has white pawn) -> Corrected: PPP1PPPP (d2 is empty)
+const disambiguationFen = "r1bqkbnr/pppppppp/8/8/8/5N2/PPP1PPPP/1N1QKB1R w Kkq - 0 1";
 
 
 describe('SanGenerator', () => {
