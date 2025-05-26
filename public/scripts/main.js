@@ -1,4 +1,5 @@
 import { Chessboard } from "./3rdparty/cm-chessboard/Chessboard.js";
+import { SanGenerator } from './san_generator.js';
 // We no longer need to import FEN directly as the backend will provide it.
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -36,38 +37,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
         let userMoveSan;
         try {
-            // Assume board.chess is the chess.js instance used by cm-chessboard
-            // and board.chess.constructor is the Chess class constructor.
-            // We create a new Chess instance to avoid altering the board's internal state prematurely.
-            const chessInstance = new board.chess.constructor(fenAtCriticalPrompt); 
-            
-            const moveAttempt = {
-                from: event.squareFrom,
-                to: event.squareTo
-            };
-            // cm-chessboard's event.promotionPiece provides the piece type (e.g., 'q') if it's a promotion
-            if (event.promotionPiece) { 
-                moveAttempt.promotion = event.promotionPiece;
-            }
+            const sanGenerator = new SanGenerator(fenAtCriticalPrompt, event.squareFrom, event.squareTo, event.promotionPiece);
+            userMoveSan = sanGenerator.getSan();
 
-            const moveResult = chessInstance.move(moveAttempt);
-
-            if (!moveResult) {
-                // This case should ideally be caught by cm-chessboard's own validation
-                // (event.legalMove would be false). If we reach here, it's an unexpected state
-                // or a discrepancy between cm-chessboard's validator and chess.js.
-                console.error("Critical Challenge - Move deemed legal by cm-chessboard but rejected by chess.js instance:", event);
-                moveInfoDisplay.textContent = "That move is not valid according to the rules. Try again!";
-                return false; // Reject the move
+            if (!userMoveSan) {
+                // This implies the move was illegal by chess.js in SanGenerator,
+                // or some other error occurred (e.g. invalid FEN, missing params).
+                // The SanGenerator logs specifics.
+                console.error("Critical Challenge - SanGenerator could not produce SAN. Move might be illegal or data inconsistent.", 
+                              { from: event.squareFrom, to: event.squareTo, promotion: event.promotionPiece, fen: fenAtCriticalPrompt });
+                moveInfoDisplay.textContent = "That move is not valid or could not be processed. Try again!";
+                return false; // Reject the move, preventing cm-chessboard from visually making it.
             }
-            userMoveSan = moveResult.san;
-        } catch (e) {
-            console.error("Error generating SAN for move:", e);
+        } catch (e) { 
+            // Catch any unexpected errors from SanGenerator instantiation or getSan() itself, though SanGenerator is designed to catch its own errors.
+            console.error("Critical Challenge - Error generating SAN using SanGenerator:", e);
             moveInfoDisplay.textContent = "Error processing your move. Try again!";
             return false; // Reject the move
         }
         
-        console.log(`Critical Challenge - User attempted: ${userMoveSan} (derived from ${event.squareFrom}-${event.squareTo}), Expected good move: ${goodMoveSanForChallenge}`);
+        console.log(`Critical Challenge - User attempted: ${userMoveSan} (derived from ${event.squareFrom}-${event.squareTo}${event.promotionPiece ? "="+event.promotionPiece : ""}), Expected good move: ${goodMoveSanForChallenge}`);
 
         if (userMoveSan === goodMoveSanForChallenge) {
             moveInfoDisplay.textContent = `Correct! "${userMoveSan}" is a better move. Click 'Next Move' to continue the actual game.`;
