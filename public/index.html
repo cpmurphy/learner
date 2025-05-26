@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Learn Tool</title>
+    <link rel="stylesheet" href="3rdparty-assets/cm-chessboard/styles/cm-chessboard.css">
+    <link rel="stylesheet" href="styles/style.css">
+</head>
+<body>
+    <h1>Chess Learn Tool</h1>
+    <div id="chessboard-container" style="width: 400px; max-width: 100vw;">
+        <!-- Chessboard will be rendered here by cm-chessboard -->
+    </div>
+    <div class="controls">
+        <button id="prev-move">Previous</button>
+        <button id="next-move">Next</button>
+        <button id="next-critical">Next Critical Moment</button>
+    </div>
+    <div class="info">
+        <p>Select side to learn from:</p>
+        <select id="learn-side">
+            <option value="white">White</option>
+            <option value="black">Black</option>
+        </select>
+    </div>
+
+    <script type="module" src="scripts/main.js"></script>
+</body>
+</html>
