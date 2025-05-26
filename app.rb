@@ -124,7 +124,7 @@ helpers do
 
     {
       number: current_position_index,
-      turn: (current_position_index - 1) % 2 == 0 ? 'w' : 'b',
+      turn: (current_position_index - 1) % 2 == 0 ? 'white' : 'black',
       san: move.notation.to_s,
       comment: move.comment,
       annotation: move.annotation, # NAGs (Numeric Annotation Glyphs)
