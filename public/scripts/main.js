@@ -10,6 +10,33 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let board; // Chessboard instance, will be initialized after fetching initial FEN
     const assetsUrl = "/3rdparty-assets/cm-chessboard/"; // Path to cm-chessboard assets
+    const moveInfoDisplay = document.getElementById("move-info-display");
+
+    /**
+     * Updates the move information display area.
+     * @param {object|null} lastMoveData - Data about the last move, or null.
+     */
+    function updateMoveInfoDisplay(lastMoveData) {
+        if (!moveInfoDisplay) return;
+
+        if (lastMoveData) {
+            const lm = lastMoveData;
+            // Format: "1. e4" or "1... e5"
+            let movePrefix = `${lm.number}${lm.turn === 'w' ? '.' : '...'}`;
+            let displayText = `${movePrefix} ${lm.san}`;
+
+            if (lm.comment && lm.comment.trim() !== "") {
+                displayText += ` {${lm.comment.trim()}}`;
+            }
+            if (lm.nags && lm.nags.length > 0) {
+                displayText += ` ${lm.nags.join(' ')}`;
+            }
+            moveInfoDisplay.textContent = displayText;
+        } else {
+            // Initial position or no move info
+            moveInfoDisplay.textContent = "Game start.";
+        }
+    }
 
     /**
      * Fetches FEN from the backend and updates the chessboard.
@@ -44,17 +71,23 @@ document.addEventListener("DOMContentLoaded", () => {
                         assetsUrl: assetsUrl
                     };
                     board = new Chessboard(boardContainer, props);
-                    console.log(`Chessboard initialized. FEN: ${data.fen}, Move: ${data.move_index + 1}/${data.total_positions -1 }`);
+                    console.log(`Chessboard initialized. FEN: ${data.fen}, Position index: ${data.move_index}, Total positions: ${data.total_positions}`);
                 } else {
                     // Update existing board
                     board.setPosition(data.fen, true); // true for animation
-                    console.log(`Board updated. FEN: ${data.fen}, Move index: ${data.move_index}`);
-                    if (data.message) {
-                        console.log(`Server message: ${data.message}`);
-                    }
+                    console.log(`Board updated. FEN: ${data.fen}, Position index: ${data.move_index}`);
                 }
+                updateMoveInfoDisplay(data.last_move); // Update move display
+
+                if (data.message) { // Log server messages like "Already at last move"
+                    console.log(`Server message: ${data.message}`);
+                }
+
             } else if (data.error) {
                  console.error("Error from server:", data.error);
+                 if (moveInfoDisplay && data.error.includes("Game not loaded")) {
+                    moveInfoDisplay.textContent = "Error: Game not loaded on server.";
+                 }
             }
             return data;
         } catch (error) {

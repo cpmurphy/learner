@@ -1,5 +1,5 @@
 require 'sinatra'
-require 'pgn'
+require 'pgn2' # Corrected to use pgn2 gem
 require 'json'
 
 # --- Global State ---
@@ -39,8 +39,7 @@ configure do
     puts "Loading PGN file: #{pgn_file_path}"
     begin
       pgn_content = File.read(pgn_file_path)
-      games = PGN.parse(pgn_content)
-      p games
+      games = Pgn2.parse(pgn_content) # Corrected to use Pgn2.parse
 
       if games.empty?
         puts "ERROR: No games found in PGN file: #{pgn_file_path}"
@@ -76,6 +75,23 @@ helpers do
     status status_code
     data.to_json
   end
+
+  def get_last_move_info(move_index)
+    return nil if move_index == 0 || !game_loaded?
+
+    position = $game.positions[move_index]
+    move = position.previous_move # This is a Pgn2::Move object
+
+    return nil unless move # Should exist if move_index > 0 and game is loaded
+
+    {
+      number: move.number,
+      turn: move.turn, # 'w' or 'b'
+      san: move.notation.to_s, # Standard Algebraic Notation (e.g., "e4", "Nf3")
+      comment: move.comment, # String or nil
+      nags: move.nags # Array of strings (e.g., ["$1", "$201"])
+    }
+  end
 end
 # --- End Helpers ---
 
@@ -91,7 +107,8 @@ get '/game/current_fen' do
   unless game_loaded?
     return json_response({ error: "Game not loaded. Please provide a valid PGN file via PGN_FILE environment variable when starting the server." }, 404)
   end
-  json_response({ fen: current_board_fen, move_index: $current_move_index, total_positions: $game.positions.size })
+  last_move = get_last_move_info($current_move_index)
+  json_response({ fen: current_board_fen, move_index: $current_move_index, total_positions: $game.positions.size, last_move: last_move })
 end
 
 # API endpoint to go to the next move
@@ -102,10 +119,12 @@ post '/game/next_move' do
 
   if $current_move_index < $game.positions.size - 1
     $current_move_index += 1
-    json_response({ fen: current_board_fen, move_index: $current_move_index })
+    last_move = get_last_move_info($current_move_index)
+    json_response({ fen: current_board_fen, move_index: $current_move_index, last_move: last_move })
   else
     # Already at the last move, return current state without error
-    json_response({ fen: current_board_fen, move_index: $current_move_index, message: "Already at the last move." })
+    last_move = get_last_move_info($current_move_index)
+    json_response({ fen: current_board_fen, move_index: $current_move_index, message: "Already at the last move.", last_move: last_move })
   end
 end
 
@@ -117,10 +136,12 @@ post '/game/prev_move' do
 
   if $current_move_index > 0
     $current_move_index -= 1
-    json_response({ fen: current_board_fen, move_index: $current_move_index })
+    last_move = get_last_move_info($current_move_index)
+    json_response({ fen: current_board_fen, move_index: $current_move_index, last_move: last_move })
   else
     # Already at the first move, return current state without error
-    json_response({ fen: current_board_fen, move_index: $current_move_index, message: "Already at the first move." })
+    last_move = get_last_move_info($current_move_index) # Will be nil for index 0
+    json_response({ fen: current_board_fen, move_index: $current_move_index, message: "Already at the first move.", last_move: last_move })
   end
 end
 # --- End Routes ---
