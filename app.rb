@@ -39,7 +39,7 @@ configure do
     puts "Loading PGN file: #{pgn_file_path}"
     begin
       pgn_content = File.read(pgn_file_path)
-      games = Pgn.parse(pgn_content) # Pgn.parse returns an array of games
+      games = PGN.parse(pgn_content)
 
       if games.empty?
         puts "ERROR: No games found in PGN file: #{pgn_file_path}"
