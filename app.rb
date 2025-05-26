@@ -80,7 +80,7 @@ helpers do
     return nil if move_index == 0 || !game_loaded?
 
     position = $game.positions[move_index]
-    move = position.previous_move # This is a Pgn2::Move object
+    move = position.previous_move # This is a PGN::Move object
 
     return nil unless move # Should exist if move_index > 0 and game is loaded
 
