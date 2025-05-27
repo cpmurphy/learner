@@ -22,17 +22,17 @@ document.addEventListener("DOMContentLoaded", () => {
     /**
      * Handles the user's move attempt during a critical moment challenge.
      * This function is passed to `board.enableMoveInput`.
-     * @param {object} event - The event object from cm-chessboard, contains `san`, `squareFrom`, `squareTo`, `piece`.
+     * @param {object} event - The event object from cm-chessboard, contains `squareFrom`, `squareTo`, `piece`.
      * @returns {boolean} - True if the move is allowed (correct), false otherwise.
      */
     async function handleCriticalMoveAttempt(event) {
-        if (event.type !== 'moveInputFinished' || !event.legalMove) {
-            return true;
+        if (event.type !== 'moveInputFinished') {
+            return; // Ignore non-moveInputFinished events
         }
+        
         if (!inCriticalMomentChallenge || !goodMoveSanForChallenge) {
-            // This should ideally not be reached if input is managed correctly
             console.warn("handleCriticalMoveAttempt called inappropriately.");
-            return false; 
+            return false;
         }
 
         let userMoveSan;
@@ -53,7 +53,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // Catch any unexpected errors from SanGenerator instantiation or getSan() itself, though SanGenerator is designed to catch its own errors.
             console.error("Critical Challenge - Error generating SAN using SanGenerator:", e);
             moveInfoDisplay.textContent = "Error processing your move. Try again!";
-            return false; // Reject the move
+            return false;
         }
         
         console.log(`Critical Challenge - User attempted: ${userMoveSan} (derived from ${event.squareFrom}-${event.squareTo}${event.promotionPiece ? "="+event.promotionPiece : ""}), Expected good move: ${goodMoveSanForChallenge}`);
@@ -61,13 +61,13 @@ document.addEventListener("DOMContentLoaded", () => {
         if (userMoveSan === goodMoveSanForChallenge) {
             moveInfoDisplay.textContent = `Correct! "${userMoveSan}" is a better move. Click 'Next Move' to continue the actual game.`;
             board.disableMoveInput();
-            // board.addMarker(MARKER_TYPE.square, event.squareTo); // Optional: highlight the move
-            inCriticalMomentChallenge = false; // Challenge resolved
-            return true; // Allow cm-chessboard to make the move on the board
+            inCriticalMomentChallenge = false;
+            return true;
         } else {
             moveInfoDisplay.textContent = `"${userMoveSan}" is not the best move. Try again!`;
-            // Returning false prevents cm-chessboard from making the move, effectively reverting.
-            return false; 
+            // Force the board to revert to the previous position
+            board.setPosition(fenAtCriticalPrompt, false);
+            return false;
         }
     }
     
@@ -165,7 +165,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 if (setupChallenge) {
                     moveInfoDisplay.textContent = `Critical moment! The game move was ${lastMoveData.san}. That was a poor choice. Try a better move for ${learningSide}.`;
-                    board.enableMoveInput(handleCriticalMoveAttempt, learningSide === 'w' ? 'white' : 'black');
+                    board.enableMoveInput(handleCriticalMoveAttempt, learningSide);
                 } else {
                     // Not a challenge, or challenge conditions not met. Display regular move info.
                     updateMoveInfoDisplay(lastMoveData); // This will also note opponent's blunders
