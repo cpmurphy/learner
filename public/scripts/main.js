@@ -14,7 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const moveInfoDisplay = document.getElementById("move-info-display");
     const learnSideSelect = document.getElementById("learn-side");
 
-    let learningSide = 'white'; // Default, updated by selector
+    let learningSide = learnSideSelect.value || 'white';
     let inCriticalMomentChallenge = false;
     let fenAtCriticalPrompt = null; // FEN before the bad move, for reverting
     let goodMoveSanForChallenge = null; // SAN of the good alternative move
@@ -82,7 +82,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // This function is for displaying the *actual last game move* information,
             // not for critical challenge prompts.
             const lm = lastMoveData;
-            let movePrefix = `${lm.number}${lm.turn === 'w' ? '.' : '...'}`;
+            let movePrefix = `${lm.number}${lm.turn === 'white' ? '.' : '...'}`;
             let displayText = `${movePrefix} ${lm.san}`;
 
             if (lm.comment && lm.comment.trim() !== "") {
