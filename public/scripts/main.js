@@ -148,13 +148,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
             if (data.fen || (data.last_move && data.last_move.fen_before_move) || (url === '/api/load_game' && data.fen)) { // Ensure there's a FEN to display or it's a load_game response with FEN
-                // If we successfully got game data, and it's not a "no more critical moves" message, enable the button.
-                if (nextCriticalButton && board) { // board check ensures a game is loaded
-                    if (!(url === '/game/next_critical_moment' && data.message && data.message.startsWith("No further critical moments found"))) {
-                        nextCriticalButton.disabled = false;
-                    }
-                }
-
                 const lastMoveData = data.last_move;
                 let setupChallenge = false;
 
@@ -171,8 +164,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 const fenToDisplay = setupChallenge ? fenAtCriticalPrompt : data.fen;
 
-                if (!board) {
-                    // Initialize board for the first time
+                if (!board) { // First time board initialization
                     const props = {
                         position: fenToDisplay,
                         assetsUrl: assetsUrl,
@@ -183,35 +175,55 @@ document.addEventListener("DOMContentLoaded", () => {
                     };
                     board = new Chessboard(boardContainer, props);
                     console.log(`Chessboard initialized. FEN: ${fenToDisplay}, Position index: ${data.move_index}, Total positions: ${data.total_positions}`);
-                } else {
-                    // Update existing board
+                    // After initializing board on game load, check if "Next Critical" should be enabled
+                    if (url === '/api/load_game' && nextCriticalButton) {
+                        if (data.has_initial_critical_moment_for_white && learningSide === 'white') {
+                            nextCriticalButton.disabled = false;
+                        } else {
+                            // If learningSide is black, or no critical for white, it remains/becomes disabled.
+                            // A side change to black would re-enable it via its own handler if it finds criticals.
+                            nextCriticalButton.disabled = true; 
+                        }
+                    }
+                } else { // Board already exists, just updating position
                     board.setPosition(fenToDisplay, true); // true for animation
                     console.log(`Board updated. FEN: ${fenToDisplay}, Position index: ${data.move_index}`);
                 }
+
+                // General logic for enabling Next Critical button after any move, unless explicitly told no more.
+                if (nextCriticalButton && board) { 
+                    // If it's a response from next_critical_moment and no more were found, the click handler itself disables it.
+                    // Otherwise, if it's not a game load (which has specific logic above), enable it.
+                    if (url !== '/api/load_game' && !(url === '/game/next_critical_moment' && data.message && data.message.startsWith("No further critical moments found"))) {
+                        nextCriticalButton.disabled = false;
+                    }
+                }
+
 
                 if (setupChallenge) {
                     moveInfoDisplay.textContent = `Critical moment! The game move was ${lastMoveData.san}. That was a poor choice. Try a better move for ${learningSide}.`;
                     board.enableMoveInput(handleCriticalMoveAttempt, learningSide);
                 } else {
-                    // Not a challenge, or challenge conditions not met. Display regular move info.
-                    updateMoveInfoDisplay(lastMoveData); // This will also note opponent's blunders
+                    updateMoveInfoDisplay(lastMoveData); 
                 }
                 
-                if (data.message) { // Log server messages like "Already at last move"
+                if (data.message) { 
                     console.log(`Server message: ${data.message}`);
                 }
 
-            } else if (data.error) {
+            } else if (data.error) { // Handle errors from server (response not ok)
                  console.error("Error from server:", data.error);
-                 if (moveInfoDisplay && data.error.includes("Game not loaded")) {
-                    moveInfoDisplay.textContent = "Error: Game not loaded on server.";
+                 if (moveInfoDisplay) { // Update UI with error
+                    moveInfoDisplay.textContent = data.error || "An unspecified error occurred.";
                  }
+                 if (nextCriticalButton) nextCriticalButton.disabled = true; // Disable on error
             }
-            return data;
-        } catch (error) {
+            return data; // Return data for further processing if needed by caller
+        } catch (error) { // Handle network errors or JSON parsing errors
             console.error(`Network or other error fetching from ${url}:`, error);
-            // Display a more user-friendly error, e.g., in a status bar on the page
-            alert(`Could not connect to the server or an error occurred. Please check the console for details and ensure the backend server is running. Error: ${error.message}`);
+            alert(`Could not connect to the server or an error occurred. Please check the console for details. Error: ${error.message}`);
+            if (moveInfoDisplay) moveInfoDisplay.textContent = "Network error or server unavailable.";
+            if (nextCriticalButton) nextCriticalButton.disabled = true; // Disable on network error
             return null;
         }
     }
@@ -274,12 +286,13 @@ document.addEventListener("DOMContentLoaded", () => {
         // fetchAndUpdateBoard will handle initializing or updating the board
         // and displaying initial move info or "Game start."
         const gameData = await fetchAndUpdateBoard('/api/load_game', 'POST', { pgn_file_id: selectedPgnId });
-        if (gameData && gameData.fen) { // Successfully loaded (even if at start, last_move might be null)
+        if (gameData && gameData.fen) { 
              if (moveInfoDisplay && !gameData.last_move) moveInfoDisplay.textContent = "Game loaded. Ready to start.";
-             // fetchAndUpdateBoard handles enabling nextCriticalButton if board is valid
-        } else if (!gameData) { // Failed to load
+             // The logic within fetchAndUpdateBoard now handles enabling/disabling nextCriticalButton
+             // based on data.has_initial_critical_moment_for_white and current learningSide.
+        } else if (!gameData) { 
             if (moveInfoDisplay) moveInfoDisplay.textContent = "Failed to load game. Check console or select another file.";
-            if (nextCriticalButton) nextCriticalButton.disabled = true;
+            // nextCriticalButton is disabled by fetchAndUpdateBoard in case of error or if board doesn't init
         }
     });
 

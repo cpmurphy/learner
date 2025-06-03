@@ -2,6 +2,7 @@ require 'sinatra'
 require 'pgn'
 require 'json'
 require_relative 'lib/game_editor'
+require_relative 'lib/app_helpers' # Require the new helpers
 
 # --- Global State ---
 $game = nil # Holds the currently loaded PGN game object
@@ -9,7 +10,11 @@ $current_move_index = 0 # Index for the current move in $game
 $available_pgns = [] # Holds {id: string, name: string, path: string} for discovered PGN files
 # --- End Global State ---
 
-# --- Configuration ---
+# --- Helpers ---
+helpers do
+  include AppHelpers # Include methods from AppHelpers module
+
+  def game_loaded?
 configure do
   set :public_folder, File.join(File.dirname(__FILE__), 'public')
   set :bind, '0.0.0.0'
@@ -62,10 +67,6 @@ end
 
 # --- Helpers ---
 helpers do
-  def game_loaded?
-    !$game.nil? && $game.respond_to?(:positions) && !$game.positions.empty?
-  end
-
   def current_board_fen
     return nil unless game_loaded? && $game.positions[$current_move_index]
     $game.positions[$current_move_index].to_fen.to_s
@@ -163,12 +164,18 @@ post '/api/load_game' do
     
     puts "Loaded game from PGN: #{pgn_meta[:name]}. Board positions: #{$game.positions.size}"
     last_move = get_last_move_info($current_move_index) # Will be nil for index 0
+
+    # Check for initial critical moment for White (default learning side on frontend)
+    # Search from the very first move (index 0 of $game.moves)
+    has_initial_critical_for_white = !find_critical_moment_position_index($game.moves, 0, 'white').nil?
+
     json_response({
       fen: current_board_fen,
       move_index: $current_move_index,
       total_positions: $game.positions.size,
       last_move: last_move,
-      message: "Successfully loaded game from #{pgn_meta[:name]}"
+      message: "Successfully loaded game from #{pgn_meta[:name]}",
+      has_initial_critical_moment_for_white: has_initial_critical_for_white
     })
   rescue StandardError => e
     $game = nil # Ensure game is not partially loaded
@@ -237,31 +244,16 @@ post '/game/next_critical_moment' do
     return json_response({ error: "Invalid learning_side parameter. Must be 'white' or 'black'." }, 400)
   end
   
-  found_critical_move_at_new_position_index = nil
-
-  # Iterate through moves starting from the one that would follow the current position.
-  # $current_move_index is the index for $game.positions.
-  # $game.moves[i] leads to $game.positions[i+1].
-  # So, if current position is $current_move_index, the next potential move is $game.moves[$current_move_index].
-  start_move_array_idx = $current_move_index
+  # $current_move_index is the current position index.
+  # If current position is 0 (start), $game.moves[0] is the first move to check.
+  # If current position is N, $game.moves[N] is the next move to check.
+  # So, start_search_from_move_idx is $current_move_index.
+  start_search_from_move_idx = $current_move_index
   
-  (start_move_array_idx...$game.moves.size).each do |move_array_idx|
-    move = $game.moves[move_array_idx]
-    
-    # Determine turn for game.moves[move_array_idx]
-    # move_array_idx 0 is White's 1st move (leading to position 1), 1 is Black's 1st move (leading to position 2), etc.
-    move_turn = (move_array_idx % 2 == 0) ? 'white' : 'black'
+  new_critical_position_index = find_critical_moment_position_index($game.moves, start_search_from_move_idx, learning_side)
 
-    if move_turn == learning_side && move.annotation&.include?('$201')
-      # Found the next critical move for the learning side
-      # The position index corresponding to this move is move_array_idx + 1
-      found_critical_move_at_new_position_index = move_array_idx + 1
-      break
-    end
-  end
-
-  if found_critical_move_at_new_position_index
-    $current_move_index = found_critical_move_at_new_position_index
+  if new_critical_position_index
+    $current_move_index = new_critical_position_index
     last_move = get_last_move_info($current_move_index)
     json_response({
       fen: current_board_fen,
