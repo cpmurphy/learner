@@ -351,6 +351,7 @@ document.addEventListener("DOMContentLoaded", () => {
             fetchAndUpdateBoard('/game/current_fen'); 
         }
         // If a game is loaded, changing learning side should re-enable the next critical button.
+        // The click on the button will then verify if a critical moment exists for the new side.
         if (board && nextCriticalButton) {
             nextCriticalButton.disabled = false;
         }
