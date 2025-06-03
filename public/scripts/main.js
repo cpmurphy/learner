@@ -13,6 +13,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const assetsUrl = "/3rdparty-assets/cm-chessboard/"; // Path to cm-chessboard assets
     const moveInfoDisplay = document.getElementById("move-info-display");
     const learnSideSelect = document.getElementById("learn-side");
+    const pgnFileSelect = document.getElementById("pgn-file-select");
+    const loadPgnButton = document.getElementById("load-pgn-button");
+
 
     let learningSide = learnSideSelect.value || 'white';
     let inCriticalMomentChallenge = false;
@@ -112,23 +115,39 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const options = { method };
             if (body) {
-                // For POST requests, we might send data, though not used in current next/prev
-                // options.headers = { 'Content-Type': 'application/json' };
-                // options.body = JSON.stringify(body);
+                options.headers = { 'Content-Type': 'application/json' };
+                options.body = JSON.stringify(body);
             }
             const response = await fetch(url, options);
             const data = await response.json();
 
             if (!response.ok) {
                 console.error(`Error from server ${url}: ${response.status} ${response.statusText}`, data.error || '');
-                if (data.error && data.error.includes("Game not loaded")) {
-                    alert("Game data is not loaded on the server. Please check server logs and ensure a PGN_FILE environment variable was correctly set when starting the server.");
-                    if (moveInfoDisplay) moveInfoDisplay.textContent = "Error: Game not loaded on server.";
+                const errorMsg = data.error || `Server error ${response.status}. Check console.`;
+                if (moveInfoDisplay) moveInfoDisplay.textContent = `Error: ${errorMsg}`;
+                
+                if (errorMsg.includes("No game loaded")) {
+                     // This is a common case if user clicks next/prev before loading a game.
+                     // Alert is handled by the click handlers for next/prev.
+                     // For other cases, like initial load, it's good to have a message.
+                     if (url === '/game/current_fen' && !board) { // Initial load attempt
+                        moveInfoDisplay.textContent = "Please select a PGN file and load a game.";
+                     }
+                } else if (errorMsg.includes("PGN_DIR environment variable not set") || errorMsg.includes("PGN directory not found")) {
+                    alert("Server PGN directory not configured. Please check server logs.");
+                } else if (url === '/api/load_game') { // Specific error during game load
+                    alert(`Error loading game: ${errorMsg}`);
                 }
                 return null;
             }
+            
+            if (data.message && (url === '/api/load_game' || url === '/game/next_move' || url === '/game/prev_move')) { 
+                console.log(`Server message: ${data.message}`);
+                // Optionally display this message in moveInfoDisplay or a dedicated status area
+            }
 
-            if (data.fen || (data.last_move && data.last_move.fen_before_move)) { // Ensure there's a FEN to display
+
+            if (data.fen || (data.last_move && data.last_move.fen_before_move) || (url === '/api/load_game' && data.fen)) { // Ensure there's a FEN to display or it's a load_game response with FEN
                 const lastMoveData = data.last_move;
                 let setupChallenge = false;
 
@@ -190,31 +209,86 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // Fetch initial board position when the page loads
-    fetchAndUpdateBoard('/game/current_fen');
+    /**
+     * Fetches the list of PGN files and populates the select dropdown.
+     */
+    async function loadPgnFileList() {
+        if (!pgnFileSelect) return;
+        try {
+            const response = await fetch('/api/pgn_files');
+            if (!response.ok) {
+                pgnFileSelect.innerHTML = '<option value="">Error loading PGNs</option>';
+                console.error("Failed to fetch PGN file list:", response.status, response.statusText);
+                alert(`Failed to load PGN file list from server: ${response.statusText}. Check server logs and PGN_DIR configuration.`);
+                if (loadPgnButton) loadPgnButton.disabled = true;
+                return;
+            }
+            const pgnFiles = await response.json();
+            if (pgnFiles.length === 0) {
+                pgnFileSelect.innerHTML = '<option value="">No PGN files found</option>';
+                if (loadPgnButton) loadPgnButton.disabled = true;
+                if (moveInfoDisplay) moveInfoDisplay.textContent = "No PGN files found in the configured directory. Check server PGN_DIR.";
+            } else {
+                pgnFileSelect.innerHTML = '<option value="">-- Select a PGN --</option>'; // Placeholder
+                pgnFiles.forEach(file => {
+                    const option = document.createElement("option");
+                    option.value = file.id;
+                    option.textContent = file.name;
+                    pgnFileSelect.appendChild(option);
+                });
+                if (loadPgnButton) loadPgnButton.disabled = false;
+                if (moveInfoDisplay) moveInfoDisplay.textContent = "Please select a PGN file and load a game.";
+            }
+        } catch (error) {
+            pgnFileSelect.innerHTML = '<option value="">Error loading PGNs</option>';
+            console.error("Error fetching PGN file list:", error);
+            alert(`Error fetching PGN file list: ${error.message}. Is the server running?`);
+            if (loadPgnButton) loadPgnButton.disabled = true;
+        }
+    }
+
+    // Initial setup
+    loadPgnFileList(); // Load PGN files on page load
+    // Board is not initialized until a game is loaded.
+    // Initial message is set within loadPgnFileList or if it fails.
 
     // Event listeners for controls
+    loadPgnButton?.addEventListener("click", async () => {
+        const selectedPgnId = pgnFileSelect.value;
+        if (!selectedPgnId) {
+            alert("Please select a PGN file from the dropdown.");
+            return;
+        }
+        console.log(`Loading game from PGN ID: ${selectedPgnId}`);
+        // fetchAndUpdateBoard will handle initializing or updating the board
+        // and displaying initial move info or "Game start."
+        const gameData = await fetchAndUpdateBoard('/api/load_game', 'POST', { pgn_file_id: selectedPgnId });
+        if (gameData && !gameData.last_move && gameData.fen) { // Successfully loaded, at start of game
+             if (moveInfoDisplay) moveInfoDisplay.textContent = "Game loaded. Ready to start.";
+        } else if (!gameData) {
+            if (moveInfoDisplay) moveInfoDisplay.textContent = "Failed to load game. Check console or select another file.";
+        }
+    });
+
     document.getElementById("prev-move")?.addEventListener("click", async () => {
         console.log("Previous move clicked");
-        if (board) { // Ensure board is initialized
+        if (board) {
             await fetchAndUpdateBoard('/game/prev_move', 'POST');
         } else {
-            console.warn("Board not initialized yet. Cannot go to previous move.");
-            alert("Chessboard is not yet loaded. Please wait or check server status.");
+            alert("Please load a game first using the 'Load First Game' button.");
         }
     });
 
     document.getElementById("next-move")?.addEventListener("click", async () => {
         console.log("Next move clicked");
-        if (board) { // Ensure board is initialized
+        if (board) {
             await fetchAndUpdateBoard('/game/next_move', 'POST');
         } else {
-            console.warn("Board not initialized yet. Cannot go to next move.");
-            alert("Chessboard is not yet loaded. Please wait or check server status.");
+            alert("Please load a game first using the 'Load First Game' button.");
         }
     });
 
-    // Placeholder event listeners for other controls (unchanged)
+    // Placeholder event listeners for other controls
     document.getElementById("next-critical")?.addEventListener("click", () => {
         console.log("Next critical moment clicked");
         // TODO: Implement logic for jumping to the next critical move.

@@ -4,67 +4,66 @@ require 'json'
 require_relative 'lib/game_editor'
 
 # --- Global State ---
-# For simplicity in this skeleton, we use global variables.
-# In a more complex app, consider sessions, databases, or other state management.
-$game = nil
-$current_move_index = 0
+$game = nil # Holds the currently loaded PGN game object
+$current_move_index = 0 # Index for the current move in $game
+$available_pgns = [] # Holds {id: string, name: string, path: string} for discovered PGN files
 # --- End Global State ---
 
 # --- Configuration ---
-# This block runs once when Sinatra starts.
 configure do
-  # Set the directory for static files (HTML, CSS, JS)
   set :public_folder, File.join(File.dirname(__FILE__), 'public')
-  # Bind to all network interfaces, useful for Docker or VMs
   set :bind, '0.0.0.0'
-  # Port will be determined by the server (Puma/Rackup), typically 9292 or 4567 if specified.
 
-  pgn_file_path = ENV['PGN_FILE']
+  pgn_dir_path = ENV['PGN_DIR']
 
-  if pgn_file_path.nil? || pgn_file_path.empty?
+  if pgn_dir_path.nil? || pgn_dir_path.empty?
     puts "---------------------------------------------------------------------------------------"
-    puts "ERROR: PGN_FILE environment variable not set."
-    puts "Please provide the path to a PGN file to load."
-    puts "Example: PGN_FILE=test/data/threadwell-2025-05-26-01.pgn bundle exec puma config.ru"
+    puts "ERROR: PGN_DIR environment variable not set."
+    puts "Please provide the path to a directory containing PGN files."
+    puts "Example: PGN_DIR=./test/data bundle exec puma config.ru"
+    puts "The application will start, but game functionality will be disabled until a PGN is loaded via API."
+    puts "---------------------------------------------------------------------------------------"
+  elsif !Dir.exist?(pgn_dir_path)
+    puts "---------------------------------------------------------------------------------------"
+    puts "ERROR: PGN directory not found at path: #{pgn_dir_path}"
+    puts "Please ensure the PGN_DIR environment variable points to an existing directory."
     puts "The application will start, but game functionality will be disabled."
     puts "---------------------------------------------------------------------------------------"
-    $game = nil
-  elsif !File.exist?(pgn_file_path)
-    puts "---------------------------------------------------------------------------------------"
-    puts "ERROR: PGN file not found at path: #{pgn_file_path}"
-    puts "Please ensure the PGN_FILE environment variable points to an existing file."
-    puts "The application will start, but game functionality will be disabled."
-    puts "---------------------------------------------------------------------------------------"
-    $game = nil
   else
-    puts "Loading PGN file: #{pgn_file_path}"
-    begin
-      pgn_content = File.read(pgn_file_path)
-      games = PGN.parse(pgn_content)
-
-      if games.empty?
-        puts "ERROR: No games found in PGN file: #{pgn_file_path}"
-        $game = nil
-      else
-        $game = games.first # We'll use the first game found in the PGN
-        GameEditor.shift_critical_annotations($game) # Use the refactored method
-        $current_move_index = 0 # Start at the beginning of the game
-        puts "Game loaded successfully. Board positions available: #{$game.positions.size}"
+    puts "Scanning PGN directory: #{pgn_dir_path}"
+    pgn_files = Dir.glob(File.join(pgn_dir_path, '*.pgn'))
+    if pgn_files.empty?
+      puts "No PGN files found in #{pgn_dir_path}."
+    else
+      pgn_files.each_with_index do |file_path, index|
+        filename = File.basename(file_path)
+        # Ensure path is absolute and normalized for security/consistency
+        abs_path = File.expand_path(file_path)
+        # Basic check to ensure the file is within the intended PGN_DIR
+        # This is a simple check; more robust sandboxing might be needed for untrusted PGN_DIR values
+        if abs_path.start_with?(File.expand_path(pgn_dir_path))
+          $available_pgns << {
+            id: index.to_s, # Use index as a simple, safe ID
+            name: filename,
+            path: abs_path 
+          }
+        else
+          puts "WARNING: File #{file_path} is outside the PGN_DIR and will be ignored."
+        end
       end
-    rescue StandardError => e
-      puts "ERROR: Could not parse PGN file: #{pgn_file_path}."
-      puts "Details: #{e.message}"
-      puts e.backtrace.join("\n")
-      $game = nil
+      puts "Found #{$available_pgns.size} PGN files. Ready for selection via API."
     end
   end
+  # No game is loaded by default on startup
+  $game = nil
+  $current_move_index = 0
 end
 # --- End Configuration ---
 
 # --- Helpers ---
 helpers do
   def game_loaded?
-    !$game.nil? && !$game.positions.empty?
+    !$game.nil? && $game.respond_to?(:positions) && !$game.positions.empty?
   end
 
   def current_board_fen
@@ -121,19 +120,78 @@ get '/' do
   send_file File.join(settings.public_folder, 'index.html')
 end
 
-# API endpoint to get the current FEN
+# API endpoint to list available PGN files
+get '/api/pgn_files' do
+  # Return only id and name, not the full path, for security and simplicity
+  files_for_client = $available_pgns.map { |pgn_meta| { id: pgn_meta[:id], name: pgn_meta[:name] } }
+  json_response(files_for_client)
+end
+
+# API endpoint to load the first game from a selected PGN file
+post '/api/load_game' do
+  begin
+    params = JSON.parse(request.body.read)
+  rescue JSON::ParserError
+    return json_response({ error: "Invalid JSON in request body" }, 400)
+  end
+  
+  pgn_file_id = params['pgn_file_id']
+
+  unless pgn_file_id
+    return json_response({ error: "Missing pgn_file_id parameter" }, 400)
+  end
+
+  pgn_meta = $available_pgns.find { |p| p[:id] == pgn_file_id }
+
+  unless pgn_meta
+    return json_response({ error: "PGN file not found for ID: #{pgn_file_id}" }, 404)
+  end
+
+  begin
+    pgn_content = File.read(pgn_meta[:path])
+    games_in_file = PGN.parse(pgn_content)
+
+    if games_in_file.empty?
+      $game = nil # Unload any previously loaded game
+      $current_move_index = 0
+      return json_response({ error: "No games found in PGN file: #{pgn_meta[:name]}" }, 400)
+    end
+
+    $game = games_in_file.first # Load the first game
+    GameEditor.shift_critical_annotations($game)
+    $current_move_index = 0
+    
+    puts "Loaded game from PGN: #{pgn_meta[:name]}. Board positions: #{$game.positions.size}"
+    last_move = get_last_move_info($current_move_index) # Will be nil for index 0
+    json_response({
+      fen: current_board_fen,
+      move_index: $current_move_index,
+      total_positions: $game.positions.size,
+      last_move: last_move,
+      message: "Successfully loaded game from #{pgn_meta[:name]}"
+    })
+  rescue StandardError => e
+    $game = nil # Ensure game is not partially loaded
+    $current_move_index = 0
+    puts "ERROR: Could not parse PGN file: #{pgn_meta[:path]}."
+    puts "Details: #{e.message}"
+    json_response({ error: "Could not parse PGN file: #{pgn_meta[:name]}. Details: #{e.message}" }, 500)
+  end
+end
+
+# API endpoint to get the current FEN of the loaded game
 get '/game/current_fen' do
   unless game_loaded?
-    return json_response({ error: "Game not loaded. Please provide a valid PGN file via PGN_FILE environment variable when starting the server." }, 404)
+    return json_response({ error: "No game loaded. Please select a PGN file and load a game." }, 404)
   end
   last_move = get_last_move_info($current_move_index)
   json_response({ fen: current_board_fen, move_index: $current_move_index, total_positions: $game.positions.size, last_move: last_move })
 end
 
-# API endpoint to go to the next move
+# API endpoint to go to the next move of the loaded game
 post '/game/next_move' do
   unless game_loaded?
-    return json_response({ error: "Game not loaded." }, 404)
+    return json_response({ error: "No game loaded. Please select a PGN file and load a game." }, 404)
   end
 
   if $current_move_index < $game.positions.size - 1
@@ -141,16 +199,15 @@ post '/game/next_move' do
     last_move = get_last_move_info($current_move_index)
     json_response({ fen: current_board_fen, move_index: $current_move_index, last_move: last_move })
   else
-    # Already at the last move, return current state without error
     last_move = get_last_move_info($current_move_index)
     json_response({ fen: current_board_fen, move_index: $current_move_index, message: "Already at the last move.", last_move: last_move })
   end
 end
 
-# API endpoint to go to the previous move
+# API endpoint to go to the previous move of the loaded game
 post '/game/prev_move' do
   unless game_loaded?
-    return json_response({ error: "Game not loaded." }, 404)
+    return json_response({ error: "No game loaded. Please select a PGN file and load a game." }, 404)
   end
 
   if $current_move_index > 0
@@ -158,7 +215,6 @@ post '/game/prev_move' do
     last_move = get_last_move_info($current_move_index)
     json_response({ fen: current_board_fen, move_index: $current_move_index, last_move: last_move })
   else
-    # Already at the first move, return current state without error
     last_move = get_last_move_info($current_move_index) # Will be nil for index 0
     json_response({ fen: current_board_fen, move_index: $current_move_index, message: "Already at the first move.", last_move: last_move })
   end

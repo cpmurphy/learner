@@ -9,7 +9,16 @@
 </head>
 <body>
     <h1>Chess Learn Tool</h1>
-    <div id="chessboard-container" style="width: 400px; max-width: 100vw;">
+
+    <div class="pgn-selection controls">
+        <label for="pgn-file-select">Select PGN File:</label>
+        <select id="pgn-file-select">
+            <option value="">-- Loading PGNs --</option>
+        </select>
+        <button id="load-pgn-button">Load First Game</button>
+    </div>
+
+    <div id="chessboard-container" style="width: 400px; max-width: 100vw; margin-top: 10px;">
         <!-- Chessboard will be rendered here by cm-chessboard -->
     </div>
     <div class="controls">
