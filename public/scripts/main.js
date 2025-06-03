@@ -15,6 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const learnSideSelect = document.getElementById("learn-side");
     const pgnFileSelect = document.getElementById("pgn-file-select");
     const loadPgnButton = document.getElementById("load-pgn-button");
+    const nextCriticalButton = document.getElementById("next-critical");
 
 
     let learningSide = learnSideSelect.value || 'white';
@@ -127,27 +128,33 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (moveInfoDisplay) moveInfoDisplay.textContent = `Error: ${errorMsg}`;
                 
                 if (errorMsg.includes("No game loaded")) {
-                     // This is a common case if user clicks next/prev before loading a game.
-                     // Alert is handled by the click handlers for next/prev.
-                     // For other cases, like initial load, it's good to have a message.
-                     if (url === '/game/current_fen' && !board) { // Initial load attempt
+                     if (url === '/game/current_fen' && !board) { 
                         moveInfoDisplay.textContent = "Please select a PGN file and load a game.";
                      }
+                     if (nextCriticalButton) nextCriticalButton.disabled = true;
                 } else if (errorMsg.includes("PGN_DIR environment variable not set") || errorMsg.includes("PGN directory not found")) {
                     alert("Server PGN directory not configured. Please check server logs.");
-                } else if (url === '/api/load_game') { // Specific error during game load
+                    if (nextCriticalButton) nextCriticalButton.disabled = true;
+                } else if (url === '/api/load_game') { 
                     alert(`Error loading game: ${errorMsg}`);
+                    if (nextCriticalButton) nextCriticalButton.disabled = true;
                 }
                 return null;
             }
             
-            if (data.message && (url === '/api/load_game' || url === '/game/next_move' || url === '/game/prev_move')) { 
+            if (data.message && (url === '/api/load_game' || url === '/game/next_move' || url === '/game/prev_move' || url === '/game/next_critical_moment')) { 
                 console.log(`Server message: ${data.message}`);
-                // Optionally display this message in moveInfoDisplay or a dedicated status area
             }
 
 
             if (data.fen || (data.last_move && data.last_move.fen_before_move) || (url === '/api/load_game' && data.fen)) { // Ensure there's a FEN to display or it's a load_game response with FEN
+                // If we successfully got game data, and it's not a "no more critical moves" message, enable the button.
+                if (nextCriticalButton && board) { // board check ensures a game is loaded
+                    if (!(url === '/game/next_critical_moment' && data.message && data.message.startsWith("No further critical moments found"))) {
+                        nextCriticalButton.disabled = false;
+                    }
+                }
+
                 const lastMoveData = data.last_move;
                 let setupChallenge = false;
 
@@ -221,12 +228,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 console.error("Failed to fetch PGN file list:", response.status, response.statusText);
                 alert(`Failed to load PGN file list from server: ${response.statusText}. Check server logs and PGN_DIR configuration.`);
                 if (loadPgnButton) loadPgnButton.disabled = true;
+                if (nextCriticalButton) nextCriticalButton.disabled = true;
                 return;
             }
             const pgnFiles = await response.json();
             if (pgnFiles.length === 0) {
                 pgnFileSelect.innerHTML = '<option value="">No PGN files found</option>';
                 if (loadPgnButton) loadPgnButton.disabled = true;
+                if (nextCriticalButton) nextCriticalButton.disabled = true;
                 if (moveInfoDisplay) moveInfoDisplay.textContent = "No PGN files found in the configured directory. Check server PGN_DIR.";
             } else {
                 pgnFileSelect.innerHTML = '<option value="">-- Select a PGN --</option>'; // Placeholder
@@ -244,10 +253,12 @@ document.addEventListener("DOMContentLoaded", () => {
             console.error("Error fetching PGN file list:", error);
             alert(`Error fetching PGN file list: ${error.message}. Is the server running?`);
             if (loadPgnButton) loadPgnButton.disabled = true;
+            if (nextCriticalButton) nextCriticalButton.disabled = true;
         }
     }
 
     // Initial setup
+    if (nextCriticalButton) nextCriticalButton.disabled = true; // Initially disabled
     loadPgnFileList(); // Load PGN files on page load
     // Board is not initialized until a game is loaded.
     // Initial message is set within loadPgnFileList or if it fails.
@@ -263,10 +274,12 @@ document.addEventListener("DOMContentLoaded", () => {
         // fetchAndUpdateBoard will handle initializing or updating the board
         // and displaying initial move info or "Game start."
         const gameData = await fetchAndUpdateBoard('/api/load_game', 'POST', { pgn_file_id: selectedPgnId });
-        if (gameData && !gameData.last_move && gameData.fen) { // Successfully loaded, at start of game
-             if (moveInfoDisplay) moveInfoDisplay.textContent = "Game loaded. Ready to start.";
-        } else if (!gameData) {
+        if (gameData && gameData.fen) { // Successfully loaded (even if at start, last_move might be null)
+             if (moveInfoDisplay && !gameData.last_move) moveInfoDisplay.textContent = "Game loaded. Ready to start.";
+             // fetchAndUpdateBoard handles enabling nextCriticalButton if board is valid
+        } else if (!gameData) { // Failed to load
             if (moveInfoDisplay) moveInfoDisplay.textContent = "Failed to load game. Check console or select another file.";
+            if (nextCriticalButton) nextCriticalButton.disabled = true;
         }
     });
 
@@ -288,26 +301,45 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Placeholder event listeners for other controls
-    document.getElementById("next-critical")?.addEventListener("click", () => {
+    // Event listener for "Next Critical Moment" button
+    nextCriticalButton?.addEventListener("click", async () => {
         console.log("Next critical moment clicked");
-        // TODO: Implement logic for jumping to the next critical move.
-        // This would involve a new backend endpoint or modifying existing ones.
+        if (!board) { // Check if a game is loaded
+            alert("Please load a game first using the 'Load First Game' button.");
+            return;
+        }
+        if (!learningSide) {
+            console.error("Learning side not selected.");
+            alert("Error: Learning side not selected.");
+            return;
+        }
+
+        const responseData = await fetchAndUpdateBoard('/game/next_critical_moment', 'POST', { learning_side: learningSide });
+
+        if (responseData) {
+            if (responseData.message && responseData.message.startsWith("No further critical moments found")) {
+                alert(responseData.message); // Inform the user
+                if (nextCriticalButton) nextCriticalButton.disabled = true; // Disable the button
+            }
+            // If a critical moment was found, fetchAndUpdateBoard handled the UI update.
+            // The general enabling logic in fetchAndUpdateBoard ensures it's enabled if the board is valid
+            // and it wasn't a "no more critical" response.
+        }
+        // If responseData is null, fetchAndUpdateBoard already handled error display and button state.
     });
 
     learnSideSelect?.addEventListener("change", (event) => {
         learningSide = event.target.value;
         console.log("Learning side changed to:", learningSide);
-        // If currently in a challenge, changing sides might be complex.
-        // For now, this change will apply to the next critical moment encountered.
-        // If a board is loaded and in a challenge, ideally, we might want to reset the challenge or re-evaluate.
-        // Simplest: if inCriticalMomentChallenge, changing side cancels it.
         if (inCriticalMomentChallenge) {
             console.log("Learning side changed during a critical challenge. Challenge cancelled.");
             inCriticalMomentChallenge = false;
-            board.disableMoveInput();
-            // Re-fetch current game state to display normally without challenge
+            if (board) board.disableMoveInput();
             fetchAndUpdateBoard('/game/current_fen'); 
+        }
+        // If a game is loaded, changing learning side should re-enable the next critical button.
+        if (board && nextCriticalButton) {
+            nextCriticalButton.disabled = false;
         }
     });
 });

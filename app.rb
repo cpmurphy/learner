@@ -219,4 +219,68 @@ post '/game/prev_move' do
     json_response({ fen: current_board_fen, move_index: $current_move_index, message: "Already at the first move.", last_move: last_move })
   end
 end
+
+# API endpoint to go to the next critical move for the learning side
+post '/game/next_critical_moment' do
+  unless game_loaded?
+    return json_response({ error: "No game loaded. Please select a PGN file and load a game." }, 404)
+  end
+
+  begin
+    params = JSON.parse(request.body.read)
+    learning_side = params['learning_side'] # 'white' or 'black'
+  rescue JSON::ParserError
+    return json_response({ error: "Invalid JSON in request body" }, 400)
+  end
+
+  unless ['white', 'black'].include?(learning_side)
+    return json_response({ error: "Invalid learning_side parameter. Must be 'white' or 'black'." }, 400)
+  end
+  
+  found_critical_move_at_new_position_index = nil
+
+  # Iterate through moves starting from the one that would follow the current position.
+  # $current_move_index is the index for $game.positions.
+  # $game.moves[i] leads to $game.positions[i+1].
+  # So, if current position is $current_move_index, the next potential move is $game.moves[$current_move_index].
+  start_move_array_idx = $current_move_index
+  
+  (start_move_array_idx...$game.moves.size).each do |move_array_idx|
+    move = $game.moves[move_array_idx]
+    
+    # Determine turn for game.moves[move_array_idx]
+    # move_array_idx 0 is White's 1st move (leading to position 1), 1 is Black's 1st move (leading to position 2), etc.
+    move_turn = (move_array_idx % 2 == 0) ? 'white' : 'black'
+
+    if move_turn == learning_side && move.annotation&.include?('$201')
+      # Found the next critical move for the learning side
+      # The position index corresponding to this move is move_array_idx + 1
+      found_critical_move_at_new_position_index = move_array_idx + 1
+      break
+    end
+  end
+
+  if found_critical_move_at_new_position_index
+    $current_move_index = found_critical_move_at_new_position_index
+    last_move = get_last_move_info($current_move_index)
+    json_response({
+      fen: current_board_fen,
+      move_index: $current_move_index,
+      total_positions: $game.positions.size,
+      last_move: last_move,
+      message: "Jumped to next critical moment for #{learning_side}."
+    })
+  else
+    # No more critical moves found for this side from the current position
+    # Return current state but with a message; $current_move_index is unchanged.
+    last_move = get_last_move_info($current_move_index) 
+    json_response({
+      fen: current_board_fen, 
+      move_index: $current_move_index, 
+      total_positions: $game.positions.size,
+      last_move: last_move,
+      message: "No further critical moments found for #{learning_side} from this point."
+    }, 200) # HTTP 200 OK, but with a specific message in the payload
+  end
+end
 # --- End Routes ---
