@@ -10,11 +10,7 @@ $current_move_index = 0 # Index for the current move in $game
 $available_pgns = [] # Holds {id: string, name: string, path: string} for discovered PGN files
 # --- End Global State ---
 
-# --- Helpers ---
-helpers do
-  include AppHelpers # Include methods from AppHelpers module
-
-  def game_loaded?
+# --- Configuration ---
 configure do
   set :public_folder, File.join(File.dirname(__FILE__), 'public')
   set :bind, '0.0.0.0'
@@ -67,6 +63,11 @@ end
 
 # --- Helpers ---
 helpers do
+  include AppHelpers # Include methods from AppHelpers module
+
+  def game_loaded?
+    !$game.nil? && $game.respond_to?(:positions) && !$game.positions.empty?
+  end
   def current_board_fen
     return nil unless game_loaded? && $game.positions[$current_move_index]
     $game.positions[$current_move_index].to_fen.to_s
