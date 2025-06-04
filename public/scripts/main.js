@@ -180,23 +180,30 @@ document.addEventListener("DOMContentLoaded", () => {
                         if (data.has_initial_critical_moment_for_white && learningSide === 'white') {
                             nextCriticalButton.disabled = false;
                         } else {
-                            // If learningSide is black, or no critical for white, it remains/becomes disabled.
-                            // A side change to black would re-enable it via its own handler if it finds criticals.
                             nextCriticalButton.disabled = true; 
                         }
                     }
+                    // Enable prev/next buttons now that a game is loaded
+                    if (prevMoveButton) prevMoveButton.disabled = false;
+                    if (nextMoveButton) nextMoveButton.disabled = false;
+
                 } else { // Board already exists, just updating position
                     board.setPosition(fenToDisplay, true); // true for animation
                     console.log(`Board updated. FEN: ${fenToDisplay}, Position index: ${data.move_index}`);
                 }
 
                 // General logic for enabling Next Critical button after any move, unless explicitly told no more.
-                if (nextCriticalButton && board) { 
-                    // If it's a response from next_critical_moment and no more were found, the click handler itself disables it.
-                    // Otherwise, if it's not a game load (which has specific logic above), enable it.
-                    if (url !== '/api/load_game' && !(url === '/game/next_critical_moment' && data.message && data.message.startsWith("No further critical moments found"))) {
+                if (nextCriticalButton && board) {
+                    if (url === '/game/next_critical_moment' && data.message && data.message.startsWith("No further critical moments found")) {
+                        // This case is handled by the click handler itself to disable the button.
+                    } else if (url !== '/api/load_game') { 
                         nextCriticalButton.disabled = false;
                     }
+                }
+                // Ensure prev/next buttons are enabled if board exists and it's not an error case
+                if (board) {
+                    if (prevMoveButton) prevMoveButton.disabled = false;
+                    if (nextMoveButton) nextMoveButton.disabled = false;
                 }
 
 
@@ -213,17 +220,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
             } else if (data.error) { // Handle errors from server (response not ok)
                  console.error("Error from server:", data.error);
-                 if (moveInfoDisplay) { // Update UI with error
+                 if (moveInfoDisplay) { 
                     moveInfoDisplay.textContent = data.error || "An unspecified error occurred.";
                  }
-                 if (nextCriticalButton) nextCriticalButton.disabled = true; // Disable on error
+                 if (nextCriticalButton) nextCriticalButton.disabled = true;
+                 if (prevMoveButton) prevMoveButton.disabled = true;
+                 if (nextMoveButton) nextMoveButton.disabled = true;
             }
-            return data; // Return data for further processing if needed by caller
-        } catch (error) { // Handle network errors or JSON parsing errors
+            return data; 
+        } catch (error) { 
             console.error(`Network or other error fetching from ${url}:`, error);
             alert(`Could not connect to the server or an error occurred. Please check the console for details. Error: ${error.message}`);
             if (moveInfoDisplay) moveInfoDisplay.textContent = "Network error or server unavailable.";
-            if (nextCriticalButton) nextCriticalButton.disabled = true; // Disable on network error
+            if (nextCriticalButton) nextCriticalButton.disabled = true;
+            if (prevMoveButton) prevMoveButton.disabled = true;
+            if (nextMoveButton) nextMoveButton.disabled = true;
             return null;
         }
     }
@@ -271,11 +282,37 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Initial setup
     if (nextCriticalButton) nextCriticalButton.disabled = true; // Initially disabled
+    const prevMoveButton = document.getElementById("prev-move");
+    const nextMoveButton = document.getElementById("next-move");
+
+    if (prevMoveButton) prevMoveButton.disabled = true;
+    if (nextMoveButton) nextMoveButton.disabled = true;
+    
     loadPgnFileList(); // Load PGN files on page load
     // Board is not initialized until a game is loaded.
     // Initial message is set within loadPgnFileList or if it fails.
 
     // Event listeners for controls
+    pgnFileSelect?.addEventListener("change", () => {
+        if (board) {
+            board.destroy();
+            board = null;
+        }
+        if (moveInfoDisplay) {
+            if (pgnFileSelect.value) {
+                moveInfoDisplay.textContent = "PGN file selected. Click 'Load First Game' to load.";
+            } else {
+                moveInfoDisplay.textContent = "Please select a PGN file and load a game.";
+            }
+        }
+        // Disable navigation buttons as no game is actively loaded into the board
+        if (nextCriticalButton) nextCriticalButton.disabled = true;
+        if (prevMoveButton) prevMoveButton.disabled = true;
+        if (nextMoveButton) nextMoveButton.disabled = true;
+        // loadPgnButton should be enabled if a file is selected, disabled if "-- Select a PGN --" is chosen
+        if (loadPgnButton) loadPgnButton.disabled = !pgnFileSelect.value; 
+    });
+
     loadPgnButton?.addEventListener("click", async () => {
         const selectedPgnId = pgnFileSelect.value;
         if (!selectedPgnId) {
