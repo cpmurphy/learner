@@ -1,4 +1,4 @@
-import { Chessboard } from "./3rdparty/cm-chessboard/Chessboard.js";
+import { Chessboard, COLOR } from "./3rdparty/cm-chessboard/Chessboard.js";
 import { SanGenerator } from './san_generator.js';
 // We no longer need to import FEN directly as the backend will provide it.
 
@@ -182,16 +182,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 const fenToDisplay = setupChallenge ? fenAtCriticalPrompt : data.fen;
 
                 if (!board) { // First time board initialization
+                    const initialOrientation = learningSide === 'white' ? COLOR.white : COLOR.black;
                     const props = {
                         position: fenToDisplay,
                         assetsUrl: assetsUrl,
                         style: {
                             moveFromMarker: undefined, // Optional: clear markers
                             moveToMarker: undefined,   // Optional: clear markers
-                        }
+                        },
+                        orientation: initialOrientation
                     };
                     board = new Chessboard(boardContainer, props);
-                    console.log(`Chessboard initialized. FEN: ${fenToDisplay}, Position index: ${data.move_index}, Total positions: ${data.total_positions}`);
+                    console.log(`Chessboard initialized. FEN: ${fenToDisplay}, Position index: ${data.move_index}, Total positions: ${data.total_positions}, Orientation: ${learningSide}`);
                     // After initializing board on game load, check if "Next Critical" should be enabled
                     if (url === '/api/load_game' && nextCriticalButton) {
                         if (data.has_initial_critical_moment_for_white && learningSide === 'white') {
@@ -431,6 +433,12 @@ document.addEventListener("DOMContentLoaded", () => {
         // The click on the button will then verify if a critical moment exists for the new side.
         if (board && nextCriticalButton) {
             nextCriticalButton.disabled = false;
+        }
+        // Flip board orientation if board exists
+        if (board) {
+            const newOrientation = learningSide === 'white' ? COLOR.white : COLOR.black;
+            board.setOrientation(newOrientation, true); // true for animation
+            console.log("Board orientation changed to:", learningSide);
         }
     });
 });
