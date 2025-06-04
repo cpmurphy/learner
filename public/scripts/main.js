@@ -16,6 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const pgnFileSelect = document.getElementById("pgn-file-select");
     const loadPgnButton = document.getElementById("load-pgn-button");
     const nextCriticalButton = document.getElementById("next-critical");
+    const playerNamesDisplay = document.getElementById("player-names-display");
 
 
     let learningSide = learnSideSelect.value || 'white';
@@ -126,6 +127,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 console.error(`Error from server ${url}: ${response.status} ${response.statusText}`, data.error || '');
                 const errorMsg = data.error || `Server error ${response.status}. Check console.`;
                 if (moveInfoDisplay) moveInfoDisplay.textContent = `Error: ${errorMsg}`;
+                if (playerNamesDisplay) playerNamesDisplay.textContent = ""; // Clear player names on error
                 
                 if (errorMsg.includes("No game loaded")) {
                      if (url === '/game/current_fen' && !board) { 
@@ -144,6 +146,15 @@ document.addEventListener("DOMContentLoaded", () => {
             
             if (data.message && (url === '/api/load_game' || url === '/game/next_move' || url === '/game/prev_move' || url === '/game/next_critical_moment')) { 
                 console.log(`Server message: ${data.message}`);
+            }
+
+            if (playerNamesDisplay && data.white_player && data.black_player) {
+                playerNamesDisplay.textContent = `${data.white_player} vs ${data.black_player}`;
+            } else if (playerNamesDisplay) {
+                // Clear if names are not in data, e.g. before game load or if API doesn't send them
+                // playerNamesDisplay.textContent = ""; 
+                // Decided to only clear on explicit error or no game loaded scenarios.
+                // If a game is loaded, names should persist.
             }
 
 
@@ -223,6 +234,7 @@ document.addEventListener("DOMContentLoaded", () => {
                  if (moveInfoDisplay) { 
                     moveInfoDisplay.textContent = data.error || "An unspecified error occurred.";
                  }
+                 if (playerNamesDisplay) playerNamesDisplay.textContent = ""; // Clear player names on error
                  if (nextCriticalButton) nextCriticalButton.disabled = true;
                  if (prevMoveButton) prevMoveButton.disabled = true;
                  if (nextMoveButton) nextMoveButton.disabled = true;
@@ -232,6 +244,7 @@ document.addEventListener("DOMContentLoaded", () => {
             console.error(`Network or other error fetching from ${url}:`, error);
             alert(`Could not connect to the server or an error occurred. Please check the console for details. Error: ${error.message}`);
             if (moveInfoDisplay) moveInfoDisplay.textContent = "Network error or server unavailable.";
+            if (playerNamesDisplay) playerNamesDisplay.textContent = ""; // Clear player names on network error
             if (nextCriticalButton) nextCriticalButton.disabled = true;
             if (prevMoveButton) prevMoveButton.disabled = true;
             if (nextMoveButton) nextMoveButton.disabled = true;
@@ -301,6 +314,7 @@ document.addEventListener("DOMContentLoaded", () => {
             board.destroy();
             board = null;
         }
+        if (playerNamesDisplay) playerNamesDisplay.textContent = ""; // Clear player names when PGN selection changes
 
         const selectedOption = pgnFileSelect.options[pgnFileSelect.selectedIndex];
         const pgnFileId = selectedOption.value;

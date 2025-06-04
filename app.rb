@@ -182,13 +182,18 @@ post '/api/load_game' do
     # Search from the very first move (index 0 of $game.moves)
     has_initial_critical_for_white = !find_critical_moment_position_index($game.moves, 0, 'white').nil?
 
+    white_player = $game.tags["White"] || "Unknown White"
+    black_player = $game.tags["Black"] || "Unknown Black"
+
     json_response({
       fen: current_board_fen,
       move_index: $current_move_index,
       total_positions: $game.positions.size,
       last_move: last_move,
       message: "Successfully loaded game from #{pgn_meta[:name]}",
-      has_initial_critical_moment_for_white: has_initial_critical_for_white
+      has_initial_critical_moment_for_white: has_initial_critical_for_white,
+      white_player: white_player,
+      black_player: black_player
     })
   rescue StandardError => e
     $game = nil # Ensure game is not partially loaded
@@ -205,7 +210,16 @@ get '/game/current_fen' do
     return json_response({ error: "No game loaded. Please select a PGN file and load a game." }, 404)
   end
   last_move = get_last_move_info($current_move_index)
-  json_response({ fen: current_board_fen, move_index: $current_move_index, total_positions: $game.positions.size, last_move: last_move })
+  white_player = $game.tags["White"] || "Unknown White"
+  black_player = $game.tags["Black"] || "Unknown Black"
+  json_response({
+    fen: current_board_fen,
+    move_index: $current_move_index,
+    total_positions: $game.positions.size,
+    last_move: last_move,
+    white_player: white_player,
+    black_player: black_player
+  })
 end
 
 # API endpoint to go to the next move of the loaded game
