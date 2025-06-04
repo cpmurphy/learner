@@ -43,10 +43,20 @@ configure do
         # Basic check to ensure the file is within the intended PGN_DIR
         # This is a simple check; more robust sandboxing might be needed for untrusted PGN_DIR values
         if abs_path.start_with?(File.expand_path(pgn_dir_path))
+          game_count = 0
+          begin
+            pgn_content_for_count = File.read(abs_path)
+            games_in_file = PGN.parse(pgn_content_for_count)
+            game_count = games_in_file.size
+          rescue StandardError => e
+            puts "WARNING: Could not parse PGN file #{filename} to count games. Error: #{e.message}. Assuming 0 games."
+            game_count = 0 # Or handle as an error indicator if preferred
+          end
           $available_pgns << {
             id: index.to_s, # Use index as a simple, safe ID
             name: filename,
-            path: abs_path 
+            path: abs_path,
+            game_count: game_count
           }
         else
           puts "WARNING: File #{file_path} is outside the PGN_DIR and will be ignored."
@@ -124,8 +134,10 @@ end
 
 # API endpoint to list available PGN files
 get '/api/pgn_files' do
-  # Return only id and name, not the full path, for security and simplicity
-  files_for_client = $available_pgns.map { |pgn_meta| { id: pgn_meta[:id], name: pgn_meta[:name] } }
+  # Return id, name, and game_count
+  files_for_client = $available_pgns.map do |pgn_meta|
+    { id: pgn_meta[:id], name: pgn_meta[:name], game_count: pgn_meta[:game_count] }
+  end
   json_response(files_for_client)
 end
 

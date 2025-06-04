@@ -266,9 +266,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     const option = document.createElement("option");
                     option.value = file.id;
                     option.textContent = file.name;
+                    option.dataset.gameCount = file.game_count; // Store game_count
                     pgnFileSelect.appendChild(option);
                 });
-                if (loadPgnButton) loadPgnButton.disabled = false;
+                // Initial state: loadPgnButton disabled until a multi-game PGN is selected,
+                // or enabled if a single-game PGN is auto-loaded (handled in 'change' event).
+                if (loadPgnButton) loadPgnButton.disabled = true; 
                 if (moveInfoDisplay) moveInfoDisplay.textContent = "Please select a PGN file and load a game.";
             }
         } catch (error) {
@@ -293,24 +296,39 @@ document.addEventListener("DOMContentLoaded", () => {
     // Initial message is set within loadPgnFileList or if it fails.
 
     // Event listeners for controls
-    pgnFileSelect?.addEventListener("change", () => {
+    pgnFileSelect?.addEventListener("change", async () => { // Made async for auto-load
         if (board) {
             board.destroy();
             board = null;
         }
-        if (moveInfoDisplay) {
-            if (pgnFileSelect.value) {
-                moveInfoDisplay.textContent = "PGN file selected. Click 'Load First Game' to load.";
-            } else {
-                moveInfoDisplay.textContent = "Please select a PGN file and load a game.";
-            }
-        }
-        // Disable navigation buttons as no game is actively loaded into the board
+
+        const selectedOption = pgnFileSelect.options[pgnFileSelect.selectedIndex];
+        const pgnFileId = selectedOption.value;
+        const gameCount = selectedOption.dataset.gameCount ? parseInt(selectedOption.dataset.gameCount, 10) : 0;
+
+        // Disable navigation buttons initially
         if (nextCriticalButton) nextCriticalButton.disabled = true;
         if (prevMoveButton) prevMoveButton.disabled = true;
         if (nextMoveButton) nextMoveButton.disabled = true;
-        // loadPgnButton should be enabled if a file is selected, disabled if "-- Select a PGN --" is chosen
-        if (loadPgnButton) loadPgnButton.disabled = !pgnFileSelect.value; 
+
+        if (pgnFileId && gameCount > 0) {
+            if (gameCount === 1) {
+                if (moveInfoDisplay) moveInfoDisplay.textContent = `Loading single game from ${selectedOption.textContent}...`;
+                if (loadPgnButton) loadPgnButton.disabled = true;
+                // Automatically load the game
+                await fetchAndUpdateBoard('/api/load_game', 'POST', { pgn_file_id: pgnFileId });
+                // fetchAndUpdateBoard will handle enabling nav buttons if load is successful
+            } else { // gameCount > 1
+                if (moveInfoDisplay) moveInfoDisplay.textContent = `PGN file selected (${gameCount} games). Click 'Load First Game' to load.`;
+                if (loadPgnButton) loadPgnButton.disabled = false; // Enable button for multi-game PGNs
+            }
+        } else if (pgnFileId && gameCount === 0) {
+            if (moveInfoDisplay) moveInfoDisplay.textContent = `Selected PGN file (${selectedOption.textContent}) contains no games.`;
+            if (loadPgnButton) loadPgnButton.disabled = true;
+        } else { // No PGN file selected (e.g., "-- Select a PGN --")
+            if (moveInfoDisplay) moveInfoDisplay.textContent = "Please select a PGN file and load a game.";
+            if (loadPgnButton) loadPgnButton.disabled = true;
+        }
     });
 
     loadPgnButton?.addEventListener("click", async () => {
