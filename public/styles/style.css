@@ -44,3 +44,14 @@ h1 {
     font-family: monospace;
     font-size: 1.1em;
 }
+
+.player-names {
+    text-align: center; /* Center the text within the div */
+    margin: 10px auto; /* Center the div itself, similar to chessboard-container */
+    width: 400px; /* Match the chessboard width for alignment */
+    max-width: 100vw;
+    font-size: 1.2em; /* Slightly larger font for names */
+    font-weight: bold;
+    color: #444;
+    padding: 5px 0; /* Some vertical padding */
+}
