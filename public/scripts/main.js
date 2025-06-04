@@ -162,6 +162,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 const lastMoveData = data.last_move;
                 let setupChallenge = false;
 
+                // Always disable move input before deciding to enable it for a new challenge,
+                // or if no challenge is being set up. This prevents "moveInput already enabled" errors.
+                if (board) {
+                    board.disableMoveInput();
+                }
+
                 // Check conditions for starting a critical moment challenge
                 if (lastMoveData && lastMoveData.is_critical && lastMoveData.turn === learningSide && lastMoveData.good_move_san && lastMoveData.fen_before_move) {
                     setupChallenge = true;
@@ -170,7 +176,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     goodMoveSanForChallenge = lastMoveData.good_move_san;
                 } else {
                     inCriticalMomentChallenge = false;
-                    if (board) board.disableMoveInput(); // Ensure input is disabled if not in challenge mode
+                    // board.disableMoveInput(); // Now called unconditionally above
                 }
 
                 const fenToDisplay = setupChallenge ? fenAtCriticalPrompt : data.fen;
@@ -395,6 +401,8 @@ document.addEventListener("DOMContentLoaded", () => {
             alert("Error: Learning side not selected.");
             return;
         }
+
+        if (nextCriticalButton) nextCriticalButton.disabled = true; // Disable button immediately
 
         const responseData = await fetchAndUpdateBoard('/game/next_critical_moment', 'POST', { learning_side: learningSide });
 
