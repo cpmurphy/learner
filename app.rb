@@ -88,40 +88,6 @@ helpers do
     status status_code
     data.to_json
   end
-
-  def get_last_move_info(current_position_index)
-    return nil if current_position_index == 0 || !game_loaded?
-
-    # The move that LED to the current_position_index
-    # $game.positions[0] is initial, $game.moves[0] is the 1st move, leading to $game.positions[1]
-    actual_move_index_in_game_array = current_position_index - 1
-    move = $game.moves[actual_move_index_in_game_array]
-
-    return nil unless move # Should exist if current_position_index > 0
-
-    fen_before_this_move = $game.positions[actual_move_index_in_game_array].to_fen.to_s
-
-    is_critical_moment = move.annotation&.include?('$201')
-    good_san = nil
-
-    if is_critical_moment && move.variations && !move.variations.empty?
-      first_variation = move.variations.first
-      if first_variation && !first_variation.empty?
-        good_san = first_variation.first.notation.to_s
-      end
-    end
-
-    {
-      number: current_position_index,
-      turn: (current_position_index - 1) % 2 == 0 ? 'white' : 'black',
-      san: move.notation.to_s,
-      comment: move.comment,
-      annotation: move.annotation, # NAGs (Numeric Annotation Glyphs)
-      is_critical: is_critical_moment,
-      good_move_san: good_san,
-      fen_before_move: fen_before_this_move
-    }
-  end
 end
 # --- End Helpers ---
 
@@ -176,7 +142,7 @@ post '/api/load_game' do
     $current_move_index = 0
     
     puts "Loaded game from PGN: #{pgn_meta[:name]}. Board positions: #{$game.positions.size}"
-    last_move = get_last_move_info($current_move_index) # Will be nil for index 0
+    last_move = get_last_move_info($game, $current_move_index) # Will be nil for index 0
 
     # Check for initial critical moment for White (default learning side on frontend)
     # Search from the very first move (index 0 of $game.moves)
@@ -209,7 +175,7 @@ get '/game/current_fen' do
   unless game_loaded?
     return json_response({ error: "No game loaded. Please select a PGN file and load a game." }, 404)
   end
-  last_move = get_last_move_info($current_move_index)
+  last_move = get_last_move_info($game, $current_move_index)
   white_player = $game.tags["White"] || "Unknown White"
   black_player = $game.tags["Black"] || "Unknown Black"
   json_response({
@@ -230,10 +196,10 @@ post '/game/next_move' do
 
   if $current_move_index < $game.positions.size - 1
     $current_move_index += 1
-    last_move = get_last_move_info($current_move_index)
+    last_move = get_last_move_info($game, $current_move_index)
     json_response({ fen: current_board_fen, move_index: $current_move_index, last_move: last_move })
   else
-    last_move = get_last_move_info($current_move_index)
+    last_move = get_last_move_info($game, $current_move_index)
     json_response({ fen: current_board_fen, move_index: $current_move_index, message: "Already at the last move.", last_move: last_move })
   end
 end
@@ -246,10 +212,10 @@ post '/game/prev_move' do
 
   if $current_move_index > 0
     $current_move_index -= 1
-    last_move = get_last_move_info($current_move_index)
+    last_move = get_last_move_info($game, $current_move_index)
     json_response({ fen: current_board_fen, move_index: $current_move_index, last_move: last_move })
   else
-    last_move = get_last_move_info($current_move_index) # Will be nil for index 0
+    last_move = get_last_move_info($game, $current_move_index) # Will be nil for index 0
     json_response({ fen: current_board_fen, move_index: $current_move_index, message: "Already at the first move.", last_move: last_move })
   end
 end
@@ -281,7 +247,7 @@ post '/game/next_critical_moment' do
 
   if new_critical_position_index
     $current_move_index = new_critical_position_index
-    last_move = get_last_move_info($current_move_index)
+    last_move = get_last_move_info($game, $current_move_index)
     json_response({
       fen: current_board_fen,
       move_index: $current_move_index,
@@ -292,7 +258,7 @@ post '/game/next_critical_moment' do
   else
     # No more critical moves found for this side from the current position
     # Return current state but with a message; $current_move_index is unchanged.
-    last_move = get_last_move_info($current_move_index) 
+    last_move = get_last_move_info($game, $current_move_index) 
     json_response({
       fen: current_board_fen, 
       move_index: $current_move_index, 
