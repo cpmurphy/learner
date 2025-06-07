@@ -17,6 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const loadPgnButton = document.getElementById("load-pgn-button");
     const nextCriticalButton = document.getElementById("next-critical");
     const playerNamesDisplay = document.getElementById("player-names-display");
+    const copyFenButton = document.getElementById("copy-fen-button");
 
 
     let learningSide = learnSideSelect.value || 'white';
@@ -205,6 +206,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     // Enable prev/next buttons now that a game is loaded
                     if (prevMoveButton) prevMoveButton.disabled = false;
                     if (nextMoveButton) nextMoveButton.disabled = false;
+                    if (copyFenButton) copyFenButton.disabled = false;
 
                 } else { // Board already exists, just updating position
                     board.setPosition(fenToDisplay, true); // true for animation
@@ -223,6 +225,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (board) {
                     if (prevMoveButton) prevMoveButton.disabled = false;
                     if (nextMoveButton) nextMoveButton.disabled = false;
+                    if (copyFenButton) copyFenButton.disabled = false;
                 }
 
 
@@ -246,6 +249,7 @@ document.addEventListener("DOMContentLoaded", () => {
                  if (nextCriticalButton) nextCriticalButton.disabled = true;
                  if (prevMoveButton) prevMoveButton.disabled = true;
                  if (nextMoveButton) nextMoveButton.disabled = true;
+                 if (copyFenButton) copyFenButton.disabled = true;
             }
             return data; 
         } catch (error) { 
@@ -256,6 +260,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (nextCriticalButton) nextCriticalButton.disabled = true;
             if (prevMoveButton) prevMoveButton.disabled = true;
             if (nextMoveButton) nextMoveButton.disabled = true;
+            if (copyFenButton) copyFenButton.disabled = true;
             return null;
         }
     }
@@ -273,6 +278,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 alert(`Failed to load PGN file list from server: ${response.statusText}. Check server logs and PGN_DIR configuration.`);
                 if (loadPgnButton) loadPgnButton.disabled = true;
                 if (nextCriticalButton) nextCriticalButton.disabled = true;
+                if (copyFenButton) copyFenButton.disabled = true;
                 return;
             }
             const pgnFiles = await response.json();
@@ -280,6 +286,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 pgnFileSelect.innerHTML = '<option value="">No PGN files found</option>';
                 if (loadPgnButton) loadPgnButton.disabled = true;
                 if (nextCriticalButton) nextCriticalButton.disabled = true;
+                if (copyFenButton) copyFenButton.disabled = true;
                 if (moveInfoDisplay) moveInfoDisplay.textContent = "No PGN files found in the configured directory. Check server PGN_DIR.";
             } else {
                 pgnFileSelect.innerHTML = '<option value="">-- Select a PGN --</option>'; // Placeholder
@@ -301,6 +308,7 @@ document.addEventListener("DOMContentLoaded", () => {
             alert(`Error fetching PGN file list: ${error.message}. Is the server running?`);
             if (loadPgnButton) loadPgnButton.disabled = true;
             if (nextCriticalButton) nextCriticalButton.disabled = true;
+            if (copyFenButton) copyFenButton.disabled = true;
         }
     }
 
@@ -311,6 +319,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (prevMoveButton) prevMoveButton.disabled = true;
     if (nextMoveButton) nextMoveButton.disabled = true;
+    if (copyFenButton) copyFenButton.disabled = true;
     
     loadPgnFileList(); // Load PGN files on page load
     // Board is not initialized until a game is loaded.
@@ -332,6 +341,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (nextCriticalButton) nextCriticalButton.disabled = true;
         if (prevMoveButton) prevMoveButton.disabled = true;
         if (nextMoveButton) nextMoveButton.disabled = true;
+        if (copyFenButton) copyFenButton.disabled = true;
 
         if (pgnFileId && gameCount > 0) {
             if (gameCount === 1) {
@@ -439,6 +449,30 @@ document.addEventListener("DOMContentLoaded", () => {
             const newOrientation = learningSide === 'white' ? COLOR.white : COLOR.black;
             board.setOrientation(newOrientation, true); // true for animation
             console.log("Board orientation changed to:", learningSide);
+        }
+    });
+
+    copyFenButton?.addEventListener("click", async () => {
+        if (!board) {
+            alert("Board is not initialized. Load a game first.");
+            return;
+        }
+        const currentFen = board.getPosition();
+        if (currentFen) {
+            try {
+                await navigator.clipboard.writeText(currentFen);
+                const originalText = copyFenButton.textContent;
+                copyFenButton.textContent = "Copied!";
+                console.log("FEN copied to clipboard:", currentFen);
+                setTimeout(() => {
+                    copyFenButton.textContent = originalText;
+                }, 1500); // Revert text after 1.5 seconds
+            } catch (err) {
+                console.error("Failed to copy FEN to clipboard:", err);
+                alert("Failed to copy FEN. See console for details.");
+            }
+        } else {
+            alert("Could not get FEN from board.");
         }
     });
 });
