@@ -269,9 +269,13 @@ class TestAppGetLastMoveInfoHelper < Minitest::Test
     # Moves: 1. e4, 1... d5, 2. Nf3
     @game.moves = [
       PGN::Move.new('e4'),
-      PGN::Move.new('d5', ['$1']), # Black's move with an annotation
-      PGN::Move.new('Nf3', nil, 'A comment') # White's move with a comment
+      PGN::Move.new('d5', ['$1']) # Black's move with an annotation
     ]
+    # White's move with a comment
+    move_with_comment = PGN::Move.new('Nf3') # Annotation is nil by default
+    move_with_comment.comment = 'A comment'
+    @game.moves << move_with_comment
+    
     # Add variations for critical moment testing if needed by get_last_move_info
     # For now, focusing on number, turn, san, comment, annotation
     critical_move_with_variation = PGN::Move.new('Qh5', ['$201'])
