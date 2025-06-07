@@ -5,3 +5,4 @@ gem 'puma', '>= 5.0'    # A recommended server for Sinatra
 gem 'pgn2'
 gem 'json'              # Standard JSON library, Sinatra often includes it
 gem 'minitest', '~> 5.0' # For testing
+gem 'debug'
