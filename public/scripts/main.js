@@ -53,12 +53,20 @@ document.addEventListener("DOMContentLoaded", () => {
                 console.error("Critical Challenge - SanGenerator could not produce SAN. Move might be illegal or data inconsistent.", 
                               { from: event.squareFrom, to: event.squareTo, promotion: event.promotionPiece, fen: fenAtCriticalPrompt });
                 moveInfoDisplay.textContent = "That move is not valid or could not be processed. Try again!";
-                return false; // Reject the move, preventing cm-chessboard from visually making it.
+                // Ensure board is reset to the state before the attempted invalid move.
+                if (board && fenAtCriticalPrompt) {
+                    board.setPosition(fenAtCriticalPrompt, false); // false for no animation
+                }
+                return false; // Reject the move.
             }
         } catch (e) { 
             // Catch any unexpected errors from SanGenerator instantiation or getSan() itself, though SanGenerator is designed to catch its own errors.
             console.error("Critical Challenge - Error generating SAN using SanGenerator:", e);
             moveInfoDisplay.textContent = "Error processing your move. Try again!";
+            // Ensure board is reset if an unexpected error occurs during SAN generation.
+            if (board && fenAtCriticalPrompt) {
+                board.setPosition(fenAtCriticalPrompt, false); // false for no animation
+            }
             return false;
         }
         
