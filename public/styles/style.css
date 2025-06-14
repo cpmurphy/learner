@@ -29,6 +29,12 @@ h1 {
     cursor: pointer;
 }
 
+.icon {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
 .controls button:hover, .info select:hover {
     background-color: #e9e9e9;
 }
