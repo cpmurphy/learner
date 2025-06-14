@@ -21,16 +21,38 @@ h1 {
 }
 
 .controls button, .info select {
-    padding: 10px 15px;
+    /* padding: 10px 15px; */ /* Replaced by fixed size and flex centering */
+    width: 40px; /* Fixed width */
+    height: 40px; /* Fixed height */
     margin: 5px;
     border: 1px solid #ccc;
     border-radius: 4px;
     background-color: #fff;
     cursor: pointer;
+    display: inline-flex; /* For centering icon */
+    align-items: center; /* Center icon vertically */
+    justify-content: center; /* Center icon horizontally */
+    padding: 0; /* Remove padding if icon is to fill */
+}
+
+.controls button.control-btn { /* More specific selector for icon buttons */
+    /* Icon will be centered by flex properties above */
+}
+
+#move-input {
+    width: 80px; /* Adjust width as needed, e.g., for 3-4 chars */
+    height: 40px; /* Match button height */
+    padding: 0 10px; /* Horizontal padding */
+    margin: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1em; /* Adjust font size as needed */
+    box-sizing: border-box; /* Include padding and border in the element's total width and height */
+    vertical-align: middle; /* Align with buttons */
 }
 
 .icon {
-  width: 24px;
+  width: 24px; /* Icon size, button padding will create space around it if needed */
   height: 24px;
   fill: currentColor;
 }
