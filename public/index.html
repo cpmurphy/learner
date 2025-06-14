@@ -25,44 +25,44 @@
         <!-- Chessboard will be rendered here by cm-chessboard -->
     </div>
     <div class="controls">
+        <button class='control-btn' id='fast-rewind-moves' title='Go to start'>
+            <svg class='icon' viewBox='0 0 24 24'>
+                <path d='M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z'></path>
+            </svg>
+        </button>
+        <button class='control-btn' id='prev-move' title='Previous move'>
+            <svg class='icon' viewBox='0 0 24 24'>
+                <path d='M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z'></path>
+            </svg>
+        </button>
+        <input id='move-input' type='text'>
+        <button class='control-btn' id='next-move' title='Next move'>
+            <svg class='icon' viewBox='0 0 24 24'>
+                <path d='M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z'></path>
+            </svg>
+        </button>
         <button class='control-btn' id='next-critical' title='Next critical moment'>
             <svg class='icon' viewBox='0 0 24 24'>
                 <path d='M4 5h2v8h-2z M4 15h2v2h-2z'></path>
                 <path d='M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z'></path>
             </svg>
         </button>
-<button class='control-btn' id='fast-rewind-moves' title='Go to start'>
-<svg class='icon' viewBox='0 0 24 24'>
-<path d='M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z'></path>
-</svg>
-</button>
-<button class='control-btn' id='prev-move' title='Previous move'>
-<svg class='icon' viewBox='0 0 24 24'>
-<path d='M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z'></path>
-</svg>
-</button>
-<input id='move-input' type='text'>
-<button class='control-btn' id='next-move' title='Next move'>
-<svg class='icon' viewBox='0 0 24 24'>
-<path d='M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z'></path>
-</svg>
-</button>
-<button class='control-btn' id='fast-forward-moves' title='Go to end'>
-<svg class='icon' viewBox='0 0 24 24'>
-<path d='M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z'></path>
-</svg>
-</button>
-</button>
-<button class='control-btn' id='flip-board' title='Flip board'>
-<svg class='icon' viewBox='0 0 24 24'>
-<path d='M19 8l-4 4h3c0 3.31-2.69 6-6 6-1.01 0-1.97-.25-2.8-.7l-1.46 1.46C8.97 19.54 10.43 20 12 20c4.42 0 8-3.58 8-8h3l-4-4zM6 12c0-3.31 2.69-6 6-6 1.01 0 1.97.25 2.8.7l1.46-1.46C15.03 4.46 13.57 4 12 4c-4.42 0-8 3.58-8 8H1l4 4 4-4H6z'></path>
-</svg>
-</button>
-<button class='control-btn' id='copy-fen-button' title='Copy FEN to clipboard'>
-<svg class='icon' viewBox='0 0 24 24'>
-<path d='M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z'></path>
-</svg>
-</button>
+        <button class='control-btn' id='fast-forward-moves' title='Go to end'>
+            <svg class='icon' viewBox='0 0 24 24'>
+                <path d='M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z'></path>
+            </svg>
+        </button>
+        </button>
+        <button class='control-btn' id='flip-board' title='Flip board'>
+            <svg class='icon' viewBox='0 0 24 24'>
+                <path d='M19 8l-4 4h3c0 3.31-2.69 6-6 6-1.01 0-1.97-.25-2.8-.7l-1.46 1.46C8.97 19.54 10.43 20 12 20c4.42 0 8-3.58 8-8h3l-4-4zM6 12c0-3.31 2.69-6 6-6 1.01 0 1.97.25 2.8.7l1.46-1.46C15.03 4.46 13.57 4 12 4c-4.42 0-8 3.58-8 8H1l4 4 4-4H6z'></path>
+            </svg>
+        </button>
+        <button class='control-btn' id='copy-fen-button' title='Copy FEN to clipboard'>
+            <svg class='icon' viewBox='0 0 24 24'>
+                <path d='M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z'></path>
+            </svg>
+        </button>
     </div>
     <div id="move-info-display" class="move-info">
         <!-- Last move details will be displayed here by JavaScript -->
