@@ -16,8 +16,21 @@ h1 {
 }
 
 .controls, .info {
-    text-align: center;
+    /* text-align: center; */ /* For .controls, flexbox will handle centering */
     margin-top: 20px;
+}
+
+/* Specific styling for .controls as a flex container */
+.controls {
+    display: flex;
+    justify-content: center; /* Center the group of items */
+    align-items: center; /* Vertically align items within the flex line */
+    flex-wrap: wrap; /* Allow items to wrap if not enough space */
+}
+
+/* Ensure .info still has text-align: center if it's not a flex container */
+.info {
+    text-align: center;
 }
 
 .controls button, .info select {
@@ -48,7 +61,7 @@ h1 {
     border-radius: 4px;
     font-size: 1em; /* Adjust font size as needed */
     box-sizing: border-box; /* Include padding and border in the element's total width and height */
-    vertical-align: middle; /* Align with buttons */
+    /* vertical-align: middle; */ /* No longer needed, flex alignment on parent handles this */
 }
 
 .icon {
