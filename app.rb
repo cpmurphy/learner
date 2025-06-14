@@ -268,4 +268,36 @@ post '/game/next_critical_moment' do
     }, 200) # HTTP 200 OK, but with a specific message in the payload
   end
 end
+
+# API endpoint to go to the start of the game
+post '/game/go_to_start' do
+  unless game_loaded?
+    return json_response({ error: "No game loaded." }, 404)
+  end
+  $current_move_index = 0
+  last_move = get_last_move_info($game, $current_move_index) # Will be nil
+  json_response({
+    fen: current_board_fen,
+    move_index: $current_move_index,
+    total_positions: $game.positions.size,
+    last_move: last_move,
+    message: "Went to start of the game."
+  })
+end
+
+# API endpoint to go to the end of the game
+post '/game/go_to_end' do
+  unless game_loaded?
+    return json_response({ error: "No game loaded." }, 404)
+  end
+  $current_move_index = $game.positions.size - 1
+  last_move = get_last_move_info($game, $current_move_index)
+  json_response({
+    fen: current_board_fen,
+    move_index: $current_move_index,
+    total_positions: $game.positions.size,
+    last_move: last_move,
+    message: "Went to end of the game."
+  })
+end
 # --- End Routes ---

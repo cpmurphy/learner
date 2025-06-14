@@ -18,6 +18,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const nextCriticalButton = document.getElementById("next-critical");
     const playerNamesDisplay = document.getElementById("player-names-display");
     const copyFenButton = document.getElementById("copy-fen-button");
+    const fastRewindButton = document.getElementById("fast-rewind-moves");
+    const fastForwardButton = document.getElementById("fast-forward-moves");
+    const flipBoardButton = document.getElementById("flip-board");
 
 
     let learningSide = learnSideSelect.value || 'white';
@@ -215,6 +218,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (prevMoveButton) prevMoveButton.disabled = false;
                     if (nextMoveButton) nextMoveButton.disabled = false;
                     if (copyFenButton) copyFenButton.disabled = false;
+                    if (fastRewindButton) fastRewindButton.disabled = false;
+                    if (fastForwardButton) fastForwardButton.disabled = false;
+                    if (flipBoardButton) flipBoardButton.disabled = false;
 
                 } else { // Board already exists, just updating position
                     board.setPosition(fenToDisplay, true); // true for animation
@@ -234,6 +240,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (prevMoveButton) prevMoveButton.disabled = false;
                     if (nextMoveButton) nextMoveButton.disabled = false;
                     if (copyFenButton) copyFenButton.disabled = false;
+                    if (fastRewindButton) fastRewindButton.disabled = false;
+                    if (fastForwardButton) fastForwardButton.disabled = false;
+                    if (flipBoardButton) flipBoardButton.disabled = false;
                 }
 
 
@@ -258,6 +267,9 @@ document.addEventListener("DOMContentLoaded", () => {
                  if (prevMoveButton) prevMoveButton.disabled = true;
                  if (nextMoveButton) nextMoveButton.disabled = true;
                  if (copyFenButton) copyFenButton.disabled = true;
+                 if (fastRewindButton) fastRewindButton.disabled = true;
+                 if (fastForwardButton) fastForwardButton.disabled = true;
+                 if (flipBoardButton) flipBoardButton.disabled = true;
             }
             return data; 
         } catch (error) { 
@@ -269,6 +281,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (prevMoveButton) prevMoveButton.disabled = true;
             if (nextMoveButton) nextMoveButton.disabled = true;
             if (copyFenButton) copyFenButton.disabled = true;
+            if (fastRewindButton) fastRewindButton.disabled = true;
+            if (fastForwardButton) fastForwardButton.disabled = true;
+            if (flipBoardButton) flipBoardButton.disabled = true;
             return null;
         }
     }
@@ -287,6 +302,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (loadPgnButton) loadPgnButton.disabled = true;
                 if (nextCriticalButton) nextCriticalButton.disabled = true;
                 if (copyFenButton) copyFenButton.disabled = true;
+                if (fastRewindButton) fastRewindButton.disabled = true;
+                if (fastForwardButton) fastForwardButton.disabled = true;
+                if (flipBoardButton) flipBoardButton.disabled = true;
                 return;
             }
             const pgnFiles = await response.json();
@@ -295,6 +313,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (loadPgnButton) loadPgnButton.disabled = true;
                 if (nextCriticalButton) nextCriticalButton.disabled = true;
                 if (copyFenButton) copyFenButton.disabled = true;
+                if (fastRewindButton) fastRewindButton.disabled = true;
+                if (fastForwardButton) fastForwardButton.disabled = true;
+                if (flipBoardButton) flipBoardButton.disabled = true;
                 if (moveInfoDisplay) moveInfoDisplay.textContent = "No PGN files found in the configured directory. Check server PGN_DIR.";
             } else {
                 pgnFileSelect.innerHTML = '<option value="">-- Select a PGN --</option>'; // Placeholder
@@ -317,6 +338,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (loadPgnButton) loadPgnButton.disabled = true;
             if (nextCriticalButton) nextCriticalButton.disabled = true;
             if (copyFenButton) copyFenButton.disabled = true;
+            if (fastRewindButton) fastRewindButton.disabled = true;
+            if (fastForwardButton) fastForwardButton.disabled = true;
+            if (flipBoardButton) flipBoardButton.disabled = true;
         }
     }
 
@@ -328,6 +352,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (prevMoveButton) prevMoveButton.disabled = true;
     if (nextMoveButton) nextMoveButton.disabled = true;
     if (copyFenButton) copyFenButton.disabled = true;
+    if (fastRewindButton) fastRewindButton.disabled = true;
+    if (fastForwardButton) fastForwardButton.disabled = true;
+    if (flipBoardButton) flipBoardButton.disabled = true;
     
     loadPgnFileList(); // Load PGN files on page load
     // Board is not initialized until a game is loaded.
@@ -350,6 +377,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (prevMoveButton) prevMoveButton.disabled = true;
         if (nextMoveButton) nextMoveButton.disabled = true;
         if (copyFenButton) copyFenButton.disabled = true;
+        if (fastRewindButton) fastRewindButton.disabled = true;
+        if (fastForwardButton) fastForwardButton.disabled = true;
+        if (flipBoardButton) flipBoardButton.disabled = true;
+
 
         if (pgnFileId && gameCount > 0) {
             if (gameCount === 1) {
@@ -458,6 +489,40 @@ document.addEventListener("DOMContentLoaded", () => {
             board.setOrientation(newOrientation, true); // true for animation
             console.log("Board orientation changed to:", learningSide);
         }
+    });
+
+    fastRewindButton?.addEventListener("click", async () => {
+        console.log("Fast rewind clicked");
+        if (board) {
+            await fetchAndUpdateBoard('/game/go_to_start', 'POST');
+        } else {
+            alert("Please load a game first.");
+        }
+    });
+
+    fastForwardButton?.addEventListener("click", async () => {
+        console.log("Fast forward clicked");
+        if (board) {
+            await fetchAndUpdateBoard('/game/go_to_end', 'POST');
+        } else {
+            alert("Please load a game first.");
+        }
+    });
+
+    flipBoardButton?.addEventListener("click", () => {
+        if (!board) {
+            alert("Board is not initialized. Load a game first.");
+            return;
+        }
+        learningSide = (learningSide === 'white') ? 'black' : 'white';
+        learnSideSelect.value = learningSide; // Update dropdown
+        
+        // Manually trigger the change event logic for learnSideSelect
+        // to avoid duplicating the board flipping and console logging logic.
+        const event = new Event('change');
+        learnSideSelect.dispatchEvent(event);
+        
+        console.log("Board flipped by button. Learning side now:", learningSide);
     });
 
     copyFenButton?.addEventListener("click", async () => {
