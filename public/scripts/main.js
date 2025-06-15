@@ -534,12 +534,16 @@ document.addEventListener("DOMContentLoaded", () => {
         if (currentFen) {
             try {
                 await navigator.clipboard.writeText(currentFen);
-                const originalText = copyFenButton.textContent;
-                copyFenButton.textContent = "Copied!";
-                console.log("FEN copied to clipboard:", currentFen);
-                setTimeout(() => {
-                    copyFenButton.textContent = originalText;
-                }, 1500); // Revert text after 1.5 seconds
+                const feedbackSpan = document.getElementById("copy-fen-feedback");
+                if (feedbackSpan) {
+                    feedbackSpan.textContent = "Copied!";
+                    feedbackSpan.style.display = "inline"; // Show feedback
+                    console.log("FEN copied to clipboard:", currentFen);
+                    setTimeout(() => {
+                        feedbackSpan.textContent = "";
+                        feedbackSpan.style.display = "none"; // Hide feedback
+                    }, 1500); // Clear and hide after 1.5 seconds
+                }
             } catch (err) {
                 console.error("Failed to copy FEN to clipboard:", err);
                 alert("Failed to copy FEN. See console for details.");

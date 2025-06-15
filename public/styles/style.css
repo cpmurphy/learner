@@ -96,3 +96,11 @@ h1 {
     color: #444;
     padding: 5px 0; /* Some vertical padding */
 }
+
+.copy-feedback {
+    display: none; /* Hidden by default */
+    margin-left: 8px; /* Space it out from the button */
+    font-size: 0.9em;
+    color: green;
+    font-weight: bold;
+}
