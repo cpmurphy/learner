@@ -70,6 +70,22 @@ h1 {
   fill: currentColor;
 }
 
+/* Allow #load-pgn-button (text button) to be wider */
+#load-pgn-button {
+    width: auto;         /* Override fixed width from .controls button */
+    padding: 0 12px;     /* Add horizontal padding for the text */
+    /* Inherits height: 40px and display: inline-flex for centered text, which is fine */
+}
+
+/* Allow #learn-side (select element) to be wider and look standard */
+#learn-side {
+    width: auto;         /* Override fixed width from .info select */
+    padding: 0 8px;      /* Horizontal padding (typical for select elements) */
+    display: inline-block; /* Revert to standard select element display behavior */
+    text-align: left;    /* Ensure text is left-aligned, not centered by inline-flex */
+    /* Inherits height: 40px, margin, border, etc. which are fine */
+}
+
 .controls button:hover, .info select:hover {
     background-color: #e9e9e9;
 }
