@@ -18,7 +18,7 @@ module AppHelpers
       # Determine turn for game_moves[move_array_idx]
       # move_array_idx 0 is White's 1st move (leading to position 1)
       # move_array_idx 1 is Black's 1st move (leading to position 2)
-      move_turn = (move_array_idx % 2 == 0) ? 'white' : 'black'
+      move_turn = move_array_idx.even? ? 'white' : 'black'
 
       if move_turn == learning_side_to_check && move.annotation&.include?('$201')
         return move_array_idx + 1 # Position index
@@ -34,14 +34,14 @@ module AppHelpers
   #                         1 is the state after the first move (game.moves[0]), etc.
   # Returns a hash with move details, or nil if current_position_index is 0.
   def get_last_move_info(game, current_position_index)
-    return nil if current_position_index == 0 || game.nil? || game.moves.empty?
+    return nil if current_position_index.zero? || game.nil? || game.moves.empty?
 
     # The move that LED to the current_position_index
     # game.positions[0] is initial, game.moves[0] is the 1st move, leading to game.positions[1]
     actual_move_index_in_game_array = current_position_index - 1
 
     # Ensure actual_move_index_in_game_array is valid for game.moves
-    return nil if actual_move_index_in_game_array < 0 || actual_move_index_in_game_array >= game.moves.size
+    return nil if actual_move_index_in_game_array.negative? || actual_move_index_in_game_array >= game.moves.size
 
     move = game.moves[actual_move_index_in_game_array]
     return nil unless move # Should exist if index is valid
@@ -69,7 +69,7 @@ module AppHelpers
     # actual_move_index_in_game_array 1 (Black's 1st) -> (1/2)+1 = 1
     # actual_move_index_in_game_array 2 (White's 2nd) -> (2/2)+1 = 2
     display_move_number = (actual_move_index_in_game_array / 2) + 1
-    current_turn = (actual_move_index_in_game_array % 2 == 0) ? 'white' : 'black'
+    current_turn = actual_move_index_in_game_array.even? ? 'white' : 'black'
 
     {
       number: display_move_number, # Corrected display move number

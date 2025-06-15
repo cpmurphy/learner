@@ -1,0 +1,66 @@
+plugins: rubocop-minitest
+
+AllCops:
+  NewCops: enable
+  TargetRubyVersion: 3.0
+  Exclude:
+    - 'bin/**/*'
+    - 'vendor/**/*'
+    - 'db/schema.rb'
+    - 'sandbox/**/*'
+
+# Style preferences
+Style/Documentation:
+  Enabled: false  # Documentation can be added later
+
+Style/StringLiterals:
+  EnforcedStyle: single_quotes
+
+Style/FrozenStringLiteralComment:
+  Enabled: true
+
+# Metrics - more reasonable limits
+Metrics/ClassLength:
+  Max: 150
+  Exclude:
+    - 'lib/move_translator.rb'
+    - 'test/**/*'
+
+Metrics/ModuleLength:
+  Max: 120
+  Exclude:
+    - 'test/**/*'
+
+Metrics/MethodLength:
+  Max: 26
+  Exclude:
+    - 'test/**/*'
+
+Metrics/AbcSize:
+  Max: 25
+  Exclude:
+    - 'test/**/*'
+
+Metrics/BlockLength:
+  Max: 30
+  Exclude:
+    - 'test/**/*'
+    - 'config/routes.rb'
+
+Layout/LineLength:
+  Max: 120
+  Exclude:
+    - 'test/**/*'
+
+# Common sense adjustments
+Naming/VariableNumber:
+  EnforcedStyle: snake_case
+
+Style/NumericLiterals:
+  Enabled: false  # Allows numbers without underscore separators
+
+Style/ClassAndModuleChildren:
+  Enabled: false  # Allows both compact and nested styles
+
+Naming/MethodParameterName:
+  AllowedNames: ['id', 'ip', 'to', 'x', 'y']

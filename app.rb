@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'sinatra'
 require 'pgn'
 require 'json'
@@ -15,21 +17,21 @@ configure do
   set :public_folder, File.join(File.dirname(__FILE__), 'public')
   set :bind, '0.0.0.0'
 
-  pgn_dir_path = ENV['PGN_DIR']
+  pgn_dir_path = ENV.fetch('PGN_DIR', nil)
 
   if pgn_dir_path.nil? || pgn_dir_path.empty?
-    puts "---------------------------------------------------------------------------------------"
-    puts "ERROR: PGN_DIR environment variable not set."
-    puts "Please provide the path to a directory containing PGN files."
-    puts "Example: PGN_DIR=./test/data bundle exec puma config.ru"
-    puts "The application will start, but game functionality will be disabled until a PGN is loaded via API."
-    puts "---------------------------------------------------------------------------------------"
+    puts '---------------------------------------------------------------------------------------'
+    puts 'ERROR: PGN_DIR environment variable not set.'
+    puts 'Please provide the path to a directory containing PGN files.'
+    puts 'Example: PGN_DIR=./test/data bundle exec puma config.ru'
+    puts 'The application will start, but game functionality will be disabled until a PGN is loaded via API.'
+    puts '---------------------------------------------------------------------------------------'
   elsif !Dir.exist?(pgn_dir_path)
-    puts "---------------------------------------------------------------------------------------"
+    puts '---------------------------------------------------------------------------------------'
     puts "ERROR: PGN directory not found at path: #{pgn_dir_path}"
-    puts "Please ensure the PGN_DIR environment variable points to an existing directory."
-    puts "The application will start, but game functionality will be disabled."
-    puts "---------------------------------------------------------------------------------------"
+    puts 'Please ensure the PGN_DIR environment variable points to an existing directory.'
+    puts 'The application will start, but game functionality will be disabled.'
+    puts '---------------------------------------------------------------------------------------'
   else
     puts "Scanning PGN directory: #{pgn_dir_path}"
     pgn_files = Dir.glob(File.join(pgn_dir_path, '*.pgn'))
@@ -78,8 +80,10 @@ helpers do
   def game_loaded?
     !$game.nil? && $game.respond_to?(:positions) && !$game.positions.empty?
   end
+
   def current_board_fen
     return nil unless game_loaded? && $game.positions[$current_move_index]
+
     $game.positions[$current_move_index].to_fen.to_s
   end
 
@@ -112,20 +116,16 @@ post '/api/load_game' do
   begin
     params = JSON.parse(request.body.read)
   rescue JSON::ParserError
-    return json_response({ error: "Invalid JSON in request body" }, 400)
+    return json_response({ error: 'Invalid JSON in request body' }, 400)
   end
-  
+
   pgn_file_id = params['pgn_file_id']
 
-  unless pgn_file_id
-    return json_response({ error: "Missing pgn_file_id parameter" }, 400)
-  end
+  return json_response({ error: 'Missing pgn_file_id parameter' }, 400) unless pgn_file_id
 
   pgn_meta = $available_pgns.find { |p| p[:id] == pgn_file_id }
 
-  unless pgn_meta
-    return json_response({ error: "PGN file not found for ID: #{pgn_file_id}" }, 404)
-  end
+  return json_response({ error: "PGN file not found for ID: #{pgn_file_id}" }, 404) unless pgn_meta
 
   begin
     pgn_content = File.read(pgn_meta[:path])
@@ -140,7 +140,7 @@ post '/api/load_game' do
     $game = games_in_file.first # Load the first game
     GameEditor.shift_critical_annotations($game)
     $current_move_index = 0
-    
+
     puts "Loaded game from PGN: #{pgn_meta[:name]}. Board positions: #{$game.positions.size}"
     last_move = get_last_move_info($game, $current_move_index) # Will be nil for index 0
 
@@ -148,19 +148,19 @@ post '/api/load_game' do
     # Search from the very first move (index 0 of $game.moves)
     has_initial_critical_for_white = !find_critical_moment_position_index($game.moves, 0, 'white').nil?
 
-    white_player = $game.tags["White"] || "Unknown White"
-    black_player = $game.tags["Black"] || "Unknown Black"
+    white_player = $game.tags['White'] || 'Unknown White'
+    black_player = $game.tags['Black'] || 'Unknown Black'
 
     json_response({
-      fen: current_board_fen,
-      move_index: $current_move_index,
-      total_positions: $game.positions.size,
-      last_move: last_move,
-      message: "Successfully loaded game from #{pgn_meta[:name]}",
-      has_initial_critical_moment_for_white: has_initial_critical_for_white,
-      white_player: white_player,
-      black_player: black_player
-    })
+                    fen: current_board_fen,
+                    move_index: $current_move_index,
+                    total_positions: $game.positions.size,
+                    last_move: last_move,
+                    message: "Successfully loaded game from #{pgn_meta[:name]}",
+                    has_initial_critical_moment_for_white: has_initial_critical_for_white,
+                    white_player: white_player,
+                    black_player: black_player
+                  })
   rescue StandardError => e
     $game = nil # Ensure game is not partially loaded
     $current_move_index = 0
@@ -172,27 +172,24 @@ end
 
 # API endpoint to get the current FEN of the loaded game
 get '/game/current_fen' do
-  unless game_loaded?
-    return json_response({ error: "No game loaded. Please select a PGN file and load a game." }, 404)
-  end
+  return json_response({ error: 'No game loaded. Please select a PGN file and load a game.' }, 404) unless game_loaded?
+
   last_move = get_last_move_info($game, $current_move_index)
-  white_player = $game.tags["White"] || "Unknown White"
-  black_player = $game.tags["Black"] || "Unknown Black"
+  white_player = $game.tags['White'] || 'Unknown White'
+  black_player = $game.tags['Black'] || 'Unknown Black'
   json_response({
-    fen: current_board_fen,
-    move_index: $current_move_index,
-    total_positions: $game.positions.size,
-    last_move: last_move,
-    white_player: white_player,
-    black_player: black_player
-  })
+                  fen: current_board_fen,
+                  move_index: $current_move_index,
+                  total_positions: $game.positions.size,
+                  last_move: last_move,
+                  white_player: white_player,
+                  black_player: black_player
+                })
 end
 
 # API endpoint to go to the next move of the loaded game
 post '/game/next_move' do
-  unless game_loaded?
-    return json_response({ error: "No game loaded. Please select a PGN file and load a game." }, 404)
-  end
+  return json_response({ error: 'No game loaded. Please select a PGN file and load a game.' }, 404) unless game_loaded?
 
   if $current_move_index < $game.positions.size - 1
     $current_move_index += 1
@@ -200,15 +197,14 @@ post '/game/next_move' do
     json_response({ fen: current_board_fen, move_index: $current_move_index, last_move: last_move })
   else
     last_move = get_last_move_info($game, $current_move_index)
-    json_response({ fen: current_board_fen, move_index: $current_move_index, message: "Already at the last move.", last_move: last_move })
+    json_response({ fen: current_board_fen, move_index: $current_move_index, message: 'Already at the last move.',
+                    last_move: last_move })
   end
 end
 
 # API endpoint to go to the previous move of the loaded game
 post '/game/prev_move' do
-  unless game_loaded?
-    return json_response({ error: "No game loaded. Please select a PGN file and load a game." }, 404)
-  end
+  return json_response({ error: 'No game loaded. Please select a PGN file and load a game.' }, 404) unless game_loaded?
 
   if $current_move_index > 0
     $current_move_index -= 1
@@ -216,102 +212,98 @@ post '/game/prev_move' do
     json_response({ fen: current_board_fen, move_index: $current_move_index, last_move: last_move })
   else
     last_move = get_last_move_info($game, $current_move_index) # Will be nil for index 0
-    json_response({ fen: current_board_fen, move_index: $current_move_index, message: "Already at the first move.", last_move: last_move })
+    json_response({ fen: current_board_fen, move_index: $current_move_index, message: 'Already at the first move.',
+                    last_move: last_move })
   end
 end
 
 # API endpoint to go to the next critical move for the learning side
 post '/game/next_critical_moment' do
-  unless game_loaded?
-    return json_response({ error: "No game loaded. Please select a PGN file and load a game." }, 404)
-  end
+  return json_response({ error: 'No game loaded. Please select a PGN file and load a game.' }, 404) unless game_loaded?
 
   begin
     params = JSON.parse(request.body.read)
     learning_side = params['learning_side'] # 'white' or 'black'
   rescue JSON::ParserError
-    return json_response({ error: "Invalid JSON in request body" }, 400)
+    return json_response({ error: 'Invalid JSON in request body' }, 400)
   end
 
-  unless ['white', 'black'].include?(learning_side)
+  unless %w[white black].include?(learning_side)
     return json_response({ error: "Invalid learning_side parameter. Must be 'white' or 'black'." }, 400)
   end
-  
+
   # $current_move_index is the current position index.
   # If current position is 0 (start), $game.moves[0] is the first move to check.
   # If current position is N, $game.moves[N] is the next move to check.
   # So, start_search_from_move_idx is $current_move_index.
   start_search_from_move_idx = $current_move_index
-  
-  new_critical_position_index = find_critical_moment_position_index($game.moves, start_search_from_move_idx, learning_side)
+
+  new_critical_position_index = find_critical_moment_position_index($game.moves, start_search_from_move_idx,
+                                                                    learning_side)
 
   if new_critical_position_index
     $current_move_index = new_critical_position_index
     last_move = get_last_move_info($game, $current_move_index)
     json_response({
-      fen: current_board_fen,
-      move_index: $current_move_index,
-      total_positions: $game.positions.size,
-      last_move: last_move,
-      message: "Jumped to next critical moment for #{learning_side}."
-    })
+                    fen: current_board_fen,
+                    move_index: $current_move_index,
+                    total_positions: $game.positions.size,
+                    last_move: last_move,
+                    message: "Jumped to next critical moment for #{learning_side}."
+                  })
   else
     # No more critical moves found for this side from the current position
     # Return current state but with a message; $current_move_index is unchanged.
-    last_move = get_last_move_info($game, $current_move_index) 
+    last_move = get_last_move_info($game, $current_move_index)
     json_response({
-      fen: current_board_fen, 
-      move_index: $current_move_index, 
-      total_positions: $game.positions.size,
-      last_move: last_move,
-      message: "No further critical moments found for #{learning_side} from this point."
-    }, 200) # HTTP 200 OK, but with a specific message in the payload
+                    fen: current_board_fen,
+                    move_index: $current_move_index,
+                    total_positions: $game.positions.size,
+                    last_move: last_move,
+                    message: "No further critical moments found for #{learning_side} from this point."
+                  }, 200) # HTTP 200 OK, but with a specific message in the payload
   end
 end
 
 # API endpoint to go to the start of the game
 post '/game/go_to_start' do
-  unless game_loaded?
-    return json_response({ error: "No game loaded." }, 404)
-  end
+  return json_response({ error: 'No game loaded.' }, 404) unless game_loaded?
+
   $current_move_index = 0
   last_move = get_last_move_info($game, $current_move_index) # Will be nil
   json_response({
-    fen: current_board_fen,
-    move_index: $current_move_index,
-    total_positions: $game.positions.size,
-    last_move: last_move,
-    message: "Went to start of the game."
-  })
+                  fen: current_board_fen,
+                  move_index: $current_move_index,
+                  total_positions: $game.positions.size,
+                  last_move: last_move,
+                  message: 'Went to start of the game.'
+                })
 end
 
 # API endpoint to go to the end of the game
 post '/game/go_to_end' do
-  unless game_loaded?
-    return json_response({ error: "No game loaded." }, 404)
-  end
+  return json_response({ error: 'No game loaded.' }, 404) unless game_loaded?
+
   $current_move_index = $game.positions.size - 1
   last_move = get_last_move_info($game, $current_move_index)
   json_response({
-    fen: current_board_fen,
-    move_index: $current_move_index,
-    total_positions: $game.positions.size,
-    last_move: last_move,
-    message: "Went to end of the game."
-  })
+                  fen: current_board_fen,
+                  move_index: $current_move_index,
+                  total_positions: $game.positions.size,
+                  last_move: last_move,
+                  message: 'Went to end of the game.'
+                })
 end
 
 # API endpoint to set the game to a specific move index
 post '/game/set_move_index' do
-  unless game_loaded?
-    return json_response({ error: "No game loaded." }, 404)
-  end
+  return json_response({ error: 'No game loaded.' }, 404) unless game_loaded?
 
   begin
     params = JSON.parse(request.body.read)
     target_move_index = params['move_index']
   rescue JSON::ParserError
-    return json_response({ error: "Invalid JSON in request body" }, 400)
+    return json_response({ error: 'Invalid JSON in request body' }, 400)
   end
 
   unless target_move_index.is_a?(Integer) && target_move_index >= 0 && target_move_index < $game.positions.size
@@ -321,17 +313,17 @@ post '/game/set_move_index' do
   $current_move_index = target_move_index
   last_move = get_last_move_info($game, $current_move_index)
   # Include player names as other navigation endpoints do
-  white_player = $game.tags["White"] || "Unknown White"
-  black_player = $game.tags["Black"] || "Unknown Black"
+  white_player = $game.tags['White'] || 'Unknown White'
+  black_player = $game.tags['Black'] || 'Unknown Black'
 
   json_response({
-    fen: current_board_fen,
-    move_index: $current_move_index,
-    total_positions: $game.positions.size,
-    last_move: last_move,
-    white_player: white_player,
-    black_player: black_player,
-    message: "Game set to move index #{target_move_index}."
-  })
+                  fen: current_board_fen,
+                  move_index: $current_move_index,
+                  total_positions: $game.positions.size,
+                  last_move: last_move,
+                  white_player: white_player,
+                  black_player: black_player,
+                  message: "Game set to move index #{target_move_index}."
+                })
 end
 # --- End Routes ---

@@ -13,16 +13,16 @@ module GameEditor
       current_move_obj = game.moves[i]
       next_move_obj = game.moves[i + 1]
 
-      if current_move_obj.annotation&.include?('$201')
-        # Remove $201 from the current move
-        current_move_obj.annotation.delete('$201')
-        # Clean up annotation array if it becomes empty
-        current_move_obj.annotation = nil if current_move_obj.annotation.empty?
+      next unless current_move_obj.annotation&.include?('$201')
 
-        # Add $201 to the next move
-        next_move_obj.annotation ||= [] # Initialize if nil
-        next_move_obj.annotation << '$201' unless next_move_obj.annotation.include?('$201')
-      end
+      # Remove $201 from the current move
+      current_move_obj.annotation.delete('$201')
+      # Clean up annotation array if it becomes empty
+      current_move_obj.annotation = nil if current_move_obj.annotation.empty?
+
+      # Add $201 to the next move
+      next_move_obj.annotation ||= [] # Initialize if nil
+      next_move_obj.annotation << '$201' unless next_move_obj.annotation.include?('$201')
     end
   end
 end
