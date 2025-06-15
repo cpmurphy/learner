@@ -53,11 +53,14 @@ module AppHelpers
 
     is_critical_moment = move.annotation&.include?('$201')
     good_san = nil
+    variation_sans = [] # Initialize as empty array
 
     if is_critical_moment && move.variations && !move.variations.empty?
-      first_variation = move.variations.first
-      if first_variation && !first_variation.empty?
-        good_san = first_variation.first.notation.to_s
+      first_variation_line = move.variations.first # This is an array of PGN::MoveText objects
+      if first_variation_line && !first_variation_line.empty?
+        good_san = first_variation_line.first.notation.to_s
+        # Populate the already initialized variation_sans
+        variation_sans = first_variation_line.map { |var_move| var_move.notation.to_s }
       end
     end
 
