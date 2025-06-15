@@ -21,12 +21,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const fastRewindButton = document.getElementById("fast-rewind-moves");
     const fastForwardButton = document.getElementById("fast-forward-moves");
     const flipBoardButton = document.getElementById("flip-board");
+    const resumeGameButton = document.getElementById("resume-game");
 
 
     let learningSide = learnSideSelect.value || 'white';
     let inCriticalMomentChallenge = false;
     let fenAtCriticalPrompt = null; // FEN before the bad move, for reverting
     let goodMoveSanForChallenge = null; // SAN of the good alternative move
+
+    // State for variation play
+    let inVariationMode = false;
+    let mainLineMoveIndexAtVariationStart = 0;
+    let currentVariationSANs = [];
+    let currentVariationPly = 0;
+    let currentFenInVariation = null;
 
     /**
      * Handles the user's move attempt during a critical moment challenge.
@@ -76,7 +84,26 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log(`Critical Challenge - User attempted: ${userMoveSan} (derived from ${event.squareFrom}-${event.squareTo}${event.promotionPiece ? "="+event.promotionPiece : ""}), Expected good move: ${goodMoveSanForChallenge}`);
 
         if (userMoveSan === goodMoveSanForChallenge) {
-            moveInfoDisplay.textContent = `Correct! "${userMoveSan}" is a better move. Click 'Next Move' to continue the actual game.`;
+            // Correct move in challenge! Enter variation mode.
+            const lastMoveDataForVariation = window.lastServerMoveData; // Use cached lastMoveData that contained variation info
+
+            if (lastMoveDataForVariation && lastMoveDataForVariation.variation_sans && lastMoveDataForVariation.variation_sans.length > 0) {
+                inVariationMode = true;
+                mainLineMoveIndexAtVariationStart = lastMoveDataForVariation.move_index_of_blunder; // Need to ensure this is correctly set
+                currentVariationSANs = lastMoveDataForVariation.variation_sans;
+                currentVariationPly = 0; // They just played the first move (index 0) of the variation
+                currentFenInVariation = board.getPosition(); // FEN after their correct first variation move
+
+                moveInfoDisplay.textContent = `Correct! "${userMoveSan}" starts a good variation. Use 'Next Move' to explore it.`;
+                if (resumeGameButton) resumeGameButton.disabled = false;
+                if (nextMoveButton) nextMoveButton.disabled = false; // Enable for variation
+                if (prevMoveButton) prevMoveButton.disabled = true; // Disable prev for variation for now
+                if (nextCriticalButton) nextCriticalButton.disabled = true; // No new critical search while in variation
+            } else {
+                // Should not happen if goodMoveSanForChallenge was set, but as a fallback:
+                moveInfoDisplay.textContent = `Correct! "${userMoveSan}" is a better move. Main game continues.`;
+            }
+            
             board.disableMoveInput();
             inCriticalMomentChallenge = false;
             return true;
@@ -92,12 +119,15 @@ document.addEventListener("DOMContentLoaded", () => {
      * Updates the move information display area.
      * @param {object|null} lastMoveData - Data about the last move, or null.
      */
-    function updateMoveInfoDisplay(lastMoveData) {
+    function updateMoveInfoDisplay(lastMoveData, isVariationMove = false, variationPly = 0) {
         if (!moveInfoDisplay) return;
 
-        if (lastMoveData) {
-            // This function is for displaying the *actual last game move* information,
-            // not for critical challenge prompts.
+        if (isVariationMove && lastMoveData && lastMoveData.san) { // lastMoveData here is just { san: '...' }
+            const moveNumberInVariation = Math.floor(variationPly / 2) + 1;
+            const turnInVariation = variationPly % 2 === 0 ? learningSide : (learningSide === 'white' ? 'black' : 'white'); // Assuming player makes first var move
+            let movePrefix = `${moveNumberInVariation}${turnInVariation === 'white' ? '.' : '...'}`;
+            moveInfoDisplay.textContent = `Variation: ${movePrefix} ${lastMoveData.san}`;
+        } else if (lastMoveData) {
             const lm = lastMoveData;
             let movePrefix = `${lm.number}${lm.turn === 'white' ? '.' : '...'}`;
             let displayText = `${movePrefix} ${lm.san}`;
@@ -105,17 +135,15 @@ document.addEventListener("DOMContentLoaded", () => {
             if (lm.comment && lm.comment.trim() !== "") {
                 displayText += ` {${lm.comment.trim()}}`;
             }
-            if (lm.annotation && lm.annotation.length > 0) { // Changed from nags to annotation for consistency with backend
+            if (lm.annotation && lm.annotation.length > 0) {
                 displayText += ` ${lm.annotation.join(' ')}`;
             }
-
-            // Add a note if it was a critical move by the opponent
             if (lm.is_critical && lm.turn !== learningSide) {
                 displayText += ` (Opponent's blunder!)`;
             }
             moveInfoDisplay.textContent = displayText;
         } else {
-            moveInfoDisplay.textContent = "Game start."; // Initial position or no move info
+            moveInfoDisplay.textContent = "Game start.";
         }
     }
 
@@ -125,6 +153,10 @@ document.addEventListener("DOMContentLoaded", () => {
      * @param {string} method - HTTP method (GET, POST, etc.).
      * @param {object|null} body - The request body for POST requests.
      */
+    // Cache last server move data that might contain variation info
+    // This is a bit of a hack; ideally, this context would be managed more cleanly.
+    window.lastServerMoveData = null; 
+
     async function fetchAndUpdateBoard(url, method = 'GET', body = null) {
         try {
             const options = { method };
@@ -139,24 +171,37 @@ document.addEventListener("DOMContentLoaded", () => {
                 console.error(`Error from server ${url}: ${response.status} ${response.statusText}`, data.error || '');
                 const errorMsg = data.error || `Server error ${response.status}. Check console.`;
                 if (moveInfoDisplay) moveInfoDisplay.textContent = `Error: ${errorMsg}`;
-                if (playerNamesDisplay) playerNamesDisplay.textContent = ""; // Clear player names on error
+                if (playerNamesDisplay) playerNamesDisplay.textContent = ""; 
                 
                 if (errorMsg.includes("No game loaded")) {
                      if (url === '/game/current_fen' && !board) { 
                         moveInfoDisplay.textContent = "Please select a PGN file and load a game.";
                      }
-                     if (nextCriticalButton) nextCriticalButton.disabled = true;
                 } else if (errorMsg.includes("PGN_DIR environment variable not set") || errorMsg.includes("PGN directory not found")) {
                     alert("Server PGN directory not configured. Please check server logs.");
-                    if (nextCriticalButton) nextCriticalButton.disabled = true;
                 } else if (url === '/api/load_game') { 
                     alert(`Error loading game: ${errorMsg}`);
-                    if (nextCriticalButton) nextCriticalButton.disabled = true;
                 }
+                // Disable all navigation buttons on error
+                if (nextCriticalButton) nextCriticalButton.disabled = true;
+                if (prevMoveButton) prevMoveButton.disabled = true;
+                if (nextMoveButton) nextMoveButton.disabled = true;
+                if (copyFenButton) copyFenButton.disabled = true;
+                if (fastRewindButton) fastRewindButton.disabled = true;
+                if (fastForwardButton) fastForwardButton.disabled = true;
+                if (flipBoardButton) flipBoardButton.disabled = true;
+                if (resumeGameButton) resumeGameButton.disabled = true;
+                inVariationMode = false; // Exit variation mode on error
                 return null;
             }
             
-            if (data.message && (url === '/api/load_game' || url === '/game/next_move' || url === '/game/prev_move' || url === '/game/next_critical_moment')) { 
+            // Cache data if it contains last_move info, for variation handling
+            if (data.last_move) {
+                window.lastServerMoveData = { ...data.last_move, move_index_of_blunder: data.move_index };
+            }
+
+
+            if (data.message && (url === '/api/load_game' || url === '/game/next_move' || url === '/game/prev_move' || url === '/game/next_critical_moment' || url === '/game/set_move_index')) { 
                 console.log(`Server message: ${data.message}`);
             }
 
@@ -190,6 +235,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     inCriticalMomentChallenge = false;
                     // board.disableMoveInput(); // Now called unconditionally above
                 }
+                
+                // If we successfully set move index (e.g. resuming game), exit variation mode.
+                if (url === '/game/set_move_index' || url === '/api/load_game' || url === '/game/go_to_start' || url === '/game/go_to_end') {
+                    inVariationMode = false;
+                    if (resumeGameButton) resumeGameButton.disabled = true;
+                }
 
                 const fenToDisplay = setupChallenge ? fenAtCriticalPrompt : data.fen;
 
@@ -218,51 +269,63 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (prevMoveButton) prevMoveButton.disabled = false;
                     if (nextMoveButton) nextMoveButton.disabled = false;
                     if (copyFenButton) copyFenButton.disabled = false;
-                    if (fastRewindButton) fastRewindButton.disabled = false;
-                    if (fastForwardButton) fastForwardButton.disabled = false;
-                    if (flipBoardButton) flipBoardButton.disabled = false;
+                    if (fastRewindButton) fastRewindButton.disabled = !inVariationMode;
+                    if (fastForwardButton) fastForwardButton.disabled = !inVariationMode;
+                    if (flipBoardButton) flipBoardButton.disabled = false; // Flip board always available if board exists
+                    if (resumeGameButton) resumeGameButton.disabled = !inVariationMode;
 
                 } else { // Board already exists, just updating position
                     board.setPosition(fenToDisplay, true); // true for animation
                     console.log(`Board updated. FEN: ${fenToDisplay}, Position index: ${data.move_index}`);
                 }
 
-                // General logic for enabling Next Critical button after any move, unless explicitly told no more.
-                if (nextCriticalButton && board) {
-                    if (url === '/game/next_critical_moment' && data.message && data.message.startsWith("No further critical moments found")) {
-                        // This case is handled by the click handler itself to disable the button.
-                    } else if (url !== '/api/load_game') { 
-                        nextCriticalButton.disabled = false;
+                // Button states based on mode
+                if (inVariationMode) {
+                    if (nextCriticalButton) nextCriticalButton.disabled = true;
+                    if (prevMoveButton) prevMoveButton.disabled = true; // Prev in variation not supported yet
+                    if (nextMoveButton) nextMoveButton.disabled = (currentVariationPly >= currentVariationSANs.length -1);
+                    if (fastRewindButton) fastRewindButton.disabled = true;
+                    if (fastForwardButton) fastForwardButton.disabled = true;
+                    if (resumeGameButton) resumeGameButton.disabled = false;
+                } else { // Main line play
+                    if (nextCriticalButton && board) {
+                         // Enable if not explicitly told no more criticals for this side
+                        const noMoreCriticals = url === '/game/next_critical_moment' && data.message && data.message.startsWith("No further critical moments found");
+                        if (url === '/api/load_game') { // Special handling for initial load
+                             nextCriticalButton.disabled = !(data.has_initial_critical_moment_for_white && learningSide === 'white');
+                        } else {
+                            nextCriticalButton.disabled = noMoreCriticals;
+                        }
                     }
+                    if (prevMoveButton) prevMoveButton.disabled = (data.move_index === 0);
+                    if (nextMoveButton) nextMoveButton.disabled = (data.move_index >= data.total_positions - 1);
+                    if (fastRewindButton) fastRewindButton.disabled = (data.move_index === 0);
+                    if (fastForwardButton) fastForwardButton.disabled = (data.move_index >= data.total_positions - 1);
+                    if (resumeGameButton) resumeGameButton.disabled = true;
                 }
-                // Ensure prev/next buttons are enabled if board exists and it's not an error case
-                if (board) {
-                    if (prevMoveButton) prevMoveButton.disabled = false;
-                    if (nextMoveButton) nextMoveButton.disabled = false;
-                    if (copyFenButton) copyFenButton.disabled = false;
-                    if (fastRewindButton) fastRewindButton.disabled = false;
-                    if (fastForwardButton) fastForwardButton.disabled = false;
-                    if (flipBoardButton) flipBoardButton.disabled = false;
-                }
+                if (copyFenButton) copyFenButton.disabled = !board; // Enabled if board exists
+                if (flipBoardButton) flipBoardButton.disabled = !board;
 
 
                 if (setupChallenge) {
                     moveInfoDisplay.textContent = `The move was ${lastMoveData.san}. Try a better move for ${learningSide}.`;
                     board.enableMoveInput(handleCriticalMoveAttempt, learningSide);
-                } else {
+                } else if (!inVariationMode) { // Don't update with main line move if we just entered variation
                     updateMoveInfoDisplay(lastMoveData); 
                 }
+                // If in variation mode, move info is updated by "Next Move" (variation) handler.
                 
                 if (data.message) { 
                     console.log(`Server message: ${data.message}`);
                 }
 
-            } else if (data.error) { // Handle errors from server (response not ok)
+            } else if (data.error) { 
                  console.error("Error from server:", data.error);
                  if (moveInfoDisplay) { 
                     moveInfoDisplay.textContent = data.error || "An unspecified error occurred.";
                  }
-                 if (playerNamesDisplay) playerNamesDisplay.textContent = ""; // Clear player names on error
+                 if (playerNamesDisplay) playerNamesDisplay.textContent = "";
+                 // Disable all navigation buttons on error
                  if (nextCriticalButton) nextCriticalButton.disabled = true;
                  if (prevMoveButton) prevMoveButton.disabled = true;
                  if (nextMoveButton) nextMoveButton.disabled = true;
@@ -270,13 +333,15 @@ document.addEventListener("DOMContentLoaded", () => {
                  if (fastRewindButton) fastRewindButton.disabled = true;
                  if (fastForwardButton) fastForwardButton.disabled = true;
                  if (flipBoardButton) flipBoardButton.disabled = true;
+                 if (resumeGameButton) resumeGameButton.disabled = true;
+                 inVariationMode = false; 
             }
             return data; 
         } catch (error) { 
             console.error(`Network or other error fetching from ${url}:`, error);
             alert(`Could not connect to the server or an error occurred. Please check the console for details. Error: ${error.message}`);
             if (moveInfoDisplay) moveInfoDisplay.textContent = "Network error or server unavailable.";
-            if (playerNamesDisplay) playerNamesDisplay.textContent = ""; // Clear player names on network error
+            if (playerNamesDisplay) playerNamesDisplay.textContent = ""; 
             if (nextCriticalButton) nextCriticalButton.disabled = true;
             if (prevMoveButton) prevMoveButton.disabled = true;
             if (nextMoveButton) nextMoveButton.disabled = true;
@@ -284,6 +349,8 @@ document.addEventListener("DOMContentLoaded", () => {
             if (fastRewindButton) fastRewindButton.disabled = true;
             if (fastForwardButton) fastForwardButton.disabled = true;
             if (flipBoardButton) flipBoardButton.disabled = true;
+            if (resumeGameButton) resumeGameButton.disabled = true;
+            inVariationMode = false; 
             return null;
         }
     }
@@ -305,6 +372,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (fastRewindButton) fastRewindButton.disabled = true;
                 if (fastForwardButton) fastForwardButton.disabled = true;
                 if (flipBoardButton) flipBoardButton.disabled = true;
+                if (resumeGameButton) resumeGameButton.disabled = true;
                 return;
             }
             const pgnFiles = await response.json();
@@ -316,6 +384,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (fastRewindButton) fastRewindButton.disabled = true;
                 if (fastForwardButton) fastForwardButton.disabled = true;
                 if (flipBoardButton) flipBoardButton.disabled = true;
+                if (resumeGameButton) resumeGameButton.disabled = true;
                 if (moveInfoDisplay) moveInfoDisplay.textContent = "No PGN files found in the configured directory. Check server PGN_DIR.";
             } else {
                 pgnFileSelect.innerHTML = '<option value="">-- Select a PGN --</option>'; // Placeholder
@@ -341,6 +410,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (fastRewindButton) fastRewindButton.disabled = true;
             if (fastForwardButton) fastForwardButton.disabled = true;
             if (flipBoardButton) flipBoardButton.disabled = true;
+            if (resumeGameButton) resumeGameButton.disabled = true;
         }
     }
 
@@ -355,6 +425,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (fastRewindButton) fastRewindButton.disabled = true;
     if (fastForwardButton) fastForwardButton.disabled = true;
     if (flipBoardButton) flipBoardButton.disabled = true;
+    if (resumeGameButton) resumeGameButton.disabled = true;
     
     loadPgnFileList(); // Load PGN files on page load
     // Board is not initialized until a game is loaded.
@@ -380,6 +451,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (fastRewindButton) fastRewindButton.disabled = true;
         if (fastForwardButton) fastForwardButton.disabled = true;
         if (flipBoardButton) flipBoardButton.disabled = true;
+        if (resumeGameButton) resumeGameButton.disabled = true;
+        inVariationMode = false; // Reset variation mode
 
 
         if (pgnFileId && gameCount > 0) {
@@ -432,15 +505,55 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     document.getElementById("next-move")?.addEventListener("click", async () => {
-        console.log("Next move clicked");
-        if (board) {
+        if (!board) {
+            alert("Please load a game first.");
+            return;
+        }
+
+        if (inVariationMode) {
+            console.log("Next move clicked (Variation Mode)");
+            currentVariationPly++;
+            if (currentVariationPly < currentVariationSANs.length) {
+                const nextSan = currentVariationSANs[currentVariationPly];
+                try {
+                    // Use cm-chessboard's internal chess.js instance to make the move
+                    const moveResult = board.chess.move(nextSan, { sloppy: true }); // Use sloppy for PGN SANs
+                    if (moveResult) {
+                        currentFenInVariation = board.chess.fen();
+                        board.setPosition(currentFenInVariation, true); // true for animation
+                        updateMoveInfoDisplay({ san: nextSan }, true, currentVariationPly);
+                        if (nextMoveButton) nextMoveButton.disabled = (currentVariationPly >= currentVariationSANs.length - 1);
+                        if (prevMoveButton) prevMoveButton.disabled = true; // Still no prev in variation
+                    } else {
+                        console.error(`Illegal move in variation: ${nextSan} from FEN: ${currentFenInVariation}`);
+                        moveInfoDisplay.textContent = `Error: Illegal move '${nextSan}' in variation. Resuming main game.`;
+                        if (resumeGameButton) resumeGameButton.click(); // Attempt to resume main game
+                    }
+                } catch (e) {
+                    console.error(`Error playing variation move ${nextSan}:`, e);
+                    moveInfoDisplay.textContent = `Error playing variation move. Resuming main game.`;
+                    if (resumeGameButton) resumeGameButton.click();
+                }
+            } else {
+                // End of variation
+                moveInfoDisplay.textContent = "End of variation.";
+                if (nextMoveButton) nextMoveButton.disabled = true;
+            }
+        } else { // Main line play
+            console.log("Next move clicked (Main Line)");
             await fetchAndUpdateBoard('/game/next_move', 'POST');
-        } else {
-            alert("Please load a game first using the 'Load First Game' button.");
         }
     });
 
-    // Event listener for "Next Critical Moment" button
+    resumeGameButton?.addEventListener("click", async () => {
+        if (!inVariationMode) return; // Should not happen if button is managed correctly
+        console.log("Resume game clicked");
+        inVariationMode = false;
+        await fetchAndUpdateBoard('/game/set_move_index', 'POST', { move_index: mainLineMoveIndexAtVariationStart });
+        // fetchAndUpdateBoard will handle disabling resumeGameButton and enabling other buttons.
+    });
+
+    // Event listener for "Next Critical Moment" button (now "Next Mistake")
     nextCriticalButton?.addEventListener("click", async () => {
         console.log("Next critical moment clicked");
         if (!board) { // Check if a game is loaded
@@ -472,18 +585,34 @@ document.addEventListener("DOMContentLoaded", () => {
     learnSideSelect?.addEventListener("change", (event) => {
         learningSide = event.target.value;
         console.log("Learning side changed to:", learningSide);
-        if (inCriticalMomentChallenge) {
-            console.log("Learning side changed during a critical challenge. Challenge cancelled.");
+        if (inCriticalMomentChallenge || inVariationMode) {
+            console.log("Learning side changed during challenge/variation. Mode cancelled.");
             inCriticalMomentChallenge = false;
+            inVariationMode = false;
             if (board) board.disableMoveInput();
-            fetchAndUpdateBoard('/game/current_fen'); 
+            // Fetch current FEN of the main line to reset state before flipping.
+            // If mainLineMoveIndexAtVariationStart is set, use it, otherwise current_fen.
+            if (mainLineMoveIndexAtVariationStart && !inCriticalMomentChallenge) { // Ensure we are not in prompt
+                 fetchAndUpdateBoard('/game/set_move_index', 'POST', { move_index: mainLineMoveIndexAtVariationStart })
+                    .then(() => {
+                        if (board) { // Board might be re-initialized
+                           const newOrientation = learningSide === 'white' ? COLOR.white : COLOR.black;
+                           board.setOrientation(newOrientation, true);
+                           console.log("Board orientation changed to:", learningSide);
+                        }
+                         if (nextCriticalButton && board) nextCriticalButton.disabled = false;
+                    });
+                 return; // Avoid double update/flip
+            } else {
+                 fetchAndUpdateBoard('/game/current_fen'); // Resets to current main line FEN
+            }
         }
-        // If a game is loaded, changing learning side should re-enable the next critical button.
-        // The click on the button will then verify if a critical moment exists for the new side.
-        if (board && nextCriticalButton) {
+        
+        // If a game is loaded and not in variation/challenge, changing learning side should re-enable the next critical button.
+        if (board && nextCriticalButton && !inVariationMode && !inCriticalMomentChallenge) {
             nextCriticalButton.disabled = false;
         }
-        // Flip board orientation if board exists
+        // Flip board orientation if board exists (and not handled by async above)
         if (board) {
             const newOrientation = learningSide === 'white' ? COLOR.white : COLOR.black;
             board.setOrientation(newOrientation, true); // true for animation

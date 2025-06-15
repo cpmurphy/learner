@@ -76,6 +76,7 @@ module AppHelpers
       annotation: move.annotation, # NAGs (Numeric Annotation Glyphs)
       is_critical: is_critical_moment,
       good_move_san: good_san,
+      variation_sans: variation_sans, # Add the SANs for the first variation
       fen_before_move: fen_before_this_move
     }
   end

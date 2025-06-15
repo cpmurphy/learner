@@ -300,4 +300,38 @@ post '/game/go_to_end' do
     message: "Went to end of the game."
   })
 end
+
+# API endpoint to set the game to a specific move index
+post '/game/set_move_index' do
+  unless game_loaded?
+    return json_response({ error: "No game loaded." }, 404)
+  end
+
+  begin
+    params = JSON.parse(request.body.read)
+    target_move_index = params['move_index']
+  rescue JSON::ParserError
+    return json_response({ error: "Invalid JSON in request body" }, 400)
+  end
+
+  unless target_move_index.is_a?(Integer) && target_move_index >= 0 && target_move_index < $game.positions.size
+    return json_response({ error: "Invalid move_index: #{target_move_index}" }, 400)
+  end
+
+  $current_move_index = target_move_index
+  last_move = get_last_move_info($game, $current_move_index)
+  # Include player names as other navigation endpoints do
+  white_player = $game.tags["White"] || "Unknown White"
+  black_player = $game.tags["Black"] || "Unknown Black"
+
+  json_response({
+    fen: current_board_fen,
+    move_index: $current_move_index,
+    total_positions: $game.positions.size,
+    last_move: last_move,
+    white_player: white_player,
+    black_player: black_player,
+    message: "Game set to move index #{target_move_index}."
+  })
+end
 # --- End Routes ---
