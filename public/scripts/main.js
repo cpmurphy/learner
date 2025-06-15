@@ -28,6 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let inCriticalMomentChallenge = false;
     let fenAtCriticalPrompt = null; // FEN before the bad move, for reverting
     let goodMoveSanForChallenge = null; // SAN of the good alternative move
+    let lastKnownServerFEN = null; // Stores the last FEN received from the server for the main line
 
     // State for variation play
     let inVariationMode = false;
@@ -200,6 +201,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 window.lastServerMoveData = { ...data.last_move, move_index_of_blunder: data.move_index };
             }
 
+            // Update the last known FEN from the server if provided
+            if (data.fen) {
+                lastKnownServerFEN = data.fen;
+            }
 
             if (data.message && (url === '/api/load_game' || url === '/game/next_move' || url === '/game/prev_move' || url === '/game/next_critical_moment' || url === '/game/set_move_index')) { 
                 console.log(`Server message: ${data.message}`);
@@ -659,21 +664,41 @@ document.addEventListener("DOMContentLoaded", () => {
             alert("Board is not initialized. Load a game first.");
             return;
         }
-        const currentFen = board.getPosition();
-        if (currentFen) {
+        let fenToCopy = null;
+
+        if (inCriticalMomentChallenge && fenAtCriticalPrompt) {
+            // User is being prompted for a move at a critical moment.
+            // fenAtCriticalPrompt is the FEN of the board state shown.
+            fenToCopy = fenAtCriticalPrompt;
+            console.log("Copying FEN from critical moment prompt (server-derived):", fenToCopy);
+        } else if (inVariationMode && currentFenInVariation) {
+            // User is navigating a client-side variation.
+            // currentFenInVariation is derived from board.chess.fen().
+            fenToCopy = currentFenInVariation;
+            console.log("Copying FEN from client-side variation:", fenToCopy);
+        } else if (lastKnownServerFEN) {
+            // Normal main line play, use the last FEN received from the server.
+            fenToCopy = lastKnownServerFEN;
+            console.log("Copying last known server FEN for main line:", fenToCopy);
+        } else {
+            // Fallback if none of the above conditions met (should be rare if game is loaded).
+            // This might happen if a game is loaded but no FEN was received yet, or state is unusual.
+            fenToCopy = board.getPosition(); // Get current FEN from cm-chessboard
+            console.warn("Copying FEN using board.getPosition() as fallback:", fenToCopy);
+        }
+
+        if (fenToCopy) {
             try {
-                await navigator.clipboard.writeText(currentFen);
+                await navigator.clipboard.writeText(fenToCopy);
                 const feedbackSpan = document.getElementById("copy-fen-feedback");
                 if (feedbackSpan) {
                     feedbackSpan.textContent = "Copied!";
                     feedbackSpan.style.opacity = "1";
                     feedbackSpan.style.visibility = "visible";
-                    console.log("FEN copied to clipboard:", currentFen);
+                    console.log("FEN copied to clipboard:", fenToCopy);
                     setTimeout(() => {
                         feedbackSpan.style.opacity = "0";
                         feedbackSpan.style.visibility = "hidden";
-                        // Optionally clear text after fade out if needed, though visibility hidden is enough
-                        // setTimeout(() => { feedbackSpan.textContent = ""; }, 300); // Match transition duration
                     }, 1500); // Start hiding after 1.5 seconds
                 }
             } catch (err) {
@@ -681,7 +706,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 alert("Failed to copy FEN. See console for details.");
             }
         } else {
-            alert("Could not get FEN from board.");
+            alert("Could not determine FEN to copy for the current board state.");
         }
     });
 });
