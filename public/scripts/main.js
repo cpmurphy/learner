@@ -247,7 +247,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
                 if (setupChallenge) {
-                    moveInfoDisplay.textContent = `Critical moment! The game move was ${lastMoveData.san}. That was a poor choice. Try a better move for ${learningSide}.`;
+                    moveInfoDisplay.textContent = `The move was ${lastMoveData.san}. Try a better move for ${learningSide}.`;
                     board.enableMoveInput(handleCriticalMoveAttempt, learningSide);
                 } else {
                     updateMoveInfoDisplay(lastMoveData); 
