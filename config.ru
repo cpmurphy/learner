@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-# This is a Rack configuration file.
-# It's used by servers like Puma or Rackup to start the application.
+require 'bundler'
 
-require './app' # Load our Sinatra application from app.rb
+Bundler.require
 
-run Sinatra::Application
+require './app'
+run LearnerApp
