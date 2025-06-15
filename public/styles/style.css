@@ -103,7 +103,7 @@ h1 {
 }
 
 .copy-feedback {
-    display: none; /* Hidden by default, JS will toggle to 'block' or 'inline-block' */
+    display: block; /* Allow transitions by not being 'none'. Initially hidden by opacity/visibility. */
     position: absolute;
     top: 50%;
     left: 50%;
