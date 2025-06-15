@@ -97,10 +97,28 @@ h1 {
     padding: 5px 0; /* Some vertical padding */
 }
 
+.copy-fen-container {
+    position: relative; /* Establishes a positioning context for the feedback bubble */
+    display: inline-block; /* To keep it in line with other buttons if needed, or adjust as part of flex layout */
+}
+
 .copy-feedback {
-    display: none; /* Hidden by default */
-    margin-left: 8px; /* Space it out from the button */
+    display: none; /* Hidden by default, JS will toggle to 'block' or 'inline-block' */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%); /* Center on the button */
+    background-color: #4CAF50; /* Green background for success */
+    color: white;
+    padding: 6px 12px;
+    border-radius: 5px;
     font-size: 0.9em;
-    color: green;
     font-weight: bold;
+    white-space: nowrap; /* Prevent text from wrapping */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    z-index: 100; /* Ensure it's above other elements */
+    pointer-events: none; /* So it doesn't interfere with button clicks */
+    opacity: 0; /* For fade-in/out effect */
+    visibility: hidden;
+    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
 }

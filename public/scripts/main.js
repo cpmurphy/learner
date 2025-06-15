@@ -537,12 +537,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 const feedbackSpan = document.getElementById("copy-fen-feedback");
                 if (feedbackSpan) {
                     feedbackSpan.textContent = "Copied!";
-                    feedbackSpan.style.display = "inline"; // Show feedback
+                    feedbackSpan.style.opacity = "1";
+                    feedbackSpan.style.visibility = "visible";
                     console.log("FEN copied to clipboard:", currentFen);
                     setTimeout(() => {
-                        feedbackSpan.textContent = "";
-                        feedbackSpan.style.display = "none"; // Hide feedback
-                    }, 1500); // Clear and hide after 1.5 seconds
+                        feedbackSpan.style.opacity = "0";
+                        feedbackSpan.style.visibility = "hidden";
+                        // Optionally clear text after fade out if needed, though visibility hidden is enough
+                        // setTimeout(() => { feedbackSpan.textContent = ""; }, 300); // Match transition duration
+                    }, 1500); // Start hiding after 1.5 seconds
                 }
             } catch (err) {
                 console.error("Failed to copy FEN to clipboard:", err);
