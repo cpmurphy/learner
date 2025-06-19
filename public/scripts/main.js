@@ -1,5 +1,6 @@
 import { Chessboard, COLOR } from "./3rdparty/cm-chessboard/Chessboard.js";
 import { SanGenerator } from './san_generator.js';
+import { Chess } from './3rdparty/chess.js/chess.js';
 // We no longer need to import FEN directly as the backend will provide it.
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -38,6 +39,45 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentFenInVariation = null;
 
     /**
+     * Converts a SAN move to square coordinates for cm-chessboard's movePiece method.
+     * @param {string} san - The SAN move string (e.g., "e4", "Nf3", "O-O")
+     * @param {string} fen - The FEN string representing the current board position
+     * @returns {object|null} - Object with from and to square coordinates, or null if invalid
+     */
+    function sanToSquares(san, fen) {
+        if (!fen || typeof fen !== 'string') {
+            console.error("sanToSquares: Invalid FEN parameter:", fen);
+            return null;
+        }
+
+        // Basic FEN validation - should have 6 space-delimited fields
+        const fenParts = fen.trim().split(/\s+/);
+        if (fenParts.length !== 6) {
+            console.error("sanToSquares: FEN must have 6 space-delimited fields, got:", fenParts.length, "parts:", fenParts);
+            return null;
+        }
+
+        try {
+            const chess = new Chess(fen);
+            const move = chess._moveFromSan(san, false); // Use non-strict parsing for PGN SANs
+
+            if (move) {
+                // Convert internal 0x88 coordinates to algebraic notation
+                // file = square & 0xf, rank = square >> 4
+                const fromSquare = 'abcdefgh'.substring(move.from & 0xf, (move.from & 0xf) + 1) +
+                                 '87654321'.substring(move.from >> 4, (move.from >> 4) + 1);
+                const toSquare = 'abcdefgh'.substring(move.to & 0xf, (move.to & 0xf) + 1) +
+                               '87654321'.substring(move.to >> 4, (move.to >> 4) + 1);
+                return { from: fromSquare, to: toSquare };
+            }
+            return null;
+        } catch (e) {
+            console.error("Error converting SAN to squares:", e);
+            return null;
+        }
+    }
+
+    /**
      * Handles the user's move attempt during a critical moment challenge.
      * This function is passed to `board.enableMoveInput`.
      * @param {object} event - The event object from cm-chessboard, contains `squareFrom`, `squareTo`, `piece`.
@@ -47,7 +87,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (event.type !== 'moveInputFinished') {
             return; // Ignore non-moveInputFinished events
         }
-        
+
         if (!inCriticalMomentChallenge || !goodMoveSanForChallenge) {
             console.warn("handleCriticalMoveAttempt called inappropriately.");
             return false;
@@ -62,7 +102,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 // This implies the move was illegal by chess.js in SanGenerator,
                 // or some other error occurred (e.g. invalid FEN, missing params).
                 // The SanGenerator logs specifics.
-                console.error("Critical Challenge - SanGenerator could not produce SAN. Move might be illegal or data inconsistent.", 
+                console.error("Critical Challenge - SanGenerator could not produce SAN. Move might be illegal or data inconsistent.",
                               { from: event.squareFrom, to: event.squareTo, promotion: event.promotionPiece, fen: fenAtCriticalPrompt });
                 moveInfoDisplay.textContent = "That move is not valid or could not be processed. Try again!";
                 // Ensure board is reset to the state before the attempted invalid move.
@@ -71,7 +111,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
                 return false; // Reject the move.
             }
-        } catch (e) { 
+        } catch (e) {
             // Catch any unexpected errors from SanGenerator instantiation or getSan() itself, though SanGenerator is designed to catch its own errors.
             console.error("Critical Challenge - Error generating SAN using SanGenerator:", e);
             moveInfoDisplay.textContent = "Error processing your move. Try again!";
@@ -81,7 +121,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             return false;
         }
-        
+
         console.log(`Critical Challenge - User attempted: ${userMoveSan} (derived from ${event.squareFrom}-${event.squareTo}${event.promotionPiece ? "="+event.promotionPiece : ""}), Expected good move: ${goodMoveSanForChallenge}`);
 
         if (userMoveSan === goodMoveSanForChallenge) {
@@ -93,7 +133,29 @@ document.addEventListener("DOMContentLoaded", () => {
                 mainLineMoveIndexAtVariationStart = lastMoveDataForVariation.move_index_of_blunder; // Need to ensure this is correctly set
                 currentVariationSANs = lastMoveDataForVariation.variation_sans;
                 currentVariationPly = 0; // They just played the first move (index 0) of the variation
-                currentFenInVariation = board.getPosition(); // FEN after their correct first variation move
+
+                // cm-chessboard's getPosition() only returns the board part, not the full FEN
+                // We need to create a proper FEN from the last known server FEN and the move that was just made
+                const boardPosition = board.getPosition(); // This is just the board part like "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
+                if (lastKnownServerFEN) {
+                    // Update the board part of the last known FEN with the current board position
+                    const fenParts = lastKnownServerFEN.split(' ');
+                    fenParts[0] = boardPosition; // Replace the board part
+
+                    // Determine the correct turn for the variation
+                    // The player just made the first move (variationPly = 0), so the next turn should be the opposite side
+                    const nextTurn = learningSide === 'white' ? 'b' : 'w';
+                    fenParts[1] = nextTurn;
+
+                    // Reset move counters for variation
+                    fenParts[4] = '0'; // halfmove clock
+                    fenParts[5] = '1'; // fullmove number
+                    currentFenInVariation = fenParts.join(' ');
+                } else {
+                    // Fallback: create a minimal FEN with just the board and turn
+                    const nextTurn = learningSide === 'white' ? 'b' : 'w';
+                    currentFenInVariation = `${boardPosition} ${nextTurn} KQkq - 0 1`;
+                }
 
                 moveInfoDisplay.textContent = `Correct! "${userMoveSan}" starts a good variation. Use 'Next Move' to explore it.`;
                 if (resumeGameButton) resumeGameButton.disabled = false;
@@ -104,7 +166,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 // Should not happen if goodMoveSanForChallenge was set, but as a fallback:
                 moveInfoDisplay.textContent = `Correct! "${userMoveSan}" is a better move. Main game continues.`;
             }
-            
+
             board.disableMoveInput();
             inCriticalMomentChallenge = false;
             return true;
@@ -115,7 +177,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return false;
         }
     }
-    
+
     /**
      * Updates the move information display area.
      * @param {object|null} lastMoveData - Data about the last move, or null.
@@ -156,7 +218,7 @@ document.addEventListener("DOMContentLoaded", () => {
      */
     // Cache last server move data that might contain variation info
     // This is a bit of a hack; ideally, this context would be managed more cleanly.
-    window.lastServerMoveData = null; 
+    window.lastServerMoveData = null;
 
     async function fetchAndUpdateBoard(url, method = 'GET', body = null) {
         try {
@@ -172,15 +234,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 console.error(`Error from server ${url}: ${response.status} ${response.statusText}`, data.error || '');
                 const errorMsg = data.error || `Server error ${response.status}. Check console.`;
                 if (moveInfoDisplay) moveInfoDisplay.textContent = `Error: ${errorMsg}`;
-                if (playerNamesDisplay) playerNamesDisplay.textContent = ""; 
-                
+                if (playerNamesDisplay) playerNamesDisplay.textContent = "";
+
                 if (errorMsg.includes("No game loaded")) {
-                     if (url === '/game/current_fen' && !board) { 
+                     if (url === '/game/current_fen' && !board) {
                         moveInfoDisplay.textContent = "Please select a PGN file and load a game.";
                      }
                 } else if (errorMsg.includes("PGN_DIR environment variable not set") || errorMsg.includes("PGN directory not found")) {
                     alert("Server PGN directory not configured. Please check server logs.");
-                } else if (url === '/api/load_game') { 
+                } else if (url === '/api/load_game') {
                     alert(`Error loading game: ${errorMsg}`);
                 }
                 // Disable all navigation buttons on error
@@ -195,7 +257,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 inVariationMode = false; // Exit variation mode on error
                 return null;
             }
-            
+
             // Cache data if it contains last_move info, for variation handling
             if (data.last_move) {
                 window.lastServerMoveData = { ...data.last_move, move_index_of_blunder: data.move_index };
@@ -206,7 +268,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 lastKnownServerFEN = data.fen;
             }
 
-            if (data.message && (url === '/api/load_game' || url === '/game/next_move' || url === '/game/prev_move' || url === '/game/next_critical_moment' || url === '/game/set_move_index')) { 
+            if (data.message && (url === '/api/load_game' || url === '/game/next_move' || url === '/game/prev_move' || url === '/game/next_critical_moment' || url === '/game/set_move_index')) {
                 console.log(`Server message: ${data.message}`);
             }
 
@@ -214,7 +276,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 playerNamesDisplay.textContent = `${data.white_player} vs ${data.black_player}`;
             } else if (playerNamesDisplay) {
                 // Clear if names are not in data, e.g. before game load or if API doesn't send them
-                // playerNamesDisplay.textContent = ""; 
+                // playerNamesDisplay.textContent = "";
                 // Decided to only clear on explicit error or no game loaded scenarios.
                 // If a game is loaded, names should persist.
             }
@@ -240,7 +302,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     inCriticalMomentChallenge = false;
                     // board.disableMoveInput(); // Now called unconditionally above
                 }
-                
+
                 // If we successfully set move index (e.g. resuming game), exit variation mode.
                 if (url === '/game/set_move_index' || url === '/api/load_game' || url === '/game/go_to_start' || url === '/game/go_to_end') {
                     inVariationMode = false;
@@ -267,7 +329,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         if (data.has_initial_critical_moment_for_white && learningSide === 'white') {
                             nextCriticalButton.disabled = false;
                         } else {
-                            nextCriticalButton.disabled = true; 
+                            nextCriticalButton.disabled = true;
                         }
                     }
                     // Enable prev/next buttons now that a game is loaded
@@ -316,17 +378,17 @@ document.addEventListener("DOMContentLoaded", () => {
                     moveInfoDisplay.textContent = `The move was ${lastMoveData.san}. Try a better move for ${learningSide}.`;
                     board.enableMoveInput(handleCriticalMoveAttempt, learningSide);
                 } else if (!inVariationMode) { // Don't update with main line move if we just entered variation
-                    updateMoveInfoDisplay(lastMoveData); 
+                    updateMoveInfoDisplay(lastMoveData);
                 }
                 // If in variation mode, move info is updated by "Next Move" (variation) handler.
-                
-                if (data.message) { 
+
+                if (data.message) {
                     console.log(`Server message: ${data.message}`);
                 }
 
-            } else if (data.error) { 
+            } else if (data.error) {
                  console.error("Error from server:", data.error);
-                 if (moveInfoDisplay) { 
+                 if (moveInfoDisplay) {
                     moveInfoDisplay.textContent = data.error || "An unspecified error occurred.";
                  }
                  if (playerNamesDisplay) playerNamesDisplay.textContent = "";
@@ -339,14 +401,14 @@ document.addEventListener("DOMContentLoaded", () => {
                  if (fastForwardButton) fastForwardButton.disabled = true;
                  if (flipBoardButton) flipBoardButton.disabled = true;
                  if (resumeGameButton) resumeGameButton.disabled = true;
-                 inVariationMode = false; 
+                 inVariationMode = false;
             }
-            return data; 
-        } catch (error) { 
+            return data;
+        } catch (error) {
             console.error(`Network or other error fetching from ${url}:`, error);
             alert(`Could not connect to the server or an error occurred. Please check the console for details. Error: ${error.message}`);
             if (moveInfoDisplay) moveInfoDisplay.textContent = "Network error or server unavailable.";
-            if (playerNamesDisplay) playerNamesDisplay.textContent = ""; 
+            if (playerNamesDisplay) playerNamesDisplay.textContent = "";
             if (nextCriticalButton) nextCriticalButton.disabled = true;
             if (prevMoveButton) prevMoveButton.disabled = true;
             if (nextMoveButton) nextMoveButton.disabled = true;
@@ -355,7 +417,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (fastForwardButton) fastForwardButton.disabled = true;
             if (flipBoardButton) flipBoardButton.disabled = true;
             if (resumeGameButton) resumeGameButton.disabled = true;
-            inVariationMode = false; 
+            inVariationMode = false;
             return null;
         }
     }
@@ -402,7 +464,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
                 // Initial state: loadPgnButton disabled until a multi-game PGN is selected,
                 // or enabled if a single-game PGN is auto-loaded (handled in 'change' event).
-                if (loadPgnButton) loadPgnButton.disabled = true; 
+                if (loadPgnButton) loadPgnButton.disabled = true;
                 if (moveInfoDisplay) moveInfoDisplay.textContent = "Please select a PGN file and load a game.";
             }
         } catch (error) {
@@ -431,7 +493,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (fastForwardButton) fastForwardButton.disabled = true;
     if (flipBoardButton) flipBoardButton.disabled = true;
     if (resumeGameButton) resumeGameButton.disabled = true;
-    
+
     loadPgnFileList(); // Load PGN files on page load
     // Board is not initialized until a game is loaded.
     // Initial message is set within loadPgnFileList or if it fails.
@@ -490,11 +552,11 @@ document.addEventListener("DOMContentLoaded", () => {
         // fetchAndUpdateBoard will handle initializing or updating the board
         // and displaying initial move info or "Game start."
         const gameData = await fetchAndUpdateBoard('/api/load_game', 'POST', { pgn_file_id: selectedPgnId });
-        if (gameData && gameData.fen) { 
+        if (gameData && gameData.fen) {
              if (moveInfoDisplay && !gameData.last_move) moveInfoDisplay.textContent = "Game loaded. Ready to start.";
              // The logic within fetchAndUpdateBoard now handles enabling/disabling nextCriticalButton
              // based on data.has_initial_critical_moment_for_white and current learningSide.
-        } else if (!gameData) { 
+        } else if (!gameData) {
             if (moveInfoDisplay) moveInfoDisplay.textContent = "Failed to load game. Check console or select another file.";
             // nextCriticalButton is disabled by fetchAndUpdateBoard in case of error or if board doesn't init
         }
@@ -521,16 +583,52 @@ document.addEventListener("DOMContentLoaded", () => {
             if (currentVariationPly < currentVariationSANs.length) {
                 const nextSan = currentVariationSANs[currentVariationPly];
                 try {
-                    // Use cm-chessboard's internal chess.js instance to make the move
-                    const moveResult = board.chess.move(nextSan, { sloppy: true }); // Use sloppy for PGN SANs
-                    if (moveResult) {
-                        currentFenInVariation = board.chess.fen();
-                        board.setPosition(currentFenInVariation, true); // true for animation
+                    // Use currentFenInVariation if valid, otherwise fall back to lastKnownServerFEN
+                    const fenToUse = currentFenInVariation || lastKnownServerFEN;
+                    if (!fenToUse) {
+                        console.error("No valid FEN available for variation move");
+                        moveInfoDisplay.textContent = "Error: No valid board position available. Resuming main game.";
+                        if (resumeGameButton) resumeGameButton.click();
+                        return;
+                    }
+
+                    // Convert SAN to square coordinates for cm-chessboard
+                    const squares = sanToSquares(nextSan, fenToUse);
+                    if (squares) {
+                        // Use cm-chessboard's movePiece method
+                        await board.movePiece(squares.from, squares.to, true); // true for animation
+
+                        // Update the FEN properly - board.getPosition() only returns the board part
+                        const boardPosition = board.getPosition();
+                        if (currentFenInVariation) {
+                            const fenParts = currentFenInVariation.split(' ');
+                            fenParts[0] = boardPosition; // Update board part
+
+                            // Determine the correct turn for the move we're about to make
+                            // The move we're about to make is at currentVariationPly
+                            const turnForMove = currentVariationPly % 2 === 0 ?
+                                (learningSide === 'white' ? 'w' : 'b') :
+                                (learningSide === 'white' ? 'b' : 'w');
+                            fenParts[1] = turnForMove;
+
+                            // Update move counters
+                            if (fenParts[1] === 'w') {
+                                fenParts[5] = (parseInt(fenParts[5]) + 1).toString(); // Increment fullmove number
+                            }
+                            currentFenInVariation = fenParts.join(' ');
+                        } else {
+                            // Fallback
+                            const turnForMove = currentVariationPly % 2 === 0 ?
+                                (learningSide === 'white' ? 'w' : 'b') :
+                                (learningSide === 'white' ? 'b' : 'w');
+                            currentFenInVariation = `${boardPosition} ${turnForMove} KQkq - 0 1`;
+                        }
+
                         updateMoveInfoDisplay({ san: nextSan }, true, currentVariationPly);
                         if (nextMoveButton) nextMoveButton.disabled = (currentVariationPly >= currentVariationSANs.length - 1);
                         if (prevMoveButton) prevMoveButton.disabled = true; // Still no prev in variation
                     } else {
-                        console.error(`Illegal move in variation: ${nextSan} from FEN: ${currentFenInVariation}`);
+                        console.error(`Illegal move in variation: ${nextSan} from FEN: ${fenToUse}`);
                         moveInfoDisplay.textContent = `Error: Illegal move '${nextSan}' in variation. Resuming main game.`;
                         if (resumeGameButton) resumeGameButton.click(); // Attempt to resume main game
                     }
@@ -612,7 +710,7 @@ document.addEventListener("DOMContentLoaded", () => {
                  fetchAndUpdateBoard('/game/current_fen'); // Resets to current main line FEN
             }
         }
-        
+
         // If a game is loaded and not in variation/challenge, changing learning side should re-enable the next critical button.
         if (board && nextCriticalButton && !inVariationMode && !inCriticalMomentChallenge) {
             nextCriticalButton.disabled = false;
@@ -650,12 +748,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         learningSide = (learningSide === 'white') ? 'black' : 'white';
         learnSideSelect.value = learningSide; // Update dropdown
-        
+
         // Manually trigger the change event logic for learnSideSelect
         // to avoid duplicating the board flipping and console logging logic.
         const event = new Event('change');
         learnSideSelect.dispatchEvent(event);
-        
+
         console.log("Board flipped by button. Learning side now:", learningSide);
     });
 
@@ -673,7 +771,7 @@ document.addEventListener("DOMContentLoaded", () => {
             console.log("Copying FEN from critical moment prompt (server-derived):", fenToCopy);
         } else if (inVariationMode && currentFenInVariation) {
             // User is navigating a client-side variation.
-            // currentFenInVariation is derived from board.chess.fen().
+            // currentFenInVariation is derived from board.getPosition().
             fenToCopy = currentFenInVariation;
             console.log("Copying FEN from client-side variation:", fenToCopy);
         } else if (lastKnownServerFEN) {
