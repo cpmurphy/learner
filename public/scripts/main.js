@@ -1,5 +1,5 @@
 import { Chessboard, COLOR } from "./3rdparty/cm-chessboard/Chessboard.js";
-import { SanGenerator } from './san_generator.js';
+import { MoveHelper } from './move_helper.js';
 import { Chess } from './3rdparty/chess.js/chess.js';
 // We no longer need to import FEN directly as the backend will provide it.
 
@@ -39,45 +39,6 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentFenInVariation = null;
 
     /**
-     * Converts a SAN move to square coordinates for cm-chessboard's movePiece method.
-     * @param {string} san - The SAN move string (e.g., "e4", "Nf3", "O-O")
-     * @param {string} fen - The FEN string representing the current board position
-     * @returns {object|null} - Object with from and to square coordinates, or null if invalid
-     */
-    function sanToSquares(san, fen) {
-        if (!fen || typeof fen !== 'string') {
-            console.error("sanToSquares: Invalid FEN parameter:", fen);
-            return null;
-        }
-
-        // Basic FEN validation - should have 6 space-delimited fields
-        const fenParts = fen.trim().split(/\s+/);
-        if (fenParts.length !== 6) {
-            console.error("sanToSquares: FEN must have 6 space-delimited fields, got:", fenParts.length, "parts:", fenParts);
-            return null;
-        }
-
-        try {
-            const chess = new Chess(fen);
-            const move = chess._moveFromSan(san, false); // Use non-strict parsing for PGN SANs
-
-            if (move) {
-                // Convert internal 0x88 coordinates to algebraic notation
-                // file = square & 0xf, rank = square >> 4
-                const fromSquare = 'abcdefgh'.substring(move.from & 0xf, (move.from & 0xf) + 1) +
-                                 '87654321'.substring(move.from >> 4, (move.from >> 4) + 1);
-                const toSquare = 'abcdefgh'.substring(move.to & 0xf, (move.to & 0xf) + 1) +
-                               '87654321'.substring(move.to >> 4, (move.to >> 4) + 1);
-                return { from: fromSquare, to: toSquare };
-            }
-            return null;
-        } catch (e) {
-            console.error("Error converting SAN to squares:", e);
-            return null;
-        }
-    }
-
-    /**
      * Handles the user's move attempt during a critical moment challenge.
      * This function is passed to `board.enableMoveInput`.
      * @param {object} event - The event object from cm-chessboard, contains `squareFrom`, `squareTo`, `piece`.
@@ -95,14 +56,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
         let userMoveSan;
         try {
-            const sanGenerator = new SanGenerator(fenAtCriticalPrompt, event.squareFrom, event.squareTo, event.promotionPiece);
-            userMoveSan = sanGenerator.getSan();
+            const moveHelper = new MoveHelper(fenAtCriticalPrompt, event.squareFrom, event.squareTo, event.promotionPiece);
+            userMoveSan = moveHelper.getSan();
 
             if (!userMoveSan) {
-                // This implies the move was illegal by chess.js in SanGenerator,
+                // This implies the move was illegal by chess.js in MoveHelper,
                 // or some other error occurred (e.g. invalid FEN, missing params).
-                // The SanGenerator logs specifics.
-                console.error("Critical Challenge - SanGenerator could not produce SAN. Move might be illegal or data inconsistent.",
+                // The MoveHelper logs specifics.
+                console.error("Critical Challenge - MoveHelper could not produce SAN. Move might be illegal or data inconsistent.",
                               { from: event.squareFrom, to: event.squareTo, promotion: event.promotionPiece, fen: fenAtCriticalPrompt });
                 moveInfoDisplay.textContent = "That move is not valid or could not be processed. Try again!";
                 // Ensure board is reset to the state before the attempted invalid move.
@@ -112,8 +73,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 return false; // Reject the move.
             }
         } catch (e) {
-            // Catch any unexpected errors from SanGenerator instantiation or getSan() itself, though SanGenerator is designed to catch its own errors.
-            console.error("Critical Challenge - Error generating SAN using SanGenerator:", e);
+            // Catch any unexpected errors from MoveHelper instantiation or getSan() itself, though MoveHelper is designed to catch its own errors.
+            console.error("Critical Challenge - Error generating SAN using MoveHelper:", e);
             moveInfoDisplay.textContent = "Error processing your move. Try again!";
             // Ensure board is reset if an unexpected error occurs during SAN generation.
             if (board && fenAtCriticalPrompt) {
@@ -593,7 +554,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
 
                     // Convert SAN to square coordinates for cm-chessboard
-                    const squares = sanToSquares(nextSan, fenToUse);
+                    const squares = MoveHelper.sanToSquares(nextSan, fenToUse);
                     if (squares) {
                         // Use cm-chessboard's movePiece method
                         await board.movePiece(squares.from, squares.to, true); // true for animation
