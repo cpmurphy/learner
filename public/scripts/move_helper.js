@@ -57,10 +57,10 @@ export class MoveHelper {
     }
 
     /**
-     * Converts a SAN move to square coordinates for cm-chessboard's movePiece method.
-     * @param {string} san - The SAN move string (e.g., "e4", "Nf3", "O-O")
-     * @param {string} fen - The FEN string representing the current board position
-     * @returns {object|null} - Object with from and to square coordinates, or null if invalid
+     * Converts SAN to a list of move objects and, for en passant, a square to remove.
+     * @param {string} san
+     * @param {string} fen
+     * @returns {{ moves: Array<{from: string, to: string}>, remove?: string } | null}
      */
     static sanToSquares(san, fen) {
         if (!fen || typeof fen !== 'string') {
@@ -94,7 +94,17 @@ export class MoveHelper {
                         to: isWhite ? 'd1' : 'd8'
                     });
                 }
-                return moves;
+                // Handle en passant
+                if (typeof move.isEnPassant === 'function' && move.isEnPassant()) {
+                    // The captured pawn is on the same rank as the from-square, file of the to-square
+                    // Example: e5xd6 (white pawn on e5 captures black pawn on d5 via en passant, moves to d6, remove d5)
+                    const fromRank = fromSquare[1];
+                    const toFile = toSquare[0];
+                    const removeRank = isWhite ? (parseInt(toSquare[1]) - 1).toString() : (parseInt(toSquare[1]) + 1).toString();
+                    const removeSquare = toFile + removeRank;
+                    return { moves, remove: removeSquare };
+                }
+                return { moves };
             }
             return null;
         } catch (e) {
