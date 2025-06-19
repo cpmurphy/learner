@@ -93,7 +93,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 inVariationMode = true;
                 mainLineMoveIndexAtVariationStart = lastMoveDataForVariation.move_index_of_blunder; // Need to ensure this is correctly set
                 currentVariationSANs = lastMoveDataForVariation.variation_sans;
-                currentVariationPly = 0; // They just played the first move (index 0) of the variation
+                currentVariationPly = 1; // The user just played the first move (index 0), so next-move should start at 1
 
                 // cm-chessboard's getPosition() only returns the board part, not the full FEN
                 // We need to create a proper FEN from the last known server FEN and the move that was just made
@@ -540,73 +540,45 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (inVariationMode) {
             console.log("Next move clicked (Variation Mode)");
-            currentVariationPly++;
-            if (currentVariationPly < currentVariationSANs.length) {
-                const nextSan = currentVariationSANs[currentVariationPly];
-                try {
-                    // Use currentFenInVariation if valid, otherwise fall back to lastKnownServerFEN
-                    const fenToUse = currentFenInVariation || lastKnownServerFEN;
-                    if (!fenToUse) {
-                        console.error("No valid FEN available for variation move");
-                        moveInfoDisplay.textContent = "Error: No valid board position available. Resuming main game.";
-                        if (resumeGameButton) resumeGameButton.click();
-                        return;
-                    }
-
-                    // Convert SAN to square coordinates for cm-chessboard
-                    const moveResult = MoveHelper.sanToSquares(nextSan, fenToUse);
-                    if (moveResult && moveResult.moves) {
-                        // For each move (castling = 2 moves, normal = 1)
-                        for (const move of moveResult.moves) {
-                            await board.movePiece(move.from, move.to, true); // true for animation
-                        }
-                        // If en passant, remove the captured pawn
-                        if (moveResult.remove) {
-                            board.setPiece(moveResult.remove, null);
-                        }
-                        // Update the FEN properly - board.getPosition() only returns the board part
-                        const boardPosition = board.getPosition();
-                        if (currentFenInVariation) {
-                            const fenParts = currentFenInVariation.split(' ');
-                            fenParts[0] = boardPosition; // Update board part
-
-                            // Determine the correct turn for the move we're about to make
-                            // The move we're about to make is at currentVariationPly
-                            const turnForMove = currentVariationPly % 2 === 0 ?
-                                (learningSide === 'white' ? 'w' : 'b') :
-                                (learningSide === 'white' ? 'b' : 'w');
-                            fenParts[1] = turnForMove;
-
-                            // Update move counters
-                            if (fenParts[1] === 'w') {
-                                fenParts[5] = (parseInt(fenParts[5]) + 1).toString(); // Increment fullmove number
-                            }
-                            currentFenInVariation = fenParts.join(' ');
-                        } else {
-                            // Fallback
-                            const turnForMove = currentVariationPly % 2 === 0 ?
-                                (learningSide === 'white' ? 'w' : 'b') :
-                                (learningSide === 'white' ? 'b' : 'w');
-                            currentFenInVariation = `${boardPosition} ${turnForMove} KQkq - 0 1`;
-                        }
-
-                        updateMoveInfoDisplay({ san: nextSan }, true, currentVariationPly);
-                        if (nextMoveButton) nextMoveButton.disabled = (currentVariationPly >= currentVariationSANs.length - 1);
-                        if (prevMoveButton) prevMoveButton.disabled = true; // Still no prev in variation
-                    } else {
-                        console.error(`Illegal move in variation: ${nextSan} from FEN: ${fenToUse}`);
-                        moveInfoDisplay.textContent = `Error: Illegal move '${nextSan}' in variation. Resuming main game.`;
-                        if (resumeGameButton) resumeGameButton.click(); // Attempt to resume main game
-                    }
-                } catch (e) {
-                    console.error(`Error playing variation move ${nextSan}:`, e);
-                    moveInfoDisplay.textContent = `Error playing variation move. Resuming main game.`;
-                    if (resumeGameButton) resumeGameButton.click();
-                }
-            } else {
+            if (currentVariationPly >= currentVariationSANs.length) {
                 // End of variation
-                moveInfoDisplay.textContent = "End of variation.";
+                moveInfoDisplay.textContent = "End of variation. Use Resume Game to return to the main line.";
                 if (nextMoveButton) nextMoveButton.disabled = true;
+                return;
+            }
+            // Use a Chess.js instance to get the correct FEN and turn
+            let fenForVariation = currentFenInVariation || lastKnownServerFEN;
+            const chess = new Chess(fenForVariation);
+            const fenToUse = chess.fen();
+            const nextSan = currentVariationSANs[currentVariationPly];
+            try {
+                // Convert SAN to square coordinates for cm-chessboard
+                const moveResult = MoveHelper.sanToSquares(nextSan, fenToUse);
+                if (moveResult && moveResult.moves) {
+                    // For each move (castling = 2 moves, normal = 1)
+                    for (const move of moveResult.moves) {
+                        await board.movePiece(move.from, move.to, true); // true for animation
+                    }
+                    // If en passant, remove the captured pawn
+                    if (moveResult.remove) {
+                        board.setPiece(moveResult.remove, null);
+                    }
+                    // Use the updated chess instance to get the new FEN
+                    chess.move(nextSan, { sloppy: true });
+                    currentFenInVariation = chess.fen();
+                    updateMoveInfoDisplay({ san: nextSan }, true, currentVariationPly);
+                    currentVariationPly++;
+                    if (nextMoveButton) nextMoveButton.disabled = (currentVariationPly >= currentVariationSANs.length);
+                    if (prevMoveButton) prevMoveButton.disabled = true; // Still no prev in variation
+                } else {
+                    console.error(`Illegal move in variation: ${nextSan} from FEN: ${fenToUse}`);
+                    moveInfoDisplay.textContent = `Error: Illegal move '${nextSan}' in variation. Resuming main game.`;
+                    if (resumeGameButton) resumeGameButton.click(); // Attempt to resume main game
+                }
+            } catch (e) {
+                console.error(`Error playing variation move ${nextSan}:`, e);
+                moveInfoDisplay.textContent = `Error playing variation move. Resuming main game.`;
+                if (resumeGameButton) resumeGameButton.click();
             }
         } else { // Main line play
             console.log("Next move clicked (Main Line)");
