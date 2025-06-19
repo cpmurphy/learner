@@ -67,26 +67,34 @@ export class MoveHelper {
             console.error("MoveHelper.sanToSquares: Invalid FEN parameter:", fen);
             return null;
         }
-        
         // Basic FEN validation - should have 6 space-delimited fields
         const fenParts = fen.trim().split(/\s+/);
         if (fenParts.length !== 6) {
             console.error("MoveHelper.sanToSquares: FEN must have 6 space-delimited fields, got:", fenParts.length, "parts:", fenParts);
             return null;
         }
-        
         try {
             const chess = new Chess(fen);
-            const move = chess._moveFromSan(san, false); // Use non-strict parsing for PGN SANs
-            
+            // Use the public API to get the move object
+            const move = chess.move(san, { sloppy: true });
             if (move) {
-                // Convert internal 0x88 coordinates to algebraic notation
-                // file = square & 0xf, rank = square >> 4
-                const fromSquare = 'abcdefgh'.substring(move.from & 0xf, (move.from & 0xf) + 1) +
-                                 '87654321'.substring(move.from >> 4, (move.from >> 4) + 1);
-                const toSquare = 'abcdefgh'.substring(move.to & 0xf, (move.to & 0xf) + 1) +
-                               '87654321'.substring(move.to >> 4, (move.to >> 4) + 1);
-                return { from: fromSquare, to: toSquare };
+                const fromSquare = move.from;
+                const toSquare = move.to;
+                const moves = [{ from: fromSquare, to: toSquare }];
+                // Use descriptor functions for castling
+                const isWhite = move.color === 'w';
+                if (typeof move.isKingsideCastle === 'function' && move.isKingsideCastle()) {
+                    moves.push({
+                        from: isWhite ? 'h1' : 'h8',
+                        to: isWhite ? 'f1' : 'f8'
+                    });
+                } else if (typeof move.isQueensideCastle === 'function' && move.isQueensideCastle()) {
+                    moves.push({
+                        from: isWhite ? 'a1' : 'a8',
+                        to: isWhite ? 'd1' : 'd8'
+                    });
+                }
+                return moves;
             }
             return null;
         } catch (e) {

@@ -554,11 +554,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
 
                     // Convert SAN to square coordinates for cm-chessboard
-                    const squares = MoveHelper.sanToSquares(nextSan, fenToUse);
-                    if (squares) {
-                        // Use cm-chessboard's movePiece method
-                        await board.movePiece(squares.from, squares.to, true); // true for animation
-
+                    const moves = MoveHelper.sanToSquares(nextSan, fenToUse);
+                    if (moves) {
+                        // For each move (castling = 2 moves, normal = 1)
+                        for (const move of moves) {
+                            await board.movePiece(move.from, move.to, true); // true for animation
+                        }
                         // Update the FEN properly - board.getPosition() only returns the board part
                         const boardPosition = board.getPosition();
                         if (currentFenInVariation) {

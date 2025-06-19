@@ -91,3 +91,45 @@ describe('MoveHelper', () => {
         expect(gen.getSan()).toBeNull();
     });
 });
+
+describe('MoveHelper.sanToSquares', () => {
+    it('should convert SAN to squares for a simple pawn move (e4)', () => {
+        const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        expect(MoveHelper.sanToSquares('e4', fen)).toEqual([{ from: 'e2', to: 'e4' }]);
+    });
+
+    it('should convert SAN to squares for a knight move (Nf3)', () => {
+        const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        expect(MoveHelper.sanToSquares('Nf3', fen)).toEqual([{ from: 'g1', to: 'f3' }]);
+    });
+
+    it('should convert SAN to squares for castling (O-O)', () => {
+        const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1";
+        expect(MoveHelper.sanToSquares('O-O', fen)).toEqual([
+            { from: 'e1', to: 'g1' },
+            { from: 'h1', to: 'f1' }
+        ]);
+    });
+
+    it('should convert SAN to squares for queenside castling (O-O-O)', () => {
+        const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1";
+        expect(MoveHelper.sanToSquares('O-O-O', fen)).toEqual([
+            { from: 'e1', to: 'c1' },
+            { from: 'a1', to: 'd1' }
+        ]);
+    });
+
+    it('should convert SAN to squares for promotion (b8=Q)', () => {
+        const fen = "r1bqk1nr/pPpp1ppp/8/4p3/8/8/PPP1PPPP/RNBQKBNR w KQkq - 0 1";
+        expect(MoveHelper.sanToSquares('b8=Q', fen)).toEqual([{ from: 'b7', to: 'b8' }]);
+    });
+
+    it('should return null for illegal SAN', () => {
+        const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        expect(MoveHelper.sanToSquares('Qh5', fen)).toBeNull(); // Qh5 not possible from starting position
+    });
+
+    it('should return null for invalid FEN', () => {
+        expect(MoveHelper.sanToSquares('e4', 'invalid fen')).toBeNull();
+    });
+});
