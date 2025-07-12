@@ -122,6 +122,36 @@ class Analyzer
     best_moves(fen, 1)[0]
   end
 
+  # Assess if a user's move is a good alternative to a known good move.
+  #
+  # A move is "good enough" if its score is over 250 centipawns (winning),
+  # or if its score is at least 80% of the good move's score.
+  #
+  # @param fen [String] The FEN string of the board position.
+  # @param user_move_uci [String] The user's move in UCI format.
+  # @param good_move_uci [String] The known good move in UCI format.
+  # @return [Boolean] True if the move is good enough, false otherwise.
+  def good_enough_move?(fen, user_move_uci, good_move_uci)
+    good_move_analysis = evaluate_move(fen, good_move_uci)
+    return false unless good_move_analysis
+
+    good_move_score = good_move_analysis[:score].to_f
+
+    user_move_analysis = evaluate_move(fen, user_move_uci)
+    return false unless user_move_analysis
+
+    user_move_score = user_move_analysis[:score].to_f
+
+    # A move is good enough if it has a winning advantage on its own (>2.5 pawns).
+    return true if user_move_score > 250
+
+    # Or if it's almost as good as the suggested move.
+    threshold_multiplier = good_move_score.negative? ? 1.2 : 0.8
+    return true if user_move_score >= (good_move_score * threshold_multiplier)
+
+    false
+  end
+
   def close
     @engine&.execute('quit')
   rescue Errno::EPIPE
