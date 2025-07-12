@@ -5,6 +5,7 @@ require 'pgn'
 require 'json'
 require_relative 'lib/game_editor'
 require_relative 'lib/app_helpers' # Require the new helpers
+require_relative 'lib/analyzer'
 
 class LearnerApp < Sinatra::Base
   enable :sessions
@@ -336,6 +337,34 @@ class LearnerApp < Sinatra::Base
                     black_player: black_player,
                     message: "Game set to move index #{target_move_index}."
                   })
+  end
+
+  # API to assess if a user's move is a good alternative to the correct one
+  post '/game/validate_critical_move' do
+    return json_response({ error: 'No game loaded.' }, 404) unless game_loaded?
+
+    begin
+      params = JSON.parse(request.body.read)
+      fen = params['fen']
+      user_move_uci = params['user_move_uci']
+      good_move_uci = params['good_move_uci']
+    rescue JSON::ParserError
+      return json_response({ error: 'Invalid JSON in request body' }, 400)
+    end
+
+    unless fen && user_move_uci && good_move_uci
+      return json_response({ error: 'Missing fen, user_move_uci, or good_move_uci' }, 400)
+    end
+
+    analyzer = Analyzer.new
+    begin
+      is_good_enough = analyzer.good_enough_move?(fen, user_move_uci, good_move_uci)
+      json_response({ good_enough: is_good_enough })
+    rescue Analyzer::EngineError => e
+      json_response({ error: "Analysis engine error: #{e.message}" }, 500)
+    ensure
+      analyzer.close
+    end
   end
   # --- End Routes ---
 end
