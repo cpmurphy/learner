@@ -135,12 +135,15 @@ class Analyzer
     good_move_analysis = evaluate_move(fen, good_move_uci)
     return false unless good_move_analysis
 
-    good_move_score = good_move_analysis[:score].to_f
+    # The score from `evaluate_move` is from the perspective of the side whose turn it is
+    # AFTER the move has been made. We want the score from the perspective of the player
+    # who MADE the move, so we negate it.
+    good_move_score = -good_move_analysis[:score].to_f
 
     user_move_analysis = evaluate_move(fen, user_move_uci)
     return false unless user_move_analysis
 
-    user_move_score = user_move_analysis[:score].to_f
+    user_move_score = -user_move_analysis[:score].to_f
 
     # A move is good enough if it has a winning advantage on its own (>2.5 pawns).
     return true if user_move_score > 250
