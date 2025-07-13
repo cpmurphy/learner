@@ -78,7 +78,7 @@ class Analyzer
   class EngineError < StandardError; end
   class TimeoutError < EngineError; end
 
-  def initialize(engine_path = './Stockfish', options = {})
+  def initialize(engine_path = 'stockfish', options = {})
     @parser = AnalysisParser.new
     @engine_path = engine_path
     @timeout = options.fetch(:timeout, DEFAULT_TIMEOUT)
