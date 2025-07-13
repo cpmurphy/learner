@@ -78,7 +78,7 @@ class Analyzer
   class EngineError < StandardError; end
   class TimeoutError < EngineError; end
 
-  def initialize(engine_path = 'stockfish', options = {})
+  def initialize(engine_path = './Stockfish', options = {})
     @parser = AnalysisParser.new
     @engine_path = engine_path
     @timeout = options.fetch(:timeout, DEFAULT_TIMEOUT)
@@ -132,6 +132,9 @@ class Analyzer
   # @param good_move_uci [String] The known good move in UCI format.
   # @return [Boolean] True if the move is good enough, false otherwise.
   def good_enough_move?(fen, user_move_uci, good_move_uci)
+    # The suggested move from the PGN is always considered good enough.
+    return true if user_move_uci == good_move_uci
+
     good_move_analysis = evaluate_move(fen, good_move_uci)
     return false unless good_move_analysis
 
