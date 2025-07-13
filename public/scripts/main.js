@@ -84,36 +84,79 @@ document.addEventListener("DOMContentLoaded", () => {
             return false;
         }
 
-        console.log(`Critical Challenge - User attempted: ${userMoveSan} (derived from ${event.squareFrom}-${event.squareTo}${event.promotionPiece ? "="+event.promotionPiece : ""}), Expected good move: ${goodMoveSanForChallenge}`);
+        const userMoveUci = event.squareFrom + event.squareTo + (event.promotionPiece || '');
+        console.log(`Critical Challenge - User attempted: ${userMoveSan} (UCI: ${userMoveUci}), Expected good move SAN: ${goodMoveSanForChallenge}`);
 
-        if (userMoveSan === goodMoveSanForChallenge) {
-            // Correct move in challenge! Enter variation mode.
-            moveInfoDisplay.textContent = `Correct! "${userMoveSan}" is a better move.`;
-            const lastMoveDataForVariation = window.lastServerMoveData; // Use cached lastMoveData that contained variation info
+        // Convert the good move's SAN to UCI to send to the backend validator
+        const tempChess = new Chess(fenAtCriticalPrompt);
+        const goodMoveObject = tempChess.move(goodMoveSanForChallenge, { sloppy: true });
+        if (!goodMoveObject) {
+            console.error(`Could not parse good_move_san from server ('${goodMoveSanForChallenge}') into a move object for FEN: ${fenAtCriticalPrompt}`);
+            moveInfoDisplay.textContent = "A data error occurred. Could not validate your move. Resuming game.";
+            if (resumeGameButton) resumeGameButton.click(); // Exit challenge gracefully
+            return false; // Reject the move
+        }
+        const goodMoveUci = goodMoveObject.from + goodMoveObject.to + (goodMoveObject.promotion || '');
 
-            if (lastMoveDataForVariation && lastMoveDataForVariation.variation_sans && lastMoveDataForVariation.variation_sans.length > 0) {
-                inVariationMode = true;
-                mainLineMoveIndexAtVariationStart = lastMoveDataForVariation.move_index_of_blunder; // Need to ensure this is correctly set
-                currentVariationSANs = lastMoveDataForVariation.variation_sans;
-                currentVariationPly = 1; // The user just played the first move (index 0), so next-move should start at 1
-                // Initialize variationChess from the FEN before the user's entry move, and play the user's move
-                variationChess = new Chess(fenAtCriticalPrompt);
-                variationChess.move(currentVariationSANs[0], { sloppy: true });
-                currentFenInVariation = variationChess.fen();
-                if (resumeGameButton) resumeGameButton.disabled = false;
-                if (nextMoveButton) nextMoveButton.disabled = false; // Enable for variation
-                if (nextCriticalButton) nextCriticalButton.disabled = true; // No new critical search while in variation
-            } else {
-                // Should not happen if goodMoveSanForChallenge was set, but as a fallback:
-                moveInfoDisplay.textContent = `Correct! "${userMoveSan}" is a better move. Main game continues.`;
+        try {
+            const response = await fetch('/game/validate_critical_move', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    fen: fenAtCriticalPrompt,
+                    user_move_uci: userMoveUci,
+                    good_move_uci: goodMoveUci
+                })
+            });
+            const validationData = await response.json();
+
+            if (!response.ok) {
+                console.error(`Error validating move: ${validationData.error || response.statusText}`);
+                moveInfoDisplay.textContent = "Could not validate move due to a server error. Try again!";
+                board.setPosition(fenAtCriticalPrompt, false);
+                return false;
             }
 
-            board.disableMoveInput();
-            inCriticalMomentChallenge = false;
-            return true;
-        } else {
-            moveInfoDisplay.textContent = `"${userMoveSan}" is not the best move. Try again!`;
-            // Force the board to revert to the previous position
+            if (validationData.good_enough) {
+                moveInfoDisplay.textContent = `Correct! "${userMoveSan}" is a good move.`;
+                const lastMoveDataForVariation = window.lastServerMoveData;
+
+                if (lastMoveDataForVariation) {
+                    inVariationMode = true;
+                    mainLineMoveIndexAtVariationStart = lastMoveDataForVariation.move_index_of_blunder;
+
+                    // If the user played the expected move and a variation exists, use it.
+                    // Otherwise, the variation is just the single good move the user played.
+                    if (userMoveSan === goodMoveSanForChallenge && lastMoveDataForVariation.variation_sans?.length > 0) {
+                        currentVariationSANs = lastMoveDataForVariation.variation_sans;
+                    } else {
+                        currentVariationSANs = [userMoveSan];
+                    }
+
+                    currentVariationPly = 1; // User just played the first move
+                    variationChess = new Chess(fenAtCriticalPrompt);
+                    variationChess.move(userMoveSan, { sloppy: true }); // Apply the user's validated move
+                    currentFenInVariation = variationChess.fen();
+
+                    if (resumeGameButton) resumeGameButton.disabled = false;
+                    if (nextMoveButton) nextMoveButton.disabled = (currentVariationPly >= currentVariationSANs.length);
+                    if (nextCriticalButton) nextCriticalButton.disabled = true;
+                } else {
+                    // Fallback: Should not be reached if challenge was correctly initiated.
+                    moveInfoDisplay.textContent = `Correct! "${userMoveSan}" is a better move. Main game continues.`;
+                }
+
+                board.disableMoveInput();
+                inCriticalMomentChallenge = false;
+                return true; // Accept the move
+            } else {
+                moveInfoDisplay.textContent = `"${userMoveSan}" is not the best move. Try again!`;
+                board.setPosition(fenAtCriticalPrompt, false);
+                return false; // Reject the move
+            }
+        } catch (error) {
+            console.error("Error during move validation fetch:", error);
+            moveInfoDisplay.textContent = "An error occurred while validating your move. Please try again.";
             board.setPosition(fenAtCriticalPrompt, false);
             return false;
         }
