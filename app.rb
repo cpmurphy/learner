@@ -138,6 +138,15 @@ class LearnerApp < Sinatra::Base
       end
 
       session[:game] = games_in_file.first # Load the first game
+
+      # If the PGN has no critical moment annotations, analyze it to find them.
+      has_critical_moments = session[:game].moves.any? { |m| m.annotation&.include?('$201') }
+      unless has_critical_moments
+        puts 'No critical moments found in PGN, analyzing for blunders...'
+        GameEditor.add_blunder_annotations(session[:game])
+        puts 'Blunder analysis complete.'
+      end
+
       GameEditor.shift_critical_annotations(session[:game])
       session[:current_move_index] = 0
 
