@@ -8,6 +8,8 @@ module GameEditor
     begin
       (0...game.moves.size).each do |i|
         move = game.moves[i]
+        # PGN::MoveText objects (like game results) can't be analyzed.
+        next unless move.respond_to?(:from)
         position = game.positions[i]
         fen = position.to_fen.to_s
 
@@ -48,10 +50,13 @@ module GameEditor
       current_move = moves[i]
       prev_move = moves[i - 1]
 
-      if prev_move.annotation&.include?('$201')
-        remove_201_from_move(prev_move)
+      if prev_move.respond_to?(:annotation) && prev_move.annotation&.include?('$201')
+        # Only shift annotation to a real move, not MoveText.
+        if current_move.respond_to?(:annotation)
+          remove_201_from_move(prev_move)
 
-        add_201_to_move(current_move)
+          add_201_to_move(current_move)
+        end
       end
       i -= 1
     end
