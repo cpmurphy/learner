@@ -175,9 +175,9 @@ The variation `(4. c3 ...)` shows the better move.
 - [x] Phase 3.1: Upload endpoint
 - [x] Phase 3.2: Annotate and save endpoint
 - [x] Phase 3.3: File management
-- [ ] Phase 4.1: Upload form UI
-- [ ] Phase 4.2: Upload JavaScript
-- [ ] Phase 4.3: Annotation trigger
+- [x] Phase 4.1: Upload form UI
+- [x] Phase 4.2: Upload JavaScript
+- [x] Phase 4.3: Annotation trigger
 - [ ] Phase 5.1: Progress indication
 - [ ] Phase 5.2: Error handling
 - [ ] Phase 5.3: Optional enhancements

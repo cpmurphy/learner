@@ -10,7 +10,25 @@
 <body>
     <h1>Game Review Tool</h1>
 
+    <div class="upload-section controls">
+        <h2>Upload & Annotate PGN</h2>
+        <div class="upload-form">
+            <input type="file" id="pgn-file-input" accept=".pgn" style="display: none;">
+            <button id="choose-file-button">Choose PGN File</button>
+            <span id="selected-file-name"></span>
+            <button id="upload-annotate-button" disabled>Upload & Annotate</button>
+        </div>
+        <div id="upload-status" class="upload-status"></div>
+        <div id="upload-progress" class="upload-progress" style="display: none;">
+            <div class="progress-bar">
+                <div id="progress-bar-fill" class="progress-bar-fill"></div>
+            </div>
+            <div id="progress-text" class="progress-text"></div>
+        </div>
+    </div>
+
     <div class="pgn-selection controls">
+        <h2>Or Select Existing PGN</h2>
         <label for="pgn-file-select">Select PGN File:</label>
         <select id="pgn-file-select">
             <option value="">-- Loading PGNs --</option>

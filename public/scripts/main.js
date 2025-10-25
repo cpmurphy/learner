@@ -1,6 +1,7 @@
 import { Chessboard, COLOR } from "./3rdparty/cm-chessboard/Chessboard.js";
 import { MoveHelper } from './move_helper.js';
 import { Chess } from './3rdparty/chess.js/chess.js';
+import { initializeUpload } from './upload.js';
 // We no longer need to import FEN directly as the backend will provide it.
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -479,6 +480,13 @@ document.addEventListener("DOMContentLoaded", () => {
     loadPgnFileList(); // Load PGN files on page load
     // Board is not initialized until a game is loaded.
     // Initial message is set within loadPgnFileList or if it fails.
+
+    // Initialize upload functionality
+    initializeUpload(() => {
+        // Callback when upload completes successfully - refresh the PGN file list
+        console.log("Upload completed, refreshing PGN file list");
+        loadPgnFileList();
+    });
 
     // Event listeners for controls
     pgnFileSelect?.addEventListener("change", async () => { // Made async for auto-load
