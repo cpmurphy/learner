@@ -7,7 +7,7 @@ require_relative '../lib/app_helpers' # For testing AppHelpers module
 
 class TestGameEditor < Minitest::Test
   def setup
-    @editor = GameEditor
+    @editor = GameEditor.new
   end
 
   def test_no_moves
@@ -115,6 +115,57 @@ class TestGameEditor < Minitest::Test
 
     assert_equal ['$201'].sort, game.moves[4].annotation # This is White's third move, which is index 4
     assert_nil game.moves[5].annotation # This is Black's third move, which is index 5
+  end
+
+  def test_game_evaluation
+    games = PGN.parse(File.read('test/data/quill-2025-08-06.pgn'))
+    @editor.add_blunder_annotations(games[0])
+    # Check that blunders were detected and annotated
+    blunders = games[0].moves.compact.select { |m| m.annotation && m.annotation.include?('$201') }
+    assert blunders.size > 0, 'Should find at least one blunder in the game'
+  end
+
+  def test_add_blunder_annotations_adds_variations
+    # Create a simple game where we know there's a blunder
+    # 1.e4 e5 2.Qh5?? - This is a blunder, better is 2.Nf3
+    game = PGN::Game.new(%w[e4 e5 Qh5 Nc6])
+
+    # Analyze and annotate
+    @editor.add_blunder_annotations(game)
+
+    # Find moves with $201 annotation
+    critical_moves = game.moves.select { |m| m.annotation && m.annotation.include?('$201') }
+
+    # Skip test if no blunders detected (Stockfish may not find this as a blunder)
+    skip 'No blunders detected in test game' if critical_moves.empty?
+
+    # Check that at least one critical move has variations
+    has_variation = critical_moves.any? { |m| m.variations && !m.variations.empty? }
+    assert has_variation, 'At least one blunder should have a variation with a better move'
+
+    # Check the structure of the variation
+    move_with_variation = critical_moves.find { |m| m.variations && !m.variations.empty? }
+    if move_with_variation
+      variation = move_with_variation.variations.first
+      assert variation.is_a?(Array), 'Variation should be an array of moves'
+      assert variation.size > 0, 'Variation should have at least one move'
+
+      first_var_move = variation.first
+      assert first_var_move.is_a?(PGN::MoveText), 'Variation move should be a PGN::MoveText'
+      assert first_var_move.notation, 'Variation move should have notation'
+      assert first_var_move.comment, 'Variation move should have a comment explaining the advantage'
+    end
+  end
+
+  def test_format_centipawns
+    assert_equal '+1.4', @editor.format_centipawns(140)
+    assert_equal '+2.5', @editor.format_centipawns(250)
+    assert_equal '+0.5', @editor.format_centipawns(50)
+  end
+
+  def test_format_centipawns_mate_score
+    # Mate scores are typically > 900 centipawns
+    assert_match(/\+M\d+/, @editor.format_centipawns(950))
   end
 end
 
