@@ -16,6 +16,11 @@ class LearnerApp < Sinatra::Base
     set :public_folder, File.join(File.dirname(__FILE__), 'public')
     set :bind, '0.0.0.0'
   end
+
+  # Disable Rack::Protection for API endpoints to allow uploads
+  configure :development, :test do
+    set :protection, false
+  end
   # --- End Configuration ---
 
   # --- Helpers ---
@@ -37,12 +42,44 @@ class LearnerApp < Sinatra::Base
       status status_code
       data.to_json
     end
+
+    # Sanitize filename to prevent path traversal and ensure safe filenames
+    def sanitize_filename(filename)
+      # Remove path components and keep only the basename
+      basename = File.basename(filename)
+      # Remove or replace unsafe characters
+      basename.gsub(/[^0-9A-Za-z.\-_]/, '_')
+    end
+
+    # Generate a unique filename by appending timestamp
+    def generate_unique_filename(base_filename)
+      ext = File.extname(base_filename)
+      name = File.basename(base_filename, ext)
+      timestamp = Time.now.strftime('%Y%m%d_%H%M%S')
+      "#{name}_#{timestamp}#{ext}"
+    end
+
+    # Check if file is within PGN_DIR boundary
+    def within_pgn_dir?(file_path)
+      pgn_dir = ENV.fetch('PGN_DIR', nil)
+      return false if pgn_dir.nil? || pgn_dir.empty?
+
+      abs_file_path = File.expand_path(file_path)
+      abs_pgn_dir = File.expand_path(pgn_dir)
+      abs_file_path.start_with?(abs_pgn_dir)
+    end
   end
   # --- End Helpers ---
 
   def initialize
     super
     @available_pgns = [] # Holds {id: string, name: string, path: string} for discovered PGN files
+    scan_pgn_directory
+  end
+
+  # Scan PGN_DIR and populate @available_pgns
+  def scan_pgn_directory
+    @available_pgns = []
     pgn_dir_path = ENV.fetch('PGN_DIR', nil)
 
     if pgn_dir_path.nil? || pgn_dir_path.empty?
@@ -52,46 +89,47 @@ class LearnerApp < Sinatra::Base
       puts 'Example: PGN_DIR=./test/data bundle exec puma config.ru'
       puts 'The application will start, but game functionality will be disabled until a PGN is loaded via API.'
       puts '---------------------------------------------------------------------------------------'
+      return
     elsif !Dir.exist?(pgn_dir_path)
       puts '---------------------------------------------------------------------------------------'
       puts "ERROR: PGN directory not found at path: #{pgn_dir_path}"
       puts 'Please ensure the PGN_DIR environment variable points to an existing directory.'
       puts 'The application will start, but game functionality will be disabled.'
       puts '---------------------------------------------------------------------------------------'
+      return
+    end
+
+    puts "Scanning PGN directory: #{pgn_dir_path}"
+    pgn_files = Dir.glob(File.join(pgn_dir_path, '*.pgn'))
+    if pgn_files.empty?
+      puts "No PGN files found in #{pgn_dir_path}."
     else
-      puts "Scanning PGN directory: #{pgn_dir_path}"
-      pgn_files = Dir.glob(File.join(pgn_dir_path, '*.pgn'))
-      if pgn_files.empty?
-        puts "No PGN files found in #{pgn_dir_path}."
-      else
-        pgn_files.each_with_index do |file_path, index|
-          filename = File.basename(file_path)
-          # Ensure path is absolute and normalized for security/consistency
-          abs_path = File.expand_path(file_path)
-          # Basic check to ensure the file is within the intended PGN_DIR
-          # This is a simple check; more robust sandboxing might be needed for untrusted PGN_DIR values
-          if abs_path.start_with?(File.expand_path(pgn_dir_path))
+      pgn_files.each_with_index do |file_path, index|
+        filename = File.basename(file_path)
+        # Ensure path is absolute and normalized for security/consistency
+        abs_path = File.expand_path(file_path)
+        # Basic check to ensure the file is within the intended PGN_DIR
+        if abs_path.start_with?(File.expand_path(pgn_dir_path))
+          game_count = 0
+          begin
+            pgn_content_for_count = File.read(abs_path)
+            games_in_file = PGN.parse(pgn_content_for_count)
+            game_count = games_in_file.size
+          rescue StandardError => e
+            puts "WARNING: Could not parse PGN file #{filename} to count games. Error: #{e.message}. Assuming 0 games."
             game_count = 0
-            begin
-              pgn_content_for_count = File.read(abs_path)
-              games_in_file = PGN.parse(pgn_content_for_count)
-              game_count = games_in_file.size
-            rescue StandardError => e
-              puts "WARNING: Could not parse PGN file #{filename} to count games. Error: #{e.message}. Assuming 0 games."
-              game_count = 0 # Or handle as an error indicator if preferred
-            end
-            @available_pgns << {
-              id: index.to_s, # Use index as a simple, safe ID
-              name: filename,
-              path: abs_path,
-              game_count: game_count
-            }
-          else
-            puts "WARNING: File #{file_path} is outside the PGN_DIR and will be ignored."
           end
+          @available_pgns << {
+            id: index.to_s,
+            name: filename,
+            path: abs_path,
+            game_count: game_count
+          }
+        else
+          puts "WARNING: File #{file_path} is outside the PGN_DIR and will be ignored."
         end
-        puts "Found #{@available_pgns.size} PGN files. Ready for selection via API."
       end
+      puts "Found #{@available_pgns.size} PGN files. Ready for selection via API."
     end
   end
 
@@ -374,6 +412,132 @@ class LearnerApp < Sinatra::Base
       json_response({ error: "Analysis engine error: #{e.message}" }, 500)
     ensure
       analyzer.close
+    end
+  end
+
+  # API endpoint to upload a PGN file
+  post '/api/upload_pgn' do
+    # Check if PGN_DIR is configured
+    pgn_dir = ENV.fetch('PGN_DIR', nil)
+    if pgn_dir.nil? || pgn_dir.empty? || !Dir.exist?(pgn_dir)
+      return json_response({ error: 'PGN_DIR not configured or directory does not exist' }, 500)
+    end
+
+    # Check if file was uploaded
+    unless params[:file] && params[:file][:tempfile]
+      return json_response({ error: 'No file uploaded. Please provide a file parameter.' }, 400)
+    end
+
+    tempfile = params[:file][:tempfile]
+    original_filename = params[:file][:filename]
+
+    # Validate file extension
+    unless original_filename.end_with?('.pgn')
+      return json_response({ error: 'Invalid file type. Only .pgn files are allowed.' }, 400)
+    end
+
+    # Read and validate PGN content
+    begin
+      pgn_content = tempfile.read
+      tempfile.rewind
+
+      # Validate it's parseable PGN
+      games = PGN.parse(pgn_content.dup)
+      if games.empty?
+        return json_response({ error: 'No valid games found in PGN file' }, 400)
+      end
+
+      # Return info about the uploaded file
+      json_response({
+        filename: original_filename,
+        game_count: games.size,
+        size: pgn_content.bytesize,
+        message: 'PGN file validated successfully. Use /api/annotate_and_save to process and save it.'
+      })
+    rescue StandardError => e
+      json_response({ error: "Invalid PGN file: #{e.message}" }, 400)
+    end
+  end
+
+  # API endpoint to annotate a PGN and save it to PGN_DIR
+  post '/api/annotate_and_save' do
+    require_relative 'lib/pgn_writer'
+
+    # Check if PGN_DIR is configured
+    pgn_dir = ENV.fetch('PGN_DIR', nil)
+    if pgn_dir.nil? || pgn_dir.empty? || !Dir.exist?(pgn_dir)
+      return json_response({ error: 'PGN_DIR not configured or directory does not exist' }, 500)
+    end
+
+    begin
+      # Parse request body
+      if params[:file] && params[:file][:tempfile]
+        # File upload
+        tempfile = params[:file][:tempfile]
+        original_filename = params[:file][:filename]
+        pgn_content = tempfile.read
+      elsif request.content_type&.include?('application/json')
+        # JSON body with PGN content
+        body_params = JSON.parse(request.body.read)
+        pgn_content = body_params['pgn_content']
+        original_filename = body_params['filename'] || 'uploaded_game.pgn'
+      else
+        return json_response({ error: 'Invalid request. Provide either file upload or JSON with pgn_content.' }, 400)
+      end
+
+      unless pgn_content && !pgn_content.empty?
+        return json_response({ error: 'No PGN content provided' }, 400)
+      end
+
+      # Parse PGN
+      games = PGN.parse(pgn_content.dup)
+      if games.empty?
+        return json_response({ error: 'No valid games found in PGN' }, 400)
+      end
+
+      # Annotate the first game with Stockfish
+      game = games.first
+      game_editor = GameEditor.new
+
+      puts "Annotating game with Stockfish..."
+      game_editor.add_blunder_annotations(game)
+      game_editor.shift_critical_annotations(game)
+      puts "Annotation complete."
+
+      # Serialize to PGN
+      writer = PGNWriter.new
+      annotated_pgn = writer.write(game)
+
+      # Generate safe filename
+      safe_filename = sanitize_filename(original_filename)
+      unique_filename = generate_unique_filename(safe_filename)
+      output_path = File.join(pgn_dir, unique_filename)
+
+      # Security check: ensure output path is within PGN_DIR
+      unless within_pgn_dir?(output_path)
+        return json_response({ error: 'Invalid file path' }, 400)
+      end
+
+      # Write to file
+      File.write(output_path, annotated_pgn)
+      puts "Saved annotated PGN to #{output_path}"
+
+      # Refresh the PGN file list
+      scan_pgn_directory
+
+      json_response({
+        success: true,
+        filename: unique_filename,
+        path: output_path,
+        game_count: 1,
+        message: 'Game annotated and saved successfully'
+      })
+    rescue JSON::ParserError
+      json_response({ error: 'Invalid JSON in request body' }, 400)
+    rescue StandardError => e
+      puts "ERROR: Failed to annotate and save PGN: #{e.message}"
+      puts e.backtrace.join("\n")
+      json_response({ error: "Failed to process PGN: #{e.message}" }, 500)
     end
   end
   # --- End Routes ---

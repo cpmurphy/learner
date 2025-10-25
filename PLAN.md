@@ -172,9 +172,9 @@ The variation `(4. c3 ...)` shows the better move.
 - [x] Phase 2.1: Enhanced annotation
 - [x] Phase 2.2: UCI to SAN conversion
 - [x] Phase 2.3: Enhanced annotation tests
-- [ ] Phase 3.1: Upload endpoint
-- [ ] Phase 3.2: Annotate and save endpoint
-- [ ] Phase 3.3: File management
+- [x] Phase 3.1: Upload endpoint
+- [x] Phase 3.2: Annotate and save endpoint
+- [x] Phase 3.3: File management
 - [ ] Phase 4.1: Upload form UI
 - [ ] Phase 4.2: Upload JavaScript
 - [ ] Phase 4.3: Annotation trigger

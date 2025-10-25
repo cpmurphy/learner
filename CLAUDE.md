@@ -63,9 +63,19 @@ The Stockfish directory contains a git submodule for the Stockfish chess engine.
 
 **app.rb** - Main Sinatra application
 - Manages PGN file discovery from `PGN_DIR` environment variable
-- Provides REST API endpoints for game navigation
+- Provides REST API endpoints for game navigation and file upload
 - Stores game state in session (current game, move index)
 - Automatically analyzes games without $201 annotations using Stockfish
+
+Key API endpoints:
+- `GET /api/pgn_files` - List available PGN files in PGN_DIR
+- `POST /api/upload_pgn` - Upload and validate a PGN file (doesn't save yet)
+- `POST /api/annotate_and_save` - Annotate a PGN with Stockfish and save to PGN_DIR
+  - Accepts either file upload or JSON with `pgn_content` and `filename`
+  - Automatically adds blunder annotations ($201) and variations
+  - Generates unique filename with timestamp to prevent collisions
+  - Sanitizes filenames and ensures files stay within PGN_DIR boundary
+  - Returns success with saved filename and path
 
 **lib/game_editor.rb** - Game annotation and modification
 - `add_blunder_annotations(game)` - Analyzes a game with Stockfish to find blunders (moves losing >1.4 pawns), adds $201 annotations, and adds variations showing the best move
