@@ -28,16 +28,14 @@ class GameEditor
         next unless played_move_analysis&.[](:score)
 
         best_score = best_move_analysis[:score]
-        played_score = played_move_analysis[:score]
+        # The score from evaluate_move is from the perspective of the side whose turn it is
+        # AFTER the move has been made. We want the score from the perspective of the player
+        # who MADE the move, so we negate it.
+        played_score = -played_move_analysis[:score]
 
-        is_blunder = false
-        if position.player == :white # White to move
-          # A blunder for White means the evaluation drops significantly.
-          is_blunder = (best_score - played_score) > BLUNDER_THRESHOLD
-        else # Black to move
-          # A blunder for Black means the evaluation rises significantly (for White).
-          is_blunder = (played_score - best_score) > BLUNDER_THRESHOLD
-        end
+        # Now both scores are from the perspective of the player who is about to move.
+        # A blunder means the evaluation drops significantly (for both White and Black).
+        is_blunder = (best_score - played_score) > BLUNDER_THRESHOLD
 
         next unless is_blunder
 
