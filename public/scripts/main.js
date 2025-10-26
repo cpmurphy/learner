@@ -1,8 +1,6 @@
 import { Chessboard, COLOR } from "./3rdparty/cm-chessboard/Chessboard.js";
 import { MoveHelper } from './move_helper.js';
 import { Chess } from './3rdparty/chess.js/chess.js';
-import { initializeUpload } from './upload.js';
-// We no longer need to import FEN directly as the backend will provide it.
 
 document.addEventListener("DOMContentLoaded", () => {
     const boardContainer = document.getElementById("chessboard-container");
@@ -15,8 +13,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const assetsUrl = "/3rdparty-assets/cm-chessboard/"; // Path to cm-chessboard assets
     const moveInfoDisplay = document.getElementById("move-info-display");
     const learnSideSelect = document.getElementById("learn-side");
-    const pgnFileSelect = document.getElementById("pgn-file-select");
-    const loadPgnButton = document.getElementById("load-pgn-button");
     const nextCriticalButton = document.getElementById("next-critical");
     const playerNamesDisplay = document.getElementById("player-names-display");
     const copyFenButton = document.getElementById("copy-fen-button");
@@ -24,7 +20,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const fastForwardButton = document.getElementById("fast-forward-moves");
     const flipBoardButton = document.getElementById("flip-board");
     const resumeGameButton = document.getElementById("resume-game");
-
 
     let learningSide = learnSideSelect.value || 'white';
     let inCriticalMomentChallenge = false;
@@ -406,62 +401,79 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /**
-     * Fetches the list of PGN files and populates the select dropdown.
+     * Get the filename from the URL query parameter
      */
-    async function loadPgnFileList() {
-        if (!pgnFileSelect) return;
-        try {
-            const response = await fetch('/api/pgn_files');
-            if (!response.ok) {
-                pgnFileSelect.innerHTML = '<option value="">Error loading PGNs</option>';
-                console.error("Failed to fetch PGN file list:", response.status, response.statusText);
-                alert(`Failed to load PGN file list from server: ${response.statusText}. Check server logs and PGN_DIR configuration.`);
-                if (loadPgnButton) loadPgnButton.disabled = true;
-                if (nextCriticalButton) nextCriticalButton.disabled = true;
-                if (copyFenButton) copyFenButton.disabled = true;
-                if (fastRewindButton) fastRewindButton.disabled = true;
-                if (fastForwardButton) fastForwardButton.disabled = true;
-                if (flipBoardButton) flipBoardButton.disabled = true;
-                if (resumeGameButton) resumeGameButton.disabled = true;
-                return;
+    function getFilenameFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('file');
+    }
+
+    /**
+     * Load the game automatically from the URL parameter
+     */
+    async function autoLoadGame() {
+        const filename = getFilenameFromURL();
+
+        if (!filename) {
+            if (moveInfoDisplay) {
+                moveInfoDisplay.textContent = "No game specified. Please select a game from the library.";
             }
-            const pgnFiles = await response.json();
-            if (pgnFiles.length === 0) {
-                pgnFileSelect.innerHTML = '<option value="">No PGN files found</option>';
-                if (loadPgnButton) loadPgnButton.disabled = true;
-                if (nextCriticalButton) nextCriticalButton.disabled = true;
-                if (copyFenButton) copyFenButton.disabled = true;
-                if (fastRewindButton) fastRewindButton.disabled = true;
-                if (fastForwardButton) fastForwardButton.disabled = true;
-                if (flipBoardButton) flipBoardButton.disabled = true;
-                if (resumeGameButton) resumeGameButton.disabled = true;
-                if (moveInfoDisplay) moveInfoDisplay.textContent = "No PGN files found in the configured directory. Check server PGN_DIR.";
-            } else {
-                pgnFileSelect.innerHTML = '<option value="">-- Select a PGN --</option>'; // Placeholder
-                pgnFiles.forEach(file => {
-                    const option = document.createElement("option");
-                    option.value = file.id;
-                    option.textContent = file.name;
-                    option.dataset.gameCount = file.game_count; // Store game_count
-                    pgnFileSelect.appendChild(option);
-                });
-                // Initial state: loadPgnButton disabled until a multi-game PGN is selected,
-                // or enabled if a single-game PGN is auto-loaded (handled in 'change' event).
-                if (loadPgnButton) loadPgnButton.disabled = true;
-                if (moveInfoDisplay) moveInfoDisplay.textContent = "Please select a PGN file and load a game.";
-            }
-        } catch (error) {
-            pgnFileSelect.innerHTML = '<option value="">Error loading PGNs</option>';
-            console.error("Error fetching PGN file list:", error);
-            alert(`Error fetching PGN file list: ${error.message}. Is the server running?`);
-            if (loadPgnButton) loadPgnButton.disabled = true;
-            if (nextCriticalButton) nextCriticalButton.disabled = true;
-            if (copyFenButton) copyFenButton.disabled = true;
-            if (fastRewindButton) fastRewindButton.disabled = true;
-            if (fastForwardButton) fastForwardButton.disabled = true;
-            if (flipBoardButton) flipBoardButton.disabled = true;
-            if (resumeGameButton) resumeGameButton.disabled = true;
+            return;
         }
+
+        try {
+            const response = await fetch('/api/load_game', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pgn_id: filename, game_index: 0 })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to load game');
+            }
+
+            // Update player names
+            if (playerNamesDisplay) {
+                const white = data.white || 'White';
+                const black = data.black || 'Black';
+                playerNamesDisplay.textContent = `${white} vs ${black}`;
+            }
+
+            // Initialize the board
+            await initializeBoardAfterLoad(data.fen);
+
+            // Update move info
+            if (moveInfoDisplay && data.last_move) {
+                moveInfoDisplay.textContent = data.last_move.notation || '';
+            } else if (moveInfoDisplay) {
+                moveInfoDisplay.textContent = '';
+            }
+
+            // Enable controls
+            enableControls();
+
+        } catch (error) {
+            console.error('Error loading game:', error);
+            if (moveInfoDisplay) {
+                moveInfoDisplay.textContent = `Error loading game: ${error.message}`;
+            }
+            alert(`Failed to load game: ${error.message}`);
+        }
+    }
+
+    function enableControls() {
+        if (nextCriticalButton) nextCriticalButton.disabled = false;
+        if (copyFenButton) copyFenButton.disabled = false;
+        if (fastRewindButton) fastRewindButton.disabled = false;
+        if (fastForwardButton) fastForwardButton.disabled = false;
+        if (flipBoardButton) flipBoardButton.disabled = false;
+        if (resumeGameButton) resumeGameButton.disabled = false;
     }
 
     // Initial setup
@@ -477,80 +489,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (flipBoardButton) flipBoardButton.disabled = true;
     if (resumeGameButton) resumeGameButton.disabled = true;
 
-    loadPgnFileList(); // Load PGN files on page load
-    // Board is not initialized until a game is loaded.
-    // Initial message is set within loadPgnFileList or if it fails.
-
-    // Initialize upload functionality
-    initializeUpload(() => {
-        // Callback when upload completes successfully - refresh the PGN file list
-        console.log("Upload completed, refreshing PGN file list");
-        loadPgnFileList();
-    });
+    // Auto-load the game from URL parameter
+    autoLoadGame();
 
     // Event listeners for controls
-    pgnFileSelect?.addEventListener("change", async () => { // Made async for auto-load
-        if (board) {
-            board.destroy();
-            board = null;
-        }
-        if (playerNamesDisplay) playerNamesDisplay.textContent = ""; // Clear player names when PGN selection changes
-
-        const selectedOption = pgnFileSelect.options[pgnFileSelect.selectedIndex];
-        const pgnFileId = selectedOption.value;
-        const gameCount = selectedOption.dataset.gameCount ? parseInt(selectedOption.dataset.gameCount, 10) : 0;
-
-        // Disable navigation buttons initially
-        if (nextCriticalButton) nextCriticalButton.disabled = true;
-        if (prevMoveButton) prevMoveButton.disabled = true;
-        if (nextMoveButton) nextMoveButton.disabled = true;
-        if (copyFenButton) copyFenButton.disabled = true;
-        if (fastRewindButton) fastRewindButton.disabled = true;
-        if (fastForwardButton) fastForwardButton.disabled = true;
-        if (flipBoardButton) flipBoardButton.disabled = true;
-        if (resumeGameButton) resumeGameButton.disabled = true;
-        inVariationMode = false; // Reset variation mode
-
-
-        if (pgnFileId && gameCount > 0) {
-            if (gameCount === 1) {
-                if (moveInfoDisplay) moveInfoDisplay.textContent = `Loading single game from ${selectedOption.textContent}...`;
-                if (loadPgnButton) loadPgnButton.disabled = true;
-                // Automatically load the game
-                await fetchAndUpdateBoard('/api/load_game', 'POST', { pgn_file_id: pgnFileId });
-                // fetchAndUpdateBoard will handle enabling nav buttons if load is successful
-            } else { // gameCount > 1
-                if (moveInfoDisplay) moveInfoDisplay.textContent = `PGN file selected (${gameCount} games). Click 'Load First Game' to load.`;
-                if (loadPgnButton) loadPgnButton.disabled = false; // Enable button for multi-game PGNs
-            }
-        } else if (pgnFileId && gameCount === 0) {
-            if (moveInfoDisplay) moveInfoDisplay.textContent = `Selected PGN file (${selectedOption.textContent}) contains no games.`;
-            if (loadPgnButton) loadPgnButton.disabled = true;
-        } else { // No PGN file selected (e.g., "-- Select a PGN --")
-            if (moveInfoDisplay) moveInfoDisplay.textContent = "Please select a PGN file and load a game.";
-            if (loadPgnButton) loadPgnButton.disabled = true;
-        }
-    });
-
-    loadPgnButton?.addEventListener("click", async () => {
-        const selectedPgnId = pgnFileSelect.value;
-        if (!selectedPgnId) {
-            alert("Please select a PGN file from the dropdown.");
-            return;
-        }
-        console.log(`Loading game from PGN ID: ${selectedPgnId}`);
-        // fetchAndUpdateBoard will handle initializing or updating the board
-        // and displaying initial move info or "Game start."
-        const gameData = await fetchAndUpdateBoard('/api/load_game', 'POST', { pgn_file_id: selectedPgnId });
-        if (gameData && gameData.fen) {
-             if (moveInfoDisplay && !gameData.last_move) moveInfoDisplay.textContent = "Game loaded. Ready to start.";
-             // The logic within fetchAndUpdateBoard now handles enabling/disabling nextCriticalButton
-             // based on data.has_initial_critical_moment_for_white and current learningSide.
-        } else if (!gameData) {
-            if (moveInfoDisplay) moveInfoDisplay.textContent = "Failed to load game. Check console or select another file.";
-            // nextCriticalButton is disabled by fetchAndUpdateBoard in case of error or if board doesn't init
-        }
-    });
 
     document.getElementById("prev-move")?.addEventListener("click", async () => {
         if (inVariationMode) {

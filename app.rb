@@ -140,6 +140,10 @@ class LearnerApp < Sinatra::Base
     send_file File.join(settings.public_folder, 'index.html')
   end
 
+  get '/game' do
+    send_file File.join(settings.public_folder, 'game.html')
+  end
+
   # API endpoint to list available PGN files
   get '/api/pgn_files' do
     # Return id, name, and game_count

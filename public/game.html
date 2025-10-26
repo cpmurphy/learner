@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Review Tool</title>
+    <link rel="stylesheet" href="3rdparty-assets/cm-chessboard/chessboard.css">
+    <link rel="stylesheet" href="styles/style.css">
+</head>
+<body>
+    <div class="page-header">
+        <a href="/" class="back-link">← Back to Library</a>
+        <h1>Game Review Tool</h1>
+    </div>
+
+    <div id="player-names-display" class="player-names">
+        <!-- Player names will be displayed here -->
+    </div>
+    <div id="chessboard-container" style="width: 400px; max-width: 100vw; margin-top: 10px;">
+        <!-- Chessboard will be rendered here by cm-chessboard -->
+    </div>
+    <div class="controls">
+        <button class='control-btn' id='fast-rewind-moves' title='Go to start'>
+            <svg class='icon' viewBox='0 0 24 24'>
+                <path d='M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z'></path>
+            </svg>
+        </button>
+        <button class='control-btn' id='prev-move' title='Previous move'>
+            <svg class='icon' viewBox='0 0 24 24'>
+                <path d='M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z'></path>
+            </svg>
+        </button>
+        <input id='move-input' type='text'>
+        <button class='control-btn' id='next-move' title='Next move'>
+            <svg class='icon' viewBox='0 0 24 24'>
+                <path d='M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z'></path>
+            </svg>
+        </button>
+        <button class='control-btn' id='resume-game' title='Resume main game'>
+            <svg class='icon' viewBox='0 0 24 24'>
+                <path d='M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14z'></path>
+            </svg>
+        </button>
+        <button class='control-btn' id='next-critical' title='Next mistake'>
+             <svg class='icon' viewBox='0 0 24 24'>
+                 <path
+                    d="m 7.6822193,5.5462532 -1.4099999,1.41 4.5799996,4.5900008 -4.5799996,4.59 1.4099999,1.41 5.9999997,-6 z" />
+                 <ellipse
+                    style="fill:#000000;stroke-width:0.917204"
+                    cx="16.764822"
+                    cy="16.574169"
+                    rx="1.1967525"
+                    ry="1.2797533" />
+                 <path
+                    style="fill:none;stroke:#000000;stroke-width:2;stroke-dasharray:none"
+                    d="m 13.015857,7.7103318 c 0,-1.88622 1.3674,-3.41531 3.05417,-3.41531 1.686769,1e-7 3.054169,1.52908 3.054169,3.41531 0,0.94311 -0.34185,1.796938 -0.894546,2.4149882 -0.552696,0.618049 -1.366275,1.000322 -2.159623,1.000322" />
+                 <path
+                    style="fill:none;fill-rule:nonzero;stroke:#000000;stroke-width:2.43861;stroke-dasharray:none;stroke-opacity:1"
+                    d="m 16.639762,10.117498 0.04027,4.905613" />
+             </svg>
+        </button>
+        <button class='control-btn' id='fast-forward-moves' title='Go to end'>
+            <svg class='icon' viewBox='0 0 24 24'>
+                <path d='M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z'></path>
+            </svg>
+        </button>
+        </button>
+        <button class='control-btn' id='flip-board' title='Flip board'>
+            <svg class='icon' viewBox='0 0 24 24'>
+                <path d='M19 8l-4 4h3c0 3.31-2.69 6-6 6-1.01 0-1.97-.25-2.8-.7l-1.46 1.46C8.97 19.54 10.43 20 12 20c4.42 0 8-3.58 8-8h3l-4-4zM6 12c0-3.31 2.69-6 6-6 1.01 0 1.97.25 2.8.7l1.46-1.46C15.03 4.46 13.57 4 12 4c-4.42 0-8 3.58-8 8H1l4 4 4-4H6z'></path>
+            </svg>
+        </button>
+        <div class="copy-fen-container">
+            <button class='control-btn' id='copy-fen-button' title='Copy FEN to clipboard'>
+                <svg class='icon' viewBox='0 0 24 24'>
+                    <path d='M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z'></path>
+                </svg>
+            </button>
+            <span id="copy-fen-feedback" class="copy-feedback"></span>
+        </div>
+    </div>
+    <div id="move-info-display" class="move-info">
+        <!-- Last move details will be displayed here by JavaScript -->
+    </div>
+    <div class="info">
+        <p>Select side to learn from:</p>
+        <select id="learn-side">
+            <option value="white">White</option>
+            <option value="black">Black</option>
+        </select>
+    </div>
+
+    <script type="module" src="scripts/main.js"></script>
+</body>
+</html>
