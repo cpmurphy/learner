@@ -39,8 +39,11 @@ class GameEditor
 
         next unless is_blunder
 
-        # Add the $201 annotation
-        add_201_to_move(move)
+        # Add the $201 annotation to the PREVIOUS move to mark the critical moment
+        # (PGN convention: $201 indicates a critical position where the next player can err)
+        if i > 0
+          add_201_to_move(game.moves[i - 1])
+        end
 
         # Add variation with the best move
         best_move_uci = best_move_analysis[:move]

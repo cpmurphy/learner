@@ -180,13 +180,20 @@ class LearnerApp < Sinatra::Base
       # If the PGN has no critical moment annotations, analyze it to find them.
       has_critical_moments = session[:game].moves.any? { |m| m.annotation&.include?('$201') }
       game_editor = GameEditor.new
-      unless has_critical_moments
+
+      if has_critical_moments
+        # PGN already has $201 annotations (likely from SCID or another tool).
+        # These might be associated with the wrong move by the parser, so shift them.
+        game_editor.shift_critical_annotations(session[:game])
+      else
+        # No existing annotations, so analyze and add them.
         puts 'No critical moments found in PGN, analyzing for blunders...'
         game_editor.add_blunder_annotations(session[:game])
         puts 'Blunder analysis complete.'
+        # Note: We do NOT call shift_critical_annotations here because annotations
+        # added by add_blunder_annotations are already on the correct move.
       end
 
-      game_editor.shift_critical_annotations(session[:game])
       session[:current_move_index] = 0
 
       puts "Loaded game from PGN: #{pgn_meta[:name]}. Board positions: #{session[:game].positions.size}"
@@ -501,7 +508,8 @@ class LearnerApp < Sinatra::Base
 
       puts "Annotating game with Stockfish..."
       game_editor.add_blunder_annotations(game)
-      game_editor.shift_critical_annotations(game)
+      # Note: shift_critical_annotations is NOT called because annotations
+      # added by add_blunder_annotations are already on the correct move.
       puts "Annotation complete."
 
       # Serialize to PGN
