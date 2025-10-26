@@ -35,19 +35,19 @@ async function loadGameLibrary() {
 
         loadingMessage.style.display = 'none';
 
-        if (!data.pgn_files || data.pgn_files.length === 0) {
+        if (!Array.isArray(data) || data.length === 0) {
             gameList.innerHTML = '<li class="info-message">No games found. Upload a PGN file to get started!</li>';
             return;
         }
 
         // Display games as a list
-        gameList.innerHTML = data.pgn_files.map(filename => {
-            // Extract game info from filename if possible
-            const displayName = formatGameName(filename);
+        gameList.innerHTML = data.map(game => {
+            // Extract game info from the game object
+            const displayName = formatGameName(game.name);
 
             return `
                 <li>
-                    <a href="/game?file=${encodeURIComponent(filename)}">
+                    <a href="/game?file=${encodeURIComponent(game.name)}">
                         <span class="game-name">${displayName}</span>
                         <span class="game-meta">→</span>
                     </a>
