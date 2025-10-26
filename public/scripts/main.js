@@ -425,7 +425,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const response = await fetch('/api/load_game', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pgn_id: filename, game_index: 0 })
+                body: JSON.stringify({ pgn_file_id: filename, game_index: 0 })
             });
 
             if (!response.ok) {
