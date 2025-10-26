@@ -45,26 +45,61 @@ class GameEditor
           add_201_to_move(game.moves[i - 1])
         end
 
-        # Add variation with the best move
+        # Add variation with the best move and continuation
         best_move_uci = best_move_analysis[:move]
+        continuation_moves = best_move_analysis[:variation] || []
+
         if best_move_uci
-          best_move_san = @uci_converter.convert(fen, best_move_uci)
+          # The variation includes the best move plus the continuation
+          full_variation = [best_move_uci] + continuation_moves
 
-          # Create a variation with the best move
-          variation_move = PGN::MoveText.new(best_move_san)
+          # Build a variation with 5 moves total to show the continuation
+          variation_sequence = build_variation_sequence(fen, full_variation, 5)
 
-          # Add a comment explaining the score difference
-          score_diff = (best_score - played_score).abs
-          variation_move.comment = "Better move (advantage: #{format_centipawns(score_diff)})"
+          unless variation_sequence.empty?
+            # Add a comment to the first move explaining the advantage
+            score_diff = (best_score - played_score).abs
+            variation_sequence[0].comment = "Better line (advantage: #{format_centipawns(score_diff)})"
 
-          # Add the variation to the move
-          move.variations ||= []
-          move.variations << [variation_move]
+            # Add the variation to the move
+            move.variations ||= []
+            move.variations << variation_sequence
+          end
         end
       end
     ensure
       analyzer&.close
     end
+  end
+
+  # Build a sequence of moves for a variation
+  # @param fen [String] the starting FEN position
+  # @param uci_moves [Array<String>] array of UCI moves
+  # @param max_moves [Integer] maximum number of moves to include
+  # @return [Array<PGN::MoveText>] array of move objects
+  def build_variation_sequence(fen, uci_moves, max_moves)
+    sequence = []
+    current_fen = fen
+
+    uci_moves.take(max_moves).each do |uci_move|
+      # Convert UCI to SAN using the current position
+      begin
+        san_move = @uci_converter.convert(current_fen, uci_move)
+        sequence << PGN::MoveText.new(san_move)
+
+        # Update the position by applying the move
+        translator = MoveTranslator.new
+        translator.load_game_from_fen(current_fen)
+        translator.translate_move(san_move)
+        current_fen = translator.board_as_fen
+      rescue StandardError => e
+        # If we can't convert or apply a move, stop the variation here
+        puts "Warning: Failed to process variation move #{uci_move}: #{e.message}"
+        break
+      end
+    end
+
+    sequence
   end
 
   # Format centipawns as a human-readable advantage string
