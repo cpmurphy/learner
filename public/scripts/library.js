@@ -47,7 +47,7 @@ async function loadGameLibrary() {
 
             return `
                 <li>
-                    <a href="/game?file=${encodeURIComponent(game.name)}">
+                    <a href="/game?id=${encodeURIComponent(game.id)}">
                         <span class="game-name">${displayName}</span>
                         <span class="game-meta">→</span>
                     </a>

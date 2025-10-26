@@ -401,20 +401,20 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /**
-     * Get the filename from the URL query parameter
+     * Get the game ID from the URL query parameter
      */
-    function getFilenameFromURL() {
+    function getGameIdFromURL() {
         const params = new URLSearchParams(window.location.search);
-        return params.get('file');
+        return params.get('id');
     }
 
     /**
      * Load the game automatically from the URL parameter
      */
     async function autoLoadGame() {
-        const filename = getFilenameFromURL();
+        const gameId = getGameIdFromURL();
 
-        if (!filename) {
+        if (!gameId) {
             if (moveInfoDisplay) {
                 moveInfoDisplay.textContent = "No game specified. Please select a game from the library.";
             }
@@ -425,7 +425,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const response = await fetch('/api/load_game', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pgn_file_id: filename, game_index: 0 })
+                body: JSON.stringify({ pgn_file_id: gameId, game_index: 0 })
             });
 
             if (!response.ok) {
@@ -434,14 +434,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const data = await response.json();
 
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to load game');
+            if (data.error) {
+                throw new Error(data.error);
             }
 
             // Update player names
             if (playerNamesDisplay) {
-                const white = data.white || 'White';
-                const black = data.black || 'Black';
+                const white = data.white_player || 'White';
+                const black = data.black_player || 'Black';
                 playerNamesDisplay.textContent = `${white} vs ${black}`;
             }
 
