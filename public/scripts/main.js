@@ -421,59 +421,13 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        try {
-            const response = await fetch('/api/load_game', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pgn_file_id: gameId, game_index: 0 })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-
-            if (data.error) {
-                throw new Error(data.error);
-            }
-
-            // Update player names
-            if (playerNamesDisplay) {
-                const white = data.white_player || 'White';
-                const black = data.black_player || 'Black';
-                playerNamesDisplay.textContent = `${white} vs ${black}`;
-            }
-
-            // Initialize the board
-            await initializeBoardAfterLoad(data.fen);
-
-            // Update move info
-            if (moveInfoDisplay && data.last_move) {
-                moveInfoDisplay.textContent = data.last_move.notation || '';
-            } else if (moveInfoDisplay) {
-                moveInfoDisplay.textContent = '';
-            }
-
-            // Enable controls
-            enableControls();
-
-        } catch (error) {
-            console.error('Error loading game:', error);
-            if (moveInfoDisplay) {
-                moveInfoDisplay.textContent = `Error loading game: ${error.message}`;
-            }
-            alert(`Failed to load game: ${error.message}`);
-        }
-    }
-
-    function enableControls() {
-        if (nextCriticalButton) nextCriticalButton.disabled = false;
-        if (copyFenButton) copyFenButton.disabled = false;
-        if (fastRewindButton) fastRewindButton.disabled = false;
-        if (fastForwardButton) fastForwardButton.disabled = false;
-        if (flipBoardButton) flipBoardButton.disabled = false;
-        if (resumeGameButton) resumeGameButton.disabled = false;
+        // Use the existing fetchAndUpdateBoard function which handles everything:
+        // - Board initialization
+        // - Player name display
+        // - Move info display
+        // - Button state management
+        // - Error handling
+        await fetchAndUpdateBoard('/api/load_game', 'POST', { pgn_file_id: gameId, game_index: 0 });
     }
 
     // Initial setup
