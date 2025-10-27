@@ -1,47 +1,30 @@
-// upload.js - Handles PGN file upload and annotation
+// upload.js - Handles PGN text upload and annotation
 
 /**
  * Initialize upload functionality
  * @param {Function} onUploadComplete - Callback when upload completes successfully
  */
 export function initializeUpload(onUploadComplete) {
-    const fileInput = document.getElementById('pgn-file-input');
-    const chooseFileButton = document.getElementById('choose-file-button');
+    const textInput = document.getElementById('pgn-text-input');
     const uploadButton = document.getElementById('upload-annotate-button');
-    const selectedFileName = document.getElementById('selected-file-name');
     const uploadStatus = document.getElementById('upload-status');
     const uploadProgress = document.getElementById('upload-progress');
     const progressBarFill = document.getElementById('progress-bar-fill');
     const progressText = document.getElementById('progress-text');
 
-    let selectedFile = null;
-
-    // Choose file button click
-    chooseFileButton.addEventListener('click', () => {
-        fileInput.click();
-    });
-
-    // File selection
-    fileInput.addEventListener('change', (event) => {
-        const file = event.target.files[0];
-        if (file) {
-            selectedFile = file;
-            selectedFileName.textContent = file.name;
-            uploadButton.disabled = false;
-            clearStatus();
-        } else {
-            selectedFile = null;
-            selectedFileName.textContent = '';
-            uploadButton.disabled = true;
-        }
-    });
-
     // Upload and annotate button click
     uploadButton.addEventListener('click', async () => {
-        if (!selectedFile) return;
+        const pgnContent = textInput.value.trim();
+
+        if (!pgnContent) {
+            updateStatus('Please paste PGN content first.', 'error');
+            return;
+        }
+
+        clearStatus();
 
         try {
-            await uploadAndAnnotatePGN(selectedFile, {
+            await uploadAndAnnotatePGN(pgnContent, {
                 onProgress: updateProgress,
                 onStatusChange: updateStatus
             });
@@ -50,6 +33,9 @@ export function initializeUpload(onUploadComplete) {
             if (onUploadComplete) {
                 onUploadComplete();
             }
+
+            // Clear the textarea after successful upload
+            textInput.value = '';
         } catch (error) {
             updateStatus(`Error: ${error.message}`, 'error');
         }
@@ -76,23 +62,24 @@ export function initializeUpload(onUploadComplete) {
 }
 
 /**
- * Upload and annotate a PGN file
- * @param {File} file - The PGN file to upload
+ * Upload and annotate PGN text
+ * @param {string} pgnContent - The PGN text content
  * @param {Object} callbacks - Callbacks for progress and status updates
  * @returns {Promise<Object>} - Result of the upload
  */
-async function uploadAndAnnotatePGN(file, callbacks = {}) {
+async function uploadAndAnnotatePGN(pgnContent, callbacks = {}) {
     const { onProgress, onStatusChange } = callbacks;
 
-    // Update status: reading file
-    if (onProgress) onProgress(10, 'Reading file...');
-    if (onStatusChange) onStatusChange('Reading file...', 'info');
+    // Extract a filename from the PGN content or generate one
+    const filename = generateFilename(pgnContent);
 
-    const pgnContent = await readFileAsText(file);
+    // Update status: validating
+    if (onProgress) onProgress(10, 'Validating PGN...');
+    if (onStatusChange) onStatusChange('Validating PGN...', 'info');
 
     // Update status: uploading
-    if (onProgress) onProgress(30, 'Uploading to server...');
-    if (onStatusChange) onStatusChange('Uploading to server...', 'info');
+    if (onProgress) onProgress(30, 'Sending to server...');
+    if (onStatusChange) onStatusChange('Sending to server...', 'info');
 
     // Send to server for annotation
     const response = await fetch('/api/annotate_and_save', {
@@ -102,7 +89,7 @@ async function uploadAndAnnotatePGN(file, callbacks = {}) {
         },
         body: JSON.stringify({
             pgn_content: pgnContent,
-            filename: file.name
+            filename: filename
         })
     });
 
@@ -130,15 +117,52 @@ async function uploadAndAnnotatePGN(file, callbacks = {}) {
 }
 
 /**
- * Read a file as text
- * @param {File} file - The file to read
- * @returns {Promise<string>} - File contents as text
+ * Generate a filename from PGN content
+ * @param {string} pgnContent - The PGN text
+ * @returns {string} - Generated filename
  */
-function readFileAsText(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (event) => resolve(event.target.result);
-        reader.onerror = (error) => reject(error);
-        reader.readAsText(file);
-    });
+function generateFilename(pgnContent) {
+    // Try to extract Event and Date tags for a meaningful filename
+    const eventMatch = pgnContent.match(/\[Event\s+"([^"]+)"\]/);
+    const dateMatch = pgnContent.match(/\[Date\s+"([^"]+)"\]/);
+    const whiteMatch = pgnContent.match(/\[White\s+"([^"]+)"\]/);
+    const blackMatch = pgnContent.match(/\[Black\s+"([^"]+)"\]/);
+
+    let filename = '';
+
+    // Use White vs Black if available
+    if (whiteMatch && blackMatch) {
+        const white = sanitizeForFilename(whiteMatch[1]);
+        const black = sanitizeForFilename(blackMatch[1]);
+        filename = `${white}-vs-${black}`;
+    } else if (eventMatch) {
+        filename = sanitizeForFilename(eventMatch[1]);
+    }
+
+    // Add date if available
+    if (dateMatch) {
+        const date = dateMatch[1].replace(/\./g, '-');
+        filename = filename ? `${filename}-${date}` : date;
+    }
+
+    // Fallback to timestamp if nothing found
+    if (!filename) {
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        filename = `game-${timestamp}`;
+    }
+
+    return `${filename}.pgn`;
+}
+
+/**
+ * Sanitize string for use in filename
+ * @param {string} str - String to sanitize
+ * @returns {string} - Sanitized string
+ */
+function sanitizeForFilename(str) {
+    return str
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .substring(0, 50);
 }

@@ -10,12 +10,21 @@
     <h1>Chess Game Library</h1>
 
     <div class="upload-section">
-        <h2>Upload & Annotate PGN</h2>
+        <h2>Paste & Annotate PGN</h2>
+        <p class="upload-instructions">Paste your PGN text below and click "Annotate with Stockfish" to analyze and save it.</p>
+        <textarea id="pgn-text-input" placeholder="Paste PGN here...
+
+Example:
+[Event &quot;Casual Game&quot;]
+[Site &quot;?&quot;]
+[Date &quot;2025.10.27&quot;]
+[White &quot;Player1&quot;]
+[Black &quot;Player2&quot;]
+[Result &quot;*&quot;]
+
+1.e4 e5 2.Nf3 Nc6 3.Bc4 Bc5 *"></textarea>
         <div class="upload-form">
-            <input type="file" id="pgn-file-input" accept=".pgn" style="display: none;">
-            <button id="choose-file-button">Choose PGN File</button>
-            <span id="selected-file-name"></span>
-            <button id="upload-annotate-button" disabled>Upload & Annotate</button>
+            <button id="upload-annotate-button">Annotate with Stockfish</button>
         </div>
         <div id="upload-status" class="upload-status"></div>
         <div id="upload-progress" class="upload-progress" style="display: none;">
