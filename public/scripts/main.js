@@ -353,7 +353,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
                 if (setupChallenge) {
-                    moveInfoDisplay.textContent = `${lastMoveData.san} played. Try a better move for ${learningSide}.`;
+                    const movePrefix = `${lastMoveData.number}${lastMoveData.turn === 'white' ? '.' : '...'}`;
+                    moveInfoDisplay.textContent = `${movePrefix}${lastMoveData.san} played. Try a better move for ${learningSide}.`;
                     board.enableMoveInput(handleCriticalMoveAttempt, learningSide);
                 } else if (!inVariationMode) { // Don't update with main line move if we just entered variation
                     updateMoveInfoDisplay(lastMoveData);
