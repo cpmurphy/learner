@@ -97,4 +97,22 @@ class UciToSanConverterTest < Minitest::Test
     # This is technically illegal in the starting position, but tests the conversion logic
     assert_equal 'Ra3', san
   end
+
+  def test_convert_en_passant_capture_by_black
+    # Position where black can capture en passant
+    # White just played d2-d4, so black's e4 pawn can capture on d3
+    fen = 'r1bqk2r/p4pp1/2pb1n1p/n3N3/3Pp3/8/PPP1BPPP/RNBQK2R b KQkq d3 0 12'
+    # e4xd3 (en passant capture)
+    san = @converter.convert(fen, 'e4d3')
+    assert_equal 'exd3', san
+  end
+
+  def test_convert_en_passant_capture_by_white
+    # Position where white can capture en passant
+    # Black just played f7-f5, so white's e5 pawn can capture on f6
+    fen = 'rnbqkbnr/pppp2pp/8/4Pp2/8/8/PPPP1PPP/RNBQKBNR w KQkq f6 0 3'
+    # e5xf6 (en passant capture)
+    san = @converter.convert(fen, 'e5f6')
+    assert_equal 'exf6', san
+  end
 end

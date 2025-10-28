@@ -29,7 +29,8 @@ class UciToSanConverter
   def convert(fen, uci_move)
     return uci_move if uci_move == '--' # Null move
 
-    position = PGN::FEN.new(fen).to_position
+    fen_obj = PGN::FEN.new(fen)
+    position = fen_obj.to_position
     from_square = uci_move[0..1]
     to_square = uci_move[2..3]
     promotion = uci_move[4]&.upcase
@@ -42,8 +43,9 @@ class UciToSanConverter
       return to_square[0] > from_square[0] ? 'O-O' : 'O-O-O'
     end
 
-    # Build SAN notation
-    san = build_san(position, piece, from_square, to_square, promotion)
+    # Build SAN notation (pass en_passant from FEN object)
+    en_passant_square = fen_obj.en_passant == '-' ? nil : fen_obj.en_passant
+    san = build_san(position, piece, from_square, to_square, promotion, en_passant_square)
 
     # Check if move results in check or checkmate
     begin
@@ -53,7 +55,7 @@ class UciToSanConverter
       # The move is valid if we got here
     rescue StandardError
       # If the simple SAN doesn't work, we might need disambiguation
-      san = build_san_with_disambiguation(position, piece, from_square, to_square, promotion)
+      san = build_san_with_disambiguation(position, piece, from_square, to_square, promotion, en_passant_square)
     end
 
     san
@@ -61,9 +63,9 @@ class UciToSanConverter
 
   private
 
-  def build_san(position, piece, from_square, to_square, promotion)
+  def build_san(position, piece, from_square, to_square, promotion, en_passant_square)
     piece_symbol = PIECE_SYMBOLS[piece]
-    is_capture = position.board.at(to_square) || is_en_passant?(position, piece, from_square, to_square)
+    is_capture = position.board.at(to_square) || is_en_passant?(piece, from_square, to_square, en_passant_square)
 
     san = ''
 
@@ -85,9 +87,9 @@ class UciToSanConverter
     san
   end
 
-  def build_san_with_disambiguation(position, piece, from_square, to_square, promotion)
+  def build_san_with_disambiguation(position, piece, from_square, to_square, promotion, en_passant_square)
     piece_symbol = PIECE_SYMBOLS[piece]
-    is_capture = position.board.at(to_square) || is_en_passant?(position, piece, from_square, to_square)
+    is_capture = position.board.at(to_square) || is_en_passant?(piece, from_square, to_square, en_passant_square)
 
     san = ''
 
@@ -114,12 +116,12 @@ class UciToSanConverter
     san
   end
 
-  def is_en_passant?(position, piece, from_square, to_square)
+  def is_en_passant?(piece, from_square, to_square, en_passant_square)
     return false unless piece.upcase == 'P'
-    return false unless position.en_passant
+    return false unless en_passant_square
 
     # En passant: pawn moves diagonally to the en passant square
-    to_square == position.en_passant && from_square[0] != to_square[0]
+    to_square == en_passant_square && from_square[0] != to_square[0]
   end
 
   def find_disambiguation(position, piece, from_square, to_square)

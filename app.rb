@@ -146,6 +146,9 @@ class LearnerApp < Sinatra::Base
 
   # API endpoint to list available PGN files
   get '/api/pgn_files' do
+    # Always scan to get the latest list of files
+    scan_pgn_directory
+
     # Return id, name, and game_count
     files_for_client = @available_pgns.map do |pgn_meta|
       { id: pgn_meta[:id], name: pgn_meta[:name], game_count: pgn_meta[:game_count] }
