@@ -78,8 +78,13 @@ class UciToSanConverter
       san += to_square
       san += "=#{promotion}" if promotion
     else
-      # Piece moves
+      # Piece moves - check if disambiguation is needed
       san += piece_symbol
+
+      # Check for disambiguation
+      disambiguation = find_disambiguation(position, piece, from_square, to_square)
+      san += disambiguation if disambiguation
+
       san += 'x' if is_capture
       san += to_square
     end
@@ -125,7 +130,7 @@ class UciToSanConverter
   end
 
   def find_disambiguation(position, piece, from_square, to_square)
-    # Find all pieces of the same type and color that could move to to_square
+    # Find all pieces of the same type and color that could legally move to to_square
     same_piece_squares = []
 
     # Iterate through all squares on the board
@@ -136,14 +141,17 @@ class UciToSanConverter
         next unless square_piece == piece
         next if square == from_square
 
-        same_piece_squares << square
+        # Check if this piece can actually move to the destination
+        if can_piece_move?(position, square, to_square, piece)
+          same_piece_squares << square
+        end
       end
     end
 
     return nil if same_piece_squares.empty?
 
     # Check if any other piece can legally move to the destination
-    # For simplicity, we'll use file disambiguation if pieces are on different files
+    # Use file disambiguation if pieces are on different files
     # or rank disambiguation if they're on the same file
 
     same_file = same_piece_squares.any? { |sq| sq[0] == from_square[0] }
@@ -156,5 +164,81 @@ class UciToSanConverter
     else
       from_square # Full square disambiguation
     end
+  end
+
+  # Check if a piece can move from one square to another based on piece movement rules
+  def can_piece_move?(position, from_square, to_square, piece)
+    piece_type = piece.upcase
+
+    case piece_type
+    when 'N'
+      can_knight_move?(from_square, to_square)
+    when 'B'
+      can_bishop_move?(position, from_square, to_square)
+    when 'R'
+      can_rook_move?(position, from_square, to_square)
+    when 'Q'
+      can_queen_move?(position, from_square, to_square)
+    when 'K'
+      can_king_move?(from_square, to_square)
+    else
+      false
+    end
+  end
+
+  def can_knight_move?(from_square, to_square)
+    file_diff = (from_square[0].ord - to_square[0].ord).abs
+    rank_diff = (from_square[1].to_i - to_square[1].to_i).abs
+    (file_diff == 2 && rank_diff == 1) || (file_diff == 1 && rank_diff == 2)
+  end
+
+  def can_bishop_move?(position, from_square, to_square)
+    file_diff = (from_square[0].ord - to_square[0].ord).abs
+    rank_diff = (from_square[1].to_i - to_square[1].to_i).abs
+    return false unless file_diff == rank_diff && file_diff > 0
+
+    path_clear?(position, from_square, to_square)
+  end
+
+  def can_rook_move?(position, from_square, to_square)
+    same_file = from_square[0] == to_square[0]
+    same_rank = from_square[1] == to_square[1]
+    return false unless same_file || same_rank
+
+    path_clear?(position, from_square, to_square)
+  end
+
+  def can_queen_move?(position, from_square, to_square)
+    can_rook_move?(position, from_square, to_square) ||
+      can_bishop_move?(position, from_square, to_square)
+  end
+
+  def can_king_move?(from_square, to_square)
+    file_diff = (from_square[0].ord - to_square[0].ord).abs
+    rank_diff = (from_square[1].to_i - to_square[1].to_i).abs
+    file_diff <= 1 && rank_diff <= 1 && (file_diff > 0 || rank_diff > 0)
+  end
+
+  def path_clear?(position, from_square, to_square)
+    from_file = from_square[0].ord
+    from_rank = from_square[1].to_i
+    to_file = to_square[0].ord
+    to_rank = to_square[1].to_i
+
+    file_step = to_file <=> from_file
+    rank_step = to_rank <=> from_rank
+
+    current_file = from_file + file_step
+    current_rank = from_rank + rank_step
+
+    while current_file != to_file || current_rank != to_rank
+      square = "#{current_file.chr}#{current_rank}"
+      return false if position.board.at(square)
+
+      current_file += file_step if file_step != 0
+      current_rank += rank_step if rank_step != 0
+    end
+
+    true
   end
 end

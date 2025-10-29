@@ -115,4 +115,13 @@ class UciToSanConverterTest < Minitest::Test
     san = @converter.convert(fen, 'e5f6')
     assert_equal 'exf6', san
   end
+
+  def test_convert_rook_move_with_file_disambiguation
+    # Position with two rooks that can both move to d1
+    # White has rooks on a1 and f1, both can move to d1
+    fen = 'r2qk2r/ppp2ppp/2nbpn2/1N6/5B2/1B3Q1P/PPP2PP1/R4RK1 w kq - 3 13'
+    # f1-d1 should be Rfd1 (not just Rd1)
+    san = @converter.convert(fen, 'f1d1')
+    assert_equal 'Rfd1', san
+  end
 end
