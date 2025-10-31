@@ -101,6 +101,13 @@ class LearnerApp < Sinatra::Base
 
     puts "Scanning PGN directory: #{pgn_dir_path}"
     pgn_files = Dir.glob(File.join(pgn_dir_path, '*.pgn'))
+    # Sort files by last modified time descending (newest first)
+    begin
+      pgn_files.sort_by! { |file_path| File.mtime(file_path) }
+      pgn_files.reverse!
+    rescue StandardError => e
+      puts "WARNING: Failed to sort PGN files by modified time: #{e.message}. Falling back to default order."
+    end
     if pgn_files.empty?
       puts "No PGN files found in #{pgn_dir_path}."
     else
@@ -158,6 +165,9 @@ class LearnerApp < Sinatra::Base
 
   # API endpoint to load the first game from a selected PGN file
   post '/api/load_game' do
+    # Ensure the PGN list (and IDs) reflect the latest directory state and sort order
+    scan_pgn_directory
+
     begin
       params = JSON.parse(request.body.read)
     rescue JSON::ParserError
