@@ -640,15 +640,15 @@ class LearnerApp < Sinatra::Base
         filename: original_filename,
         game_count: games.size,
         size: pgn_content.bytesize,
-        message: 'PGN file validated successfully. Use /api/annotate_and_save to process and save it.'
+        message: 'PGN file validated successfully. Use /api/analyze_and_save to process and save it.'
       })
     rescue StandardError => e
       json_response({ error: "Invalid PGN file: #{e.message}" }, 400)
     end
   end
 
-  # API endpoint to annotate a PGN and save it to PGN_DIR
-  post '/api/annotate_and_save' do
+  # API endpoint to analyze a PGN and save it to PGN_DIR
+  post '/api/analyze_and_save' do
     require_relative 'lib/pgn_writer'
 
     # Check if PGN_DIR is configured
@@ -684,7 +684,7 @@ class LearnerApp < Sinatra::Base
         return json_response({ error: 'No valid games found in PGN' }, 400)
       end
 
-      # Annotate the first game with Stockfish
+      # Analyze the first game with Stockfish
       game = games.first
       game_editor = GameEditor.new
 
@@ -725,7 +725,7 @@ class LearnerApp < Sinatra::Base
     rescue JSON::ParserError
       json_response({ error: 'Invalid JSON in request body' }, 400)
     rescue StandardError => e
-      puts "ERROR: Failed to annotate and save PGN: #{e.message}"
+      puts "ERROR: Failed to analyze and save PGN: #{e.message}"
       puts e.backtrace.join("\n")
       json_response({ error: "Failed to process PGN: #{e.message}" }, 500)
     end

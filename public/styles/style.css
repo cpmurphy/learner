@@ -187,20 +187,20 @@ h1 {
     flex-wrap: wrap;
 }
 
-#choose-file-button, #upload-annotate-button {
+#choose-file-button, #upload-analyze-button {
     width: auto;
     padding: 10px 20px;
     height: auto;
     font-size: 1em;
 }
 
-#upload-annotate-button:disabled {
+#upload-analyze-button:disabled {
     background-color: #ccc;
     cursor: not-allowed;
     color: #666;
 }
 
-#upload-annotate-button:not(:disabled):hover {
+#upload-analyze-button:not(:disabled):hover {
     background-color: #4CAF50;
     color: white;
     border-color: #4CAF50;

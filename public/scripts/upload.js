@@ -6,13 +6,13 @@
  */
 export function initializeUpload(onUploadComplete) {
     const textInput = document.getElementById('pgn-text-input');
-    const uploadButton = document.getElementById('upload-annotate-button');
+    const uploadButton = document.getElementById('upload-analyze-button');
     const uploadStatus = document.getElementById('upload-status');
     const uploadProgress = document.getElementById('upload-progress');
     const progressBarFill = document.getElementById('progress-bar-fill');
     const progressText = document.getElementById('progress-text');
 
-    // Upload and annotate button click
+    // Upload and analyze button click
     uploadButton.addEventListener('click', async () => {
         const pgnContent = textInput.value.trim();
 
@@ -24,7 +24,7 @@ export function initializeUpload(onUploadComplete) {
         clearStatus();
 
         try {
-            await uploadAndAnnotatePGN(pgnContent, {
+            await uploadAndAnalyzePGN(pgnContent, {
                 onProgress: updateProgress,
                 onStatusChange: updateStatus
             });
@@ -62,12 +62,12 @@ export function initializeUpload(onUploadComplete) {
 }
 
 /**
- * Upload and annotate PGN text
+ * Upload and analyze PGN text
  * @param {string} pgnContent - The PGN text content
  * @param {Object} callbacks - Callbacks for progress and status updates
  * @returns {Promise<Object>} - Result of the upload
  */
-async function uploadAndAnnotatePGN(pgnContent, callbacks = {}) {
+async function uploadAndAnalyzePGN(pgnContent, callbacks = {}) {
     const { onProgress, onStatusChange } = callbacks;
 
     // Extract a filename from the PGN content or generate one
@@ -81,8 +81,8 @@ async function uploadAndAnnotatePGN(pgnContent, callbacks = {}) {
     if (onProgress) onProgress(30, 'Sending to server...');
     if (onStatusChange) onStatusChange('Sending to server...', 'info');
 
-    // Send to server for annotation
-    const response = await fetch('/api/annotate_and_save', {
+    // Send to server for analysis
+    const response = await fetch('/api/analyze_and_save', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -99,8 +99,8 @@ async function uploadAndAnnotatePGN(pgnContent, callbacks = {}) {
     }
 
     // Update status: annotating
-    if (onProgress) onProgress(60, 'Annotating with Stockfish...');
-    if (onStatusChange) onStatusChange('Annotating with Stockfish (this may take a while)...', 'info');
+    if (onProgress) onProgress(60, 'Analyzing game...');
+    if (onStatusChange) onStatusChange('Analyzing game (this may take a while)...', 'info');
 
     const result = await response.json();
 
@@ -108,7 +108,7 @@ async function uploadAndAnnotatePGN(pgnContent, callbacks = {}) {
     if (onProgress) onProgress(100, 'Complete!');
     if (onStatusChange) {
         onStatusChange(
-            `Success! Game annotated and saved as ${result.filename}`,
+            `Success! Game analyzed and saved as ${result.filename}`,
             'success'
         );
     }
