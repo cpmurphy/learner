@@ -144,10 +144,37 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
 
                     // If the user played the expected move and a variation exists, use it.
-                    // Otherwise, the variation is just the single good move the user played.
+                    // Otherwise, check if we got a continuation line from the validation response.
                     // Compare using UCI moves instead of SAN to handle check/mate annotation differences
                     if (userMoveUci === goodMoveUci && lastMoveDataForVariation.variation_sans?.length > 0) {
                         currentVariationSANs = lastMoveDataForVariation.variation_sans;
+                    } else if (validationData.variation_sans && validationData.variation_sans.length > 0) {
+                        // User played a good move that's not the expected move, and we got a continuation line
+                        currentVariationSANs = validationData.variation_sans;
+                        
+                        // Save this variation to the PGN
+                        // move_index_of_blunder is the position index where the blunder occurs
+                        // The $201 annotation is on the move before that (move_index_of_blunder - 1)
+                        const moveIndex = lastMoveDataForVariation.move_index_of_blunder - 1;
+                        try {
+                            await fetch('/game/add_variation', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    move_index: moveIndex,
+                                    variation_sans: validationData.variation_sans,
+                                    user_move_san: userMoveSan
+                                })
+                            });
+                            // Save the game to persist the variation
+                            await fetch('/game/save', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' }
+                            });
+                        } catch (error) {
+                            console.error('Error saving variation:', error);
+                            // Continue anyway - the variation will still work in the UI
+                        }
                     } else {
                         currentVariationSANs = [userMoveSan];
                     }

@@ -212,6 +212,7 @@ class LearnerApp < Sinatra::Base
       end
 
       session[:game] = games_in_file.first # Load the first game
+      session[:pgn_file_path] = pgn_meta[:path] # Store the file path for saving
 
       # If the PGN has no critical moment annotations, analyze it to find them.
       has_critical_moments = session[:game].moves.any? { |m| m.annotation&.include?('$201') }
@@ -431,6 +432,7 @@ class LearnerApp < Sinatra::Base
   end
 
   # API to assess if a user's move is a good alternative to the correct one
+  # Returns continuation line if the move is good
   post '/game/validate_critical_move' do
     return json_response({ error: 'No game loaded.' }, 404) unless game_loaded?
 
@@ -450,11 +452,133 @@ class LearnerApp < Sinatra::Base
     analyzer = Analyzer.new
     begin
       is_good_enough = analyzer.good_enough_move?(fen, user_move_uci, good_move_uci)
-      json_response({ good_enough: is_good_enough })
+      
+      response = { good_enough: is_good_enough }
+      
+      # If the move is good enough, calculate the continuation line
+      if is_good_enough
+        user_move_analysis = analyzer.evaluate_move(fen, user_move_uci)
+        if user_move_analysis && user_move_analysis[:variation]
+          # The variation includes the user's move plus continuation
+          full_variation = [user_move_uci] + user_move_analysis[:variation]
+          
+          # Convert UCI moves to SAN
+          require_relative 'lib/game_editor'
+          require_relative 'lib/uci_to_san_converter'
+          game_editor = GameEditor.new
+          variation_sequence = game_editor.build_variation_sequence(fen, full_variation, 8)
+          variation_sans = variation_sequence.map(&:notation)
+          
+          response[:variation_sans] = variation_sans
+        end
+      end
+      
+      json_response(response)
     rescue Analyzer::EngineError => e
       json_response({ error: "Analysis engine error: #{e.message}" }, 500)
     ensure
       analyzer.close
+    end
+  end
+
+  # API endpoint to add a variation to the current move in the loaded game
+  post '/game/add_variation' do
+    return json_response({ error: 'No game loaded.' }, 404) unless game_loaded?
+
+    begin
+      params = JSON.parse(request.body.read)
+      move_index = params['move_index'] # The move index before the variation starts
+      variation_sans = params['variation_sans'] # Array of SAN moves for the variation
+      user_move_san = params['user_move_san'] # The user's move in SAN
+    rescue JSON::ParserError
+      return json_response({ error: 'Invalid JSON in request body' }, 400)
+    end
+
+    unless move_index && variation_sans && user_move_san
+      return json_response({ error: 'Missing move_index, variation_sans, or user_move_san' }, 400)
+    end
+
+    begin
+      # Ensure move_index is valid
+      unless move_index.is_a?(Integer) && move_index >= 0 && move_index < session[:game].moves.size
+        return json_response({ error: "Invalid move_index: #{move_index}" }, 400)
+      end
+
+      move = session[:game].moves[move_index]
+      
+      # Build variation sequence from SAN moves
+      require_relative 'lib/game_editor'
+      game_editor = GameEditor.new
+      
+      # Get FEN before the move where variation starts
+      fen_before = session[:game].positions[move_index].to_fen.to_s
+      
+      # Build variation sequence from SAN moves
+      variation_sequence = []
+      current_fen = fen_before
+      
+      variation_sans.each do |san_move|
+        begin
+          variation_sequence << PGN::MoveText.new(san_move)
+          
+          # Update FEN by applying the move
+          require_relative 'lib/move_translator'
+          translator = MoveTranslator.new
+          translator.load_game_from_fen(current_fen)
+          translator.translate_move(san_move)
+          current_fen = translator.board_as_fen
+        rescue StandardError => e
+          puts "Warning: Failed to process variation move #{san_move}: #{e.message}"
+          break
+        end
+      end
+
+      # Add comment to first move
+      if variation_sequence.any?
+        variation_sequence[0].comment = "Alternative line found during review"
+      end
+
+      # Add variation to the move
+      move.variations ||= []
+      move.variations << variation_sequence
+
+      json_response({
+        success: true,
+        message: 'Variation added successfully',
+        variation_count: move.variations.size
+      })
+    rescue StandardError => e
+      puts "ERROR: Failed to add variation: #{e.message}"
+      puts e.backtrace.join("\n")
+      json_response({ error: "Failed to add variation: #{e.message}" }, 500)
+    end
+  end
+
+  # API endpoint to save the current game back to its PGN file
+  post '/game/save' do
+    return json_response({ error: 'No game loaded.' }, 404) unless game_loaded?
+    return json_response({ error: 'No PGN file path stored.' }, 404) unless session[:pgn_file_path]
+
+    begin
+      require_relative 'lib/pgn_writer'
+      
+      # Serialize the game to PGN
+      writer = PGNWriter.new
+      annotated_pgn = writer.write(session[:game])
+      
+      # Write to file
+      File.write(session[:pgn_file_path], annotated_pgn)
+      puts "Saved game to #{session[:pgn_file_path]}"
+      
+      json_response({
+        success: true,
+        message: 'Game saved successfully',
+        file_path: session[:pgn_file_path]
+      })
+    rescue StandardError => e
+      puts "ERROR: Failed to save game: #{e.message}"
+      puts e.backtrace.join("\n")
+      json_response({ error: "Failed to save game: #{e.message}" }, 500)
     end
   end
 
