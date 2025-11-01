@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chess Game Library</title>
+    <title>Game Review Tool</title>
     <link rel="stylesheet" href="styles/style.css">
 </head>
 <body>
-    <h1>Chess Game Library</h1>
+    <h1>Game Review Tool</h1>
 
     <div class="upload-section">
-        <h2>Paste & Annotate PGN</h2>
-        <p class="upload-instructions">Paste your PGN text below and click "Annotate with Stockfish" to analyze and save it.</p>
+        <h2>Analyze a New Game</h2>
+        <p class="upload-instructions">Paste PGN below and click the button to analyze it.</p>
         <textarea id="pgn-text-input" placeholder="Paste PGN here...
 
 Example:
@@ -24,7 +24,7 @@ Example:
 
 1.e4 e5 2.Nf3 Nc6 3.Bc4 Bc5 *"></textarea>
         <div class="upload-form">
-            <button id="upload-annotate-button">Annotate with Stockfish</button>
+            <button id="upload-annotate-button">Analyze Game</button>
         </div>
         <div id="upload-status" class="upload-status"></div>
         <div id="upload-progress" class="upload-progress" style="display: none;">
@@ -36,7 +36,7 @@ Example:
     </div>
 
     <div class="game-library">
-        <h2>Your Games</h2>
+        <h2>Previously Analyzed Games</h2>
         <div id="game-list-loading" class="info-message">Loading games...</div>
         <div id="game-list-error" class="error-message" style="display: none;"></div>
         <ul id="game-list" class="game-list"></ul>
