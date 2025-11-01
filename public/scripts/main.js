@@ -123,7 +123,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     // If the user played the expected move and a variation exists, use it.
                     // Otherwise, the variation is just the single good move the user played.
-                    if (userMoveSan === goodMoveSanForChallenge && lastMoveDataForVariation.variation_sans?.length > 0) {
+                    // Compare using UCI moves instead of SAN to handle check/mate annotation differences
+                    if (userMoveUci === goodMoveUci && lastMoveDataForVariation.variation_sans?.length > 0) {
                         currentVariationSANs = lastMoveDataForVariation.variation_sans;
                     } else {
                         currentVariationSANs = [userMoveSan];
