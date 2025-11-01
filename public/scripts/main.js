@@ -34,6 +34,8 @@ document.addEventListener("DOMContentLoaded", () => {
     let variationStartTurn = null; // Turn (white/black) when variation starts
     let currentVariationSANs = [];
     let currentVariationPly = 0;
+    let variationSANsStartIndex = 0; // Index offset: 0 if user's move is in array, 1 if it was sliced
+    let userMoveSanInVariation = null; // Store the user's move for variation navigation
     let currentFenInVariation = null;
     let variationChess = null; // Chess.js instance for variation mode
 
@@ -147,10 +149,18 @@ document.addEventListener("DOMContentLoaded", () => {
                     // Otherwise, check if we got a continuation line from the validation response.
                     // Compare using UCI moves instead of SAN to handle check/mate annotation differences
                     if (userMoveUci === goodMoveUci && lastMoveDataForVariation.variation_sans?.length > 0) {
+                        // User played the expected move - variation already includes it
                         currentVariationSANs = lastMoveDataForVariation.variation_sans;
+                        variationSANsStartIndex = 0; // Array includes user's move at index 0
                     } else if (validationData.variation_sans && validationData.variation_sans.length > 0) {
                         // User played a good move that's not the expected move, and we got a continuation line
-                        currentVariationSANs = validationData.variation_sans;
+                        // validationData.variation_sans includes the user's move as the first element
+                        // Since we're applying the user's move separately, we need to skip it in the variation
+                        // But for saving to PGN, we want the full variation including the user's move
+                        const fullVariationForSaving = validationData.variation_sans;
+                        // Skip the first move (user's move) since we already applied it
+                        currentVariationSANs = validationData.variation_sans.slice(1);
+                        variationSANsStartIndex = 1; // Array starts after user's move (which was at index 0)
                         
                         // Save this variation to the PGN
                         // move_index_of_blunder is the position index where the blunder occurs
@@ -162,7 +172,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
                                     move_index: moveIndex,
-                                    variation_sans: validationData.variation_sans,
+                                    variation_sans: fullVariationForSaving,
                                     user_move_san: userMoveSan
                                 })
                             });
@@ -177,15 +187,28 @@ document.addEventListener("DOMContentLoaded", () => {
                         }
                     } else {
                         currentVariationSANs = [userMoveSan];
+                        variationSANsStartIndex = 0; // Array includes user's move
                     }
 
-                    currentVariationPly = 1; // User just played the first move
                     variationChess = new Chess(fenAtCriticalPrompt);
                     variationChess.move(userMoveSan, { sloppy: true }); // Apply the user's validated move
                     currentFenInVariation = variationChess.fen();
+                    userMoveSanInVariation = userMoveSan; // Store for backward navigation
+                    
+                    // Update the board to show the position after the user's move
+                    board.setPosition(currentFenInVariation, true); // true for animation
+                    
+                    // currentVariationPly tracks the number of moves played in the variation
+                    // Since we've already applied the user's move, we've played 1 move
+                    currentVariationPly = 1; // User just played the first move
+                    
+                    // Update the display to show the user's move
+                    updateMoveInfoDisplay({ san: userMoveSan }, true, currentVariationPly);
 
                     if (resumeGameButton) resumeGameButton.disabled = false;
-                    if (nextMoveButton) nextMoveButton.disabled = (currentVariationPly >= currentVariationSANs.length);
+                    // Check if we've reached the end: adjust for array indexing
+                    const nextArrayIndex = currentVariationPly - variationSANsStartIndex;
+                    if (nextMoveButton) nextMoveButton.disabled = (nextArrayIndex >= currentVariationSANs.length);
                     if (nextCriticalButton) nextCriticalButton.disabled = true;
                 } else {
                     // Fallback: Should not be reached if challenge was correctly initiated.
@@ -517,7 +540,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 currentVariationPly--;
                 board.setPosition(variationChess.fen(), true);
                 // currentVariationPly is now the ply for the move we're displaying (the one we just moved back to)
-                updateMoveInfoDisplay({ san: currentVariationSANs[currentVariationPly - 1] }, true, currentVariationPly);
+                // Adjust index based on whether user's move is in the array
+                const arrayIndex = currentVariationPly - variationSANsStartIndex;
+                if (arrayIndex >= 0 && arrayIndex < currentVariationSANs.length) {
+                    updateMoveInfoDisplay({ san: currentVariationSANs[arrayIndex] }, true, currentVariationPly);
+                } else if (currentVariationPly === 1 && userMoveSanInVariation) {
+                    // We're back at the position after user's move (ply 1)
+                    updateMoveInfoDisplay({ san: userMoveSanInVariation }, true, currentVariationPly);
+                }
                 if (nextMoveButton) nextMoveButton.disabled = false;
             }
             return;
@@ -539,14 +569,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (inVariationMode) {
             console.log("Next move clicked (Variation Mode)");
-            if (currentVariationPly >= currentVariationSANs.length) {
+            // Adjust index based on whether user's move is in the array
+            // If variationSANsStartIndex = 1, we sliced the array, so use currentVariationPly - 1
+            // If variationSANsStartIndex = 0, array includes user's move, so use currentVariationPly
+            const arrayIndex = currentVariationPly - variationSANsStartIndex;
+            
+            // Check if we've reached the end of the variation
+            if (arrayIndex >= currentVariationSANs.length) {
                 // End of variation
                 moveInfoDisplay.textContent = "End of variation. Use Resume Game to return to the main line.";
                 if (nextMoveButton) nextMoveButton.disabled = true;
                 return;
             }
+            
             // Play the next move in variationChess
-            const nextSan = currentVariationSANs[currentVariationPly];
+            const nextSan = currentVariationSANs[arrayIndex];
             try {
                 const moveResult = MoveHelper.sanToSquares(nextSan, variationChess.fen());
                 if (moveResult && moveResult.moves) {
@@ -561,7 +598,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     currentVariationPly++;
                     // currentVariationPly is now the ply for the move we just played
                     updateMoveInfoDisplay({ san: nextSan }, true, currentVariationPly);
-                    if (nextMoveButton) nextMoveButton.disabled = (currentVariationPly >= currentVariationSANs.length);
+                    // Check if we've reached the end: adjust for array indexing
+                    const nextArrayIndex = currentVariationPly - variationSANsStartIndex;
+                    if (nextMoveButton) nextMoveButton.disabled = (nextArrayIndex >= currentVariationSANs.length);
                 } else {
                     console.error(`Illegal move in variation: ${nextSan} from FEN: ${variationChess.fen()}`);
                     moveInfoDisplay.textContent = `Error: Illegal move '${nextSan}' in variation. Resuming main game.`;

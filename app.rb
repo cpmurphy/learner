@@ -457,17 +457,37 @@ class LearnerApp < Sinatra::Base
       
       # If the move is good enough, calculate the continuation line
       if is_good_enough
-        user_move_analysis = analyzer.evaluate_move(fen, user_move_uci)
-        if user_move_analysis && user_move_analysis[:variation]
-          # The variation includes the user's move plus continuation
-          full_variation = [user_move_uci] + user_move_analysis[:variation]
+        # First convert user's UCI move to SAN so we can apply it
+        require_relative 'lib/uci_to_san_converter'
+        require_relative 'lib/move_translator'
+        uci_converter = UciToSanConverter.new
+        user_move_san = uci_converter.convert(fen, user_move_uci)
+        
+        # Apply the user's move to get the position after their move
+        translator = MoveTranslator.new
+        translator.load_game_from_fen(fen)
+        translator.translate_move(user_move_san)
+        fen_after_user_move = translator.board_as_fen
+        
+        # Get the best continuation from the position after the user's move
+        # This will return moves starting with the opponent's response
+        continuation_analysis = analyzer.evaluate_best_move(fen_after_user_move)
+        
+        if continuation_analysis && continuation_analysis[:variation]
+          # continuation_analysis[:move] is the opponent's best response (in UCI)
+          # continuation_analysis[:variation] is the continuation after that (also UCI)
+          # We prepend the user's move to get the full line
+          full_variation = [user_move_uci, continuation_analysis[:move]] + continuation_analysis[:variation]
+          
+          puts "DEBUG: Full variation UCI: #{full_variation.inspect}"
           
           # Convert UCI moves to SAN
           require_relative 'lib/game_editor'
-          require_relative 'lib/uci_to_san_converter'
           game_editor = GameEditor.new
           variation_sequence = game_editor.build_variation_sequence(fen, full_variation, 8)
           variation_sans = variation_sequence.map(&:notation)
+          
+          puts "DEBUG: Variation SAN after conversion: #{variation_sans.inspect}"
           
           response[:variation_sans] = variation_sans
         end
