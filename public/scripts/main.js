@@ -30,6 +30,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // State for variation play
     let inVariationMode = false;
     let mainLineMoveIndexAtVariationStart = 0;
+    let variationStartMoveNumber = 0; // Move number where variation starts
+    let variationStartTurn = null; // Turn (white/black) when variation starts
     let currentVariationSANs = [];
     let currentVariationPly = 0;
     let currentFenInVariation = null;
@@ -121,6 +123,26 @@ document.addEventListener("DOMContentLoaded", () => {
                     inVariationMode = true;
                     mainLineMoveIndexAtVariationStart = lastMoveDataForVariation.move_index_of_blunder;
 
+                    // Calculate the starting move number and turn for the variation
+                    // The variation replaces the blunder move, which is the next move after lastMoveDataForVariation
+                    // The variation starts with learningSide making a move (replacing the blunder move)
+                    variationStartTurn = learningSide;
+
+                    // The move number calculation:
+                    // - If lastMoveDataForVariation.turn === 'black', then after black's move it's white's turn
+                    //   White's move starts a new move number: lastMoveDataForVariation.number + 1
+                    // - If lastMoveDataForVariation.turn === 'white', then after white's move it's black's turn
+                    //   Black's move uses the same move number: lastMoveDataForVariation.number
+                    if (lastMoveDataForVariation.turn === 'black') {
+                        // Last move was black's move, next turn is white
+                        // White's move starts a new move number
+                        variationStartMoveNumber = lastMoveDataForVariation.number + 1;
+                    } else {
+                        // Last move was white's move, next turn is black
+                        // Black's move uses the same move number
+                        variationStartMoveNumber = lastMoveDataForVariation.number;
+                    }
+
                     // If the user played the expected move and a variation exists, use it.
                     // Otherwise, the variation is just the single good move the user played.
                     // Compare using UCI moves instead of SAN to handle check/mate annotation differences
@@ -167,8 +189,17 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!moveInfoDisplay) return;
 
         if (isVariationMove && lastMoveData && lastMoveData.san) { // lastMoveData here is just { san: '...' }
-            const moveNumberInVariation = Math.floor(variationPly / 2) + 1;
-            const turnInVariation = variationPly % 2 === 0 ? learningSide : (learningSide === 'white' ? 'black' : 'white'); // Assuming player makes first var move
+            // Calculate move number and turn based on the starting move number and turn
+            // variationPly is 1-based (1 = first move in variation)
+            const isWhiteMove = (variationStartTurn === 'white' && (variationPly - 1) % 2 === 0) ||
+                                (variationStartTurn === 'black' && (variationPly - 1) % 2 === 1);
+            const turnInVariation = isWhiteMove ? 'white' : 'black';
+
+            // Calculate move number: increment after each pair of moves (white+black)
+            // variationPly is 1-based, so (variationPly - 1) gives 0-based index
+            // Each pair (white+black) increments the move number by 1
+            const moveNumberInVariation = variationStartMoveNumber + Math.floor((variationPly - 1) / 2);
+
             let movePrefix = `${moveNumberInVariation}${turnInVariation === 'white' ? '.' : '...'}`;
             moveInfoDisplay.textContent = `Variation: ${movePrefix} ${lastMoveData.san}`;
         } else if (lastMoveData) {
@@ -458,7 +489,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 variationChess.undo();
                 currentVariationPly--;
                 board.setPosition(variationChess.fen(), true);
-                updateMoveInfoDisplay({ san: currentVariationSANs[currentVariationPly - 1] }, true, variationChess.moveNumber());
+                // currentVariationPly is now the ply for the move we're displaying (the one we just moved back to)
+                updateMoveInfoDisplay({ san: currentVariationSANs[currentVariationPly - 1] }, true, currentVariationPly);
                 if (nextMoveButton) nextMoveButton.disabled = false;
             }
             return;
@@ -499,8 +531,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                     variationChess.move(nextSan, { sloppy: true });
                     currentFenInVariation = variationChess.fen();
-                    updateMoveInfoDisplay({ san: nextSan }, true, currentVariationPly);
                     currentVariationPly++;
+                    // currentVariationPly is now the ply for the move we just played
+                    updateMoveInfoDisplay({ san: nextSan }, true, currentVariationPly);
                     if (nextMoveButton) nextMoveButton.disabled = (currentVariationPly >= currentVariationSANs.length);
                 } else {
                     console.error(`Illegal move in variation: ${nextSan} from FEN: ${variationChess.fen()}`);
