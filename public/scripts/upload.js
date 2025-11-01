@@ -73,13 +73,40 @@ async function uploadAndAnalyzePGN(pgnContent, callbacks = {}) {
     // Extract a filename from the PGN content or generate one
     const filename = generateFilename(pgnContent);
 
-    // Update status: validating
-    if (onProgress) onProgress(10, 'Validating PGN...');
-    if (onStatusChange) onStatusChange('Validating PGN...', 'info');
+    // Start progress animation that asymptotically approaches 98% over 10 seconds
+    const startTime = Date.now();
+    const duration = 10000; // 10 seconds
+    const targetPercent = 98;
+    let animationActive = true;
 
-    // Update status: uploading
-    if (onProgress) onProgress(30, 'Sending to server...');
-    if (onStatusChange) onStatusChange('Sending to server...', 'info');
+    const updateProgressAnimation = () => {
+        if (!animationActive) return;
+        
+        const elapsed = Date.now() - startTime;
+        // Asymptotic function: approaches targetPercent as elapsed approaches duration
+        // Using exponential approach: percent = target * (1 - e^(-t/duration))
+        const t = Math.min(elapsed / duration, 1); // Clamp to 1
+        const percent = targetPercent * (1 - Math.exp(-3 * t)); // -3 gives good curve shape
+        
+        // Ensure we don't exceed targetPercent
+        const clampedPercent = Math.min(percent, targetPercent);
+        
+        if (onProgress) {
+            onProgress(clampedPercent, 'Analyzing game (this may take a while)...');
+        }
+        
+        // Continue animation if we haven't reached the target
+        if (clampedPercent < targetPercent) {
+            requestAnimationFrame(updateProgressAnimation);
+        }
+    };
+
+    // Update status: analyzing
+    if (onStatusChange) onStatusChange('Analyzing game', 'info');
+    if (onProgress) onProgress(2, 'Analysis may take a while...'); // Start at 2%
+
+    // Start the progress animation
+    requestAnimationFrame(updateProgressAnimation);
 
     // Send to server for analysis
     const response = await fetch('/api/analyze_and_save', {
@@ -93,14 +120,13 @@ async function uploadAndAnalyzePGN(pgnContent, callbacks = {}) {
         })
     });
 
+    // Stop the animation when response arrives
+    animationActive = false;
+
     if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Upload failed');
     }
-
-    // Update status: annotating
-    if (onProgress) onProgress(60, 'Analyzing game...');
-    if (onStatusChange) onStatusChange('Analyzing game (this may take a while)...', 'info');
 
     const result = await response.json();
 
