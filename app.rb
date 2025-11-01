@@ -43,6 +43,23 @@ class LearnerApp < Sinatra::Base
       data.to_json
     end
 
+    # Ensure the PGN text ends with a valid game termination token.
+    # If missing, and a [Result "..."] tag exists, append that token to the end.
+    def ensure_pgn_has_result_termination(pgn_text)
+      return pgn_text if pgn_text.nil? || pgn_text.strip.empty?
+
+      result_tag = pgn_text[/\[Result\s+"([^"]+)"\]/i, 1]
+      return pgn_text unless result_tag
+
+      normalized_result = result_tag.strip
+      return pgn_text unless ["1-0", "0-1", "1/2-1/2", "*"].include?(normalized_result)
+
+      trimmed = pgn_text.rstrip
+      return pgn_text if trimmed.match?(/(1-0|0-1|1\/2-1\/2|\*)\s*\z/)
+
+      "#{trimmed} #{normalized_result}\n"
+    end
+
     # Sanitize filename to prevent path traversal and ensure safe filenames
     def sanitize_filename(filename)
       # Remove path components and keep only the basename
@@ -120,6 +137,7 @@ class LearnerApp < Sinatra::Base
           game_count = 0
           begin
             pgn_content_for_count = File.read(abs_path)
+            pgn_content_for_count = ensure_pgn_has_result_termination(pgn_content_for_count)
             games_in_file = PGN.parse(pgn_content_for_count)
             game_count = games_in_file.size
           rescue StandardError => e
@@ -184,6 +202,7 @@ class LearnerApp < Sinatra::Base
 
     begin
       pgn_content = File.read(pgn_meta[:path])
+      pgn_content = ensure_pgn_has_result_termination(pgn_content)
       games_in_file = PGN.parse(pgn_content)
 
       if games_in_file.empty?
@@ -466,6 +485,7 @@ class LearnerApp < Sinatra::Base
       tempfile.rewind
 
       # Validate it's parseable PGN
+      pgn_content = ensure_pgn_has_result_termination(pgn_content)
       games = PGN.parse(pgn_content.dup)
       if games.empty?
         return json_response({ error: 'No valid games found in PGN file' }, 400)
@@ -514,6 +534,7 @@ class LearnerApp < Sinatra::Base
       end
 
       # Parse PGN
+      pgn_content = ensure_pgn_has_result_termination(pgn_content)
       games = PGN.parse(pgn_content.dup)
       if games.empty?
         return json_response({ error: 'No valid games found in PGN' }, 400)
