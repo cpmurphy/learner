@@ -1,0 +1,20 @@
+[Event "Chessiverse Rated Game"]
+[Site "Chessiverse.com"]
+[Date "2025.11.04"]
+[White "Cagnus Marlsen"]
+[Black "Player"]
+[Result "1-0"]
+[BlackElo "1447"]
+[FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"]
+[Termination "Checkmate"]
+[Time "23:32:44"]
+[WhiteElo "1368"]
+
+1.e4 e5 2.Nf3 Nc6 3.Nc3 Nf6 4.d4 d6 5.dxe5 dxe5 6.Qxd8+ Kxd8 7.Bg5 Be7 8.O-O-O+
+Ke8 9.Bb5 Bd7 10.Bxc6 Bxc6 11.Nxe5 Nxe4 $201 (11...h6 {{Better line (advantage:
++1.8)}} 12.Bxf6 Bxf6 13.Nxc6 Bxc3 14.bxc3 bxc6 15.Rd3) (11...Bd6 {Alternative
+line found during review} 12.Bxf6 gxf6 13.Nxc6 bxc6 14.Rd3 Bf4 15.Kb1) 12.Nxe4
+Bxe4 13.Bxe7 Kxe7 14.Rhe1 f5 15.f3 Bxc2 16.Kxc2 Kf6 17.Nd7+ Kg5 18.Nc5 b6
+19.Ne6+ Kf6 20.Nxc7 Rac8 21.Rd7 Rhd8 22.Re6+ Kg5 23.Rxg7+ Kh5 $201 (23...Kf4
+{{Better line (advantage: +5.3)}} 24.Rc6 Ke3 25.Rc3 Kf2 26.Ne6 Rg8 27.Rxc8)
+24.g4+ Kh4 25.Rh6# 1-0

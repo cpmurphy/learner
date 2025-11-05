@@ -139,6 +139,30 @@ class GameEditor
     end
   end
 
+  # Reverses shift_critical_annotations - moves $201 from move M+1 back to move M.
+  # This is used when saving games that were analyzed by our system, where
+  # add_blunder_annotations places $201 on move i-1 (before the blunder),
+  # which is the correct placement for PGN files.
+  def unshift_critical_annotations(game)
+    moves = game.moves
+    return if moves.empty?
+
+    # Start from the beginning and move $201 backwards
+    (1...moves.size).each do |i|
+      current_move = moves[i]
+      prev_move = moves[i - 1]
+
+      if current_move.respond_to?(:annotation) && current_move.annotation&.include?('$201')
+        # Only unshift annotation if previous move is a real move
+        if prev_move.respond_to?(:annotation)
+          remove_201_from_move(current_move)
+
+          add_201_to_move(prev_move)
+        end
+      end
+    end
+  end
+
   def remove_201_from_move(move)
     move.annotation.delete('$201')
     move.annotation = nil if move.annotation.empty?

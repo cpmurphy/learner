@@ -581,6 +581,12 @@ class LearnerApp < Sinatra::Base
 
     begin
       require_relative 'lib/pgn_writer'
+      require_relative 'lib/game_editor'
+      
+      # Before saving, unshift annotations back to their original positions
+      # (add_blunder_annotations places $201 on move i-1, which is correct for PGN)
+      game_editor = GameEditor.new
+      game_editor.unshift_critical_annotations(session[:game])
       
       # Serialize the game to PGN
       writer = PGNWriter.new
@@ -589,6 +595,9 @@ class LearnerApp < Sinatra::Base
       # Write to file
       File.write(session[:pgn_file_path], annotated_pgn)
       puts "Saved game to #{session[:pgn_file_path]}"
+      
+      # Re-shift annotations for in-memory use (for consistency with loaded games)
+      game_editor.shift_critical_annotations(session[:game])
       
       json_response({
         success: true,

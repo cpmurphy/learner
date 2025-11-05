@@ -95,6 +95,48 @@ class TestGameEditor < Minitest::Test
     assert_equal 1, game.moves[1].annotation.size
   end
 
+  def test_unshift_critical_annotations_reverses_shift
+    # Start with $201 on move 1 (after shift)
+    game = PGN::Game.new([PGN::MoveText.new('e4'), PGN::MoveText.new('e5', ['$201'])])
+    
+    @editor.unshift_critical_annotations(game)
+    
+    assert_equal ['$201'], game.moves[0].annotation, 'Annotation should be moved back to first move'
+    assert_nil game.moves[1].annotation, 'Annotation should be removed from second move'
+  end
+
+  def test_unshift_critical_annotations_multiple_annotations
+    game = PGN::Game.new([
+                           PGN::MoveText.new('e4'),
+                           PGN::MoveText.new('e5', ['$201']),
+                           PGN::MoveText.new('Nf3'),
+                           PGN::MoveText.new('Nc6', ['$201'])
+                         ])
+    
+    @editor.unshift_critical_annotations(game)
+    
+    assert_equal ['$201'], game.moves[0].annotation
+    assert_nil game.moves[1].annotation
+    assert_equal ['$201'], game.moves[2].annotation
+    assert_nil game.moves[3].annotation
+  end
+
+  def test_unshift_and_shift_round_trip
+    # Original: $201 on move 0 (before blunder)
+    game = PGN::Game.new([PGN::MoveText.new('e4', ['$201']), PGN::MoveText.new('e5')])
+    original_state = game.moves[0].annotation&.dup
+    
+    # Shift
+    @editor.shift_critical_annotations(game)
+    assert_nil game.moves[0].annotation
+    assert_equal ['$201'], game.moves[1].annotation
+    
+    # Unshift
+    @editor.unshift_critical_annotations(game)
+    assert_equal original_state, game.moves[0].annotation
+    assert_nil game.moves[1].annotation
+  end
+
   def test_complex_case_with_existing_annotations
     game = PGN::Game.new([
                            PGN::MoveText.new('e4', ['$1', '$201']),
