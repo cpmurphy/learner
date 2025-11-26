@@ -81,20 +81,20 @@ async function uploadAndAnalyzePGN(pgnContent, callbacks = {}) {
 
     const updateProgressAnimation = () => {
         if (!animationActive) return;
-        
+
         const elapsed = Date.now() - startTime;
         // Asymptotic function: approaches targetPercent as elapsed approaches duration
         // Using exponential approach: percent = target * (1 - e^(-t/duration))
         const t = Math.min(elapsed / duration, 1); // Clamp to 1
         const percent = targetPercent * (1 - Math.exp(-3 * t)); // -3 gives good curve shape
-        
+
         // Ensure we don't exceed targetPercent
         const clampedPercent = Math.min(percent, targetPercent);
-        
+
         if (onProgress) {
             onProgress(clampedPercent, 'Analyzing game (this may take a while)...');
         }
-        
+
         // Continue animation if we haven't reached the target
         if (clampedPercent < targetPercent) {
             requestAnimationFrame(updateProgressAnimation);

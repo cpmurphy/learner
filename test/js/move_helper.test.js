@@ -19,7 +19,7 @@ describe('MoveHelper', () => {
         const gen = new MoveHelper(promotionFen, 'b7', 'b8', 'q');
         expect(gen.getSan()).toBe('b8=Q');
     });
-    
+
     it('should generate SAN for a pawn promotion to Knight (b8=N)', () => {
         const promotionFen = "r1bqk1nr/pPpp1ppp/8/4p3/8/8/PPP1PPPP/RNBQKBNR w KQkq - 0 1";
         const gen = new MoveHelper(promotionFen, 'b7', 'b8', 'n');
@@ -37,7 +37,7 @@ describe('MoveHelper', () => {
         const gen = new MoveHelper(castlingFenWhite, 'e1', 'c1');
         expect(gen.getSan()).toBe('O-O-O');
     });
-    
+
     it('should generate SAN for black kingside castling (O-O)', () => {
         const blackTurnCastlingFen = "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1";
         const gen = new MoveHelper(blackTurnCastlingFen, 'e8', 'g8');
@@ -67,7 +67,7 @@ describe('MoveHelper', () => {
         const gen = new MoveHelper(startingFen, 'a1', 'c2'); // Invalid move for a rook
         expect(gen.getSan()).toBeNull();
     });
-    
+
     it('should return null if the move is for the wrong turn', () => {
         const startingFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
         // startingFen is white's turn. Attempting a black move.
@@ -79,7 +79,7 @@ describe('MoveHelper', () => {
         const gen = new MoveHelper("invalid fen", 'e2', 'e4');
         expect(gen.getSan()).toBeNull();
     });
-    
+
     it('should return null if fromSquare is missing', () => {
         const startingFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
         const gen = new MoveHelper(startingFen, null, 'e4');

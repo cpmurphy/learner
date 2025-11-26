@@ -161,7 +161,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         // Skip the first move (user's move) since we already applied it
                         currentVariationSANs = validationData.variation_sans.slice(1);
                         variationSANsStartIndex = 1; // Array starts after user's move (which was at index 0)
-                        
+
                         // Save this variation to the PGN
                         // move_index_of_blunder is the position index where the blunder occurs
                         // The $201 annotation is on the move before that (move_index_of_blunder - 1)
@@ -194,14 +194,14 @@ document.addEventListener("DOMContentLoaded", () => {
                     variationChess.move(userMoveSan, { sloppy: true }); // Apply the user's validated move
                     currentFenInVariation = variationChess.fen();
                     userMoveSanInVariation = userMoveSan; // Store for backward navigation
-                    
+
                     // Update the board to show the position after the user's move
                     board.setPosition(currentFenInVariation, true); // true for animation
-                    
+
                     // currentVariationPly tracks the number of moves played in the variation
                     // Since we've already applied the user's move, we've played 1 move
                     currentVariationPly = 1; // User just played the first move
-                    
+
                     // Update the display to show the user's move
                     updateMoveInfoDisplay({ san: userMoveSan }, true, currentVariationPly);
 
@@ -573,7 +573,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // If variationSANsStartIndex = 1, we sliced the array, so use currentVariationPly - 1
             // If variationSANsStartIndex = 0, array includes user's move, so use currentVariationPly
             const arrayIndex = currentVariationPly - variationSANsStartIndex;
-            
+
             // Check if we've reached the end of the variation
             if (arrayIndex >= currentVariationSANs.length) {
                 // End of variation
@@ -581,7 +581,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (nextMoveButton) nextMoveButton.disabled = true;
                 return;
             }
-            
+
             // Play the next move in variationChess
             const nextSan = currentVariationSANs[arrayIndex];
             try {

@@ -39,18 +39,18 @@ export class MoveHelper {
             }
 
             const moveResult = chessInstance.move(moveDetails);
-            
+
             if (moveResult) {
                 return moveResult.san;
             } else {
                 // This can happen if the move is illegal for the given FEN (e.g., wrong turn, invalid move)
-                console.warn("MoveHelper: chess.js considered the move illegal or invalid for the FEN.", 
+                console.warn("MoveHelper: chess.js considered the move illegal or invalid for the FEN.",
                              { fen: this.fen, from: this.fromSquare, to: this.toSquare, promotion: this.promotionPiece });
                 return null;
             }
         } catch (e) {
             // Catch errors from chess.js instantiation (e.g., invalid FEN) or other issues
-            console.error("MoveHelper: Error during SAN generation:", e, 
+            console.error("MoveHelper: Error during SAN generation:", e,
                           { fen: this.fen, from: this.fromSquare, to: this.toSquare, promotion: this.promotionPiece });
             return null;
         }

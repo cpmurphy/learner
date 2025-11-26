@@ -12,109 +12,109 @@
 
 1.e4 e5 2.Nf3 Nc6 3.Bc4 Bc5 4.c3 Nf6 5.d4 exd4 6.cxd4 Bb4+ 7.Nc3 Nxe4 8.
 O-O Nxc3 9.bxc3 $201 Bxc3 $2 $16 { Stockfish 16.1: 22:+1.70} ( 9...d5 {
-22:+0.10} 10.Re1+ Be7 11.Bd3 O-O 12.h3 Rb8 13.Rb1 Bd6 14.Bg5 Be7 15.Bd2 
+22:+0.10} 10.Re1+ Be7 11.Bd3 O-O 12.h3 Rb8 13.Rb1 Bd6 14.Bg5 Be7 15.Bd2
 Bd6 16.Ng5 g6 17.c4 Nxd4 18.cxd5 $10 ) 10.Qb3 $201 Bxa1 $2 $18 { Stockfish
 16.1: 22:+3.62} ( 10...d5 {24:+0.78} 11.Qxc3 dxc4 12.d5 Ne7 13.Bh6 Rg8 14.
 Bg5 Qxd5 15.Bxe7 Kxe7 16.Rfe1+ Be6 17.Rad1 Qc5 18.Rd4 b5 19.Re5 Qb6 20.
 Qb4+ Ke8 21.Rxb5 c5 22.Qb1 cxd4 23.Rxb6 axb6 24.Nxd4 Kd7 25.Qb5+ Ke7 $14 )
 11.Bxf7+ Kf8 $201 12.Ng5 $4 $17 { Stockfish 16.1: 22:-2.25} ( 12.Bg5 {
 23:+4.07} 12...Nxd4 13.Qa3+ Kxf7 14.Bxd8 Rxd8 15.Ng5+ Kf6 16.Rxa1 h6 17.
-Qd3 Kxg5 18.Qxd4 Kg6 19.Qe4+ Kf7 20.Re1 Kg8 21.Qg6 Kh8 22.f4 d5 23.Re8+ 
+Qd3 Kxg5 18.Qxd4 Kg6 19.Qe4+ Kf7 20.Re1 Kg8 21.Qg6 Kh8 22.f4 d5 23.Re8+
 Rxe8 24.Qxe8+ Kh7 25.f5 c6 26.Qg6+ Kh8 27.f6 gxf6 28.Qxh6+ Kg8 29.Qg6+ Kf8
 $18 ) 12...Qe7 $201 {This move was not familiar to me.} 13.Qf3 $2 $19 {Not
 sure this is the best move. I felt like I was out of book. However, we are
-going for a quick mate. Stockfish 16.1: 23:-4.08} ( 13.Qd1 {21:-2.34} 
-13...d6 14.Re1 Bg4 15.Rxe7 Bxd1 16.Rxc7 Ne7 17.Be6 Bxd4 18.h3 Ba4 19.Rc4 
+going for a quick mate. Stockfish 16.1: 23:-4.08} ( 13.Qd1 {21:-2.34}
+13...d6 14.Re1 Bg4 15.Rxe7 Bxd1 16.Rxc7 Ne7 17.Be6 Bxd4 18.h3 Ba4 19.Rc4
 Nc6 20.Rxa4 Re8 21.Bf4 Ke7 22.Bf5 Rhf8 $17 ) 13...Bxd4 $201 14.Bg6+ $6 $19
 { Stockfish 16.1: 24:-4.41} ( 14.Bb3+ {22:-3.01} 14...Bf6 15.Qd5 d6 16.Bd2
 Bxg5 17.Re1 Qf6 18.Bxg5 Qf5 19.Qd2 h6 20.Bh4 Bd7 21.Re3 Ne5 22.Bg3 Bc6 23.
-Bxe5 dxe5 24.f4 Qd7 25.Qb4+ Ke8 26.fxe5 $19 ) 14...Bf6 {This certainly 
-felt uncomfortable.} 15.Be4 $201 d5 $2 $17 { Stockfish 16.1: 22:-2.50} ( 
-15...h6 {23:-4.26} 16.Bxc6 hxg5 17.Bd5 Qe5 18.h3 d6 19.Bd2 Bg4 20.Qb3 Re8 
+Bxe5 dxe5 24.f4 Qd7 25.Qb4+ Ke8 26.fxe5 $19 ) 14...Bf6 {This certainly
+felt uncomfortable.} 15.Be4 $201 d5 $2 $17 { Stockfish 16.1: 22:-2.50} (
+15...h6 {23:-4.26} 16.Bxc6 hxg5 17.Bd5 Qe5 18.h3 d6 19.Bd2 Bg4 20.Qb3 Re8
 21.Qxb7 Bc8 22.Qc6 Bd7 23.Qb7 g4 24.Bb3 gxh3 25.Qxc7 hxg2 $19 ) 16.Ba3 Nb4
-17.Bxd5 a5 18.Ne4 c6 19.Bb3 $201 a4 $4 $18 $201 {****D9 -3.5->4.4  
+17.Bxd5 a5 18.Ne4 c6 19.Bb3 $201 a4 $4 $18 $201 {****D9 -3.5->4.4
 Stockfish 16.1: 22:+4.39} ( 19...Be6 {22:-3.50} 20.Nxf6 Qxf6 21.Qxf6+ gxf6
 22.Bxe6 Kg7 23.Rb1 b5 24.h4 Rhe8 25.Bf5 Rad8 26.Bxb4 axb4 27.Rxb4 Re5 28.
-g4 h5 29.a4 hxg4 30.Bxg4 f5 31.axb5 cxb5 32.Bf3 Rc5 $19 ) 20.Bc4 $4 $15 
-$201 { Stockfish 16.1: 21:-0.64} ( 20.Nxf6 {22:+4.39} 20...axb3 21.Bxb4 
-Qxb4 22.Nd5+ Kg8 23.Nxb4 Be6 24.axb3 h5 25.Nxc6 bxc6 26.Qxc6 Kf7 27.Re1 
-Rhe8 28.h3 Bxb3 29.Qf3+ Kg6 30.Rxe8 Rxe8 31.Qxb3 Kh7 32.Qd5 Rf8 33.Qxh5+ 
-Kg8 34.g4 $18 ) 20...b5 $4 $18 $201 { Stockfish 16.1: 24:+4.08} ( 20...c5 
-{21:-0.64} 21.Nxf6 Qxf6 22.Qe3 Qe7 23.Qf3+ Ke8 24.Bxb4 cxb4 25.Bb5+ Kd8 
+g4 h5 29.a4 hxg4 30.Bxg4 f5 31.axb5 cxb5 32.Bf3 Rc5 $19 ) 20.Bc4 $4 $15
+$201 { Stockfish 16.1: 21:-0.64} ( 20.Nxf6 {22:+4.39} 20...axb3 21.Bxb4
+Qxb4 22.Nd5+ Kg8 23.Nxb4 Be6 24.axb3 h5 25.Nxc6 bxc6 26.Qxc6 Kf7 27.Re1
+Rhe8 28.h3 Bxb3 29.Qf3+ Kg6 30.Rxe8 Rxe8 31.Qxb3 Kh7 32.Qd5 Rf8 33.Qxh5+
+Kg8 34.g4 $18 ) 20...b5 $4 $18 $201 { Stockfish 16.1: 24:+4.08} ( 20...c5
+{21:-0.64} 21.Nxf6 Qxf6 22.Qe3 Qe7 23.Qf3+ Ke8 24.Bxb4 cxb4 25.Bb5+ Kd8
 26.Qf4 Bg4 27.Rc1 h5 28.h3 Rf8 29.Qc4 Bd7 30.Qc7+ Ke8 31.Bxd7+ Kf7 32.Qxb7
-Rad8 33.Rc7 Qe1+ 34.Kh2 Qe5+ 35.g3 $15 ) 21.Bd3 $4 $17 $201 { Stockfish 
+Rad8 33.Rc7 Qe1+ 34.Kh2 Qe5+ 35.g3 $15 ) 21.Bd3 $4 $17 $201 { Stockfish
 16.1: 22:-1.59} ( 21.Bxb4 {24:+4.08} 21...Qxb4 22.Nxf6 Ra7 23.Qxc6 g6 24.
 Nd7+ Rxd7 25.Qf6+ Ke8 26.Qxh8+ Ke7 27.Qe5+ Kd8 28.Bxb5 Qd4 29.Qe6 Rd5 30.
-Qg8+ Kc7 31.Bxa4 Bf5 32.h3 h5 33.Bb3 Rd7 34.Rc1+ Kb7 $18 ) 21...Nxd3 $4 
-$18 {****D7 -1.6->3.3 This felt more generous than a human would be, 
+Qg8+ Kc7 31.Bxa4 Bf5 32.h3 h5 33.Bb3 Rd7 34.Rc1+ Kb7 $18 ) 21...Nxd3 $4
+$18 {****D7 -1.6->3.3 This felt more generous than a human would be,
 giving up the queen for a bishop. Stockfish 16.1: 22:+3.32} ( 21...Ra7 {
-22:-1.59} 22.Bxb4 Qxb4 23.Nxf6 gxf6 24.Qxf6+ Kg8 25.Rd1 Rd7 26.Qe6+ Rf7 
-27.Qxc8+ Kg7 28.Qxc6 Rd8 29.Qc2 Qd4 30.Qe2 Rd5 31.a3 b4 32.axb4 a3 33.Qa2 
-Ra7 34.h3 Qe5 35.b5 Rdd7 $17 ) 22.Bxe7+ Kxe7 23.Qxd3 {I'm only just ahead 
-on material and hoping my queen will clean up.} 23...Rd8 $201 24.Qa3+ $6 
-$16 { Stockfish 16.1: 24:+2.60} ( 24.Qe3 {24:+3.89} 24...Kf7 25.Nxf6 gxf6 
-26.Qe4 Be6 27.Qxh7+ Kf8 28.a3 Bc4 29.Ra1 Bd3 30.Qb7 Be4 31.h4 Rdb8 32.Qc7 
-b4 33.axb4 Re8 34.f3 Bd5 35.Qh7 a3 36.h5 Bf7 37.h6 a2 38.Qg7+ Ke7 39.Re1+ 
-Kd6 40.Qxf6+ Kc7 $18 ) 24...Kf7 $201 25.Nd6+ $2 $14 {****D9 2.6->0.7  
-Stockfish 16.1: 25:+0.73} ( 25.Qf3 {22:+2.63} 25...Rd5 26.g4 Kg8 27.Nxf6+ 
+22:-1.59} 22.Bxb4 Qxb4 23.Nxf6 gxf6 24.Qxf6+ Kg8 25.Rd1 Rd7 26.Qe6+ Rf7
+27.Qxc8+ Kg7 28.Qxc6 Rd8 29.Qc2 Qd4 30.Qe2 Rd5 31.a3 b4 32.axb4 a3 33.Qa2
+Ra7 34.h3 Qe5 35.b5 Rdd7 $17 ) 22.Bxe7+ Kxe7 23.Qxd3 {I'm only just ahead
+on material and hoping my queen will clean up.} 23...Rd8 $201 24.Qa3+ $6
+$16 { Stockfish 16.1: 24:+2.60} ( 24.Qe3 {24:+3.89} 24...Kf7 25.Nxf6 gxf6
+26.Qe4 Be6 27.Qxh7+ Kf8 28.a3 Bc4 29.Ra1 Bd3 30.Qb7 Be4 31.h4 Rdb8 32.Qc7
+b4 33.axb4 Re8 34.f3 Bd5 35.Qh7 a3 36.h5 Bf7 37.h6 a2 38.Qg7+ Ke7 39.Re1+
+Kd6 40.Qxf6+ Kc7 $18 ) 24...Kf7 $201 25.Nd6+ $2 $14 {****D9 2.6->0.7
+Stockfish 16.1: 25:+0.73} ( 25.Qf3 {22:+2.63} 25...Rd5 26.g4 Kg8 27.Nxf6+
 gxf6 28.Qxf6 Bd7 29.Re1 Rf8 30.Qh6 Rf7 31.f4 b4 32.h3 Rg7 33.Kh2 Rd2+ 34.
 Kg3 Rd3+ 35.Kf2 Rd2+ 36.Ke3 Rxa2 37.Qd6 h5 38.Qb8+ Kh7 39.Qxb4 $16 ) 25...
 Kg8 26.Nxc8 {There was no way I wanted to let my opponent have two bishops
 in this kind of position.} 26...Raxc8 27.g3 c5 28.Rb1 $201 b4 $2 $14 {
 ****D9 -1.4->1.2  Stockfish 16.1: 23:+1.21} ( 28...c4 {26:-1.45} 29.Kg2 c3
-30.Qb4 c2 31.Rc1 Rc4 32.Qxb5 Rdc8 33.Qb7 Kh8 34.a3 Bg5 35.f4 Bf6 36.Kf1 
+30.Qb4 c2 31.Rc1 Rc4 32.Qxb5 Rdc8 33.Qb7 Kh8 34.a3 Bg5 35.f4 Bf6 36.Kf1
 R4c7 37.Qb5 h6 38.h4 Bd4 39.Ke2 Re7+ 40.Kd3 Bf2 41.f5 Re3+ 42.Kd2 Ree8 43.
-Kd3 Red8+ 44.Ke2 Bxg3 45.Qxa4 $15 ) 29.Qxa4 Rd4 30.Qa6 Rcd8 $201 31.a3 $2 
-$10 { Stockfish 16.1: 23:+0.15} ( 31.Kg2 {23:+1.85} 31...R4d5 32.Re1 h6 
-33.Qc6 Kf8 34.f4 Bd4 35.h4 R5d6 36.Qb5 R6d7 37.g4 Re7 38.Rxe7 Kxe7 39.f5 
+Kd3 Red8+ 44.Ke2 Bxg3 45.Qxa4 $15 ) 29.Qxa4 Rd4 30.Qa6 Rcd8 $201 31.a3 $2
+$10 { Stockfish 16.1: 23:+0.15} ( 31.Kg2 {23:+1.85} 31...R4d5 32.Re1 h6
+33.Qc6 Kf8 34.f4 Bd4 35.h4 R5d6 36.Qb5 R6d7 37.g4 Re7 38.Rxe7 Kxe7 39.f5
 Rd5 40.Qb7+ Rd7 41.Qc8 Kd6 42.g5 hxg5 43.hxg5 Bc3 44.Kg3 Be5+ 45.Kf3 $16 )
-31...bxa3 32.Qxa3 c4 33.Qc5 c3 34.Kg2 Rd2 35.Rc1 $201 c2 $2 $16 { 
+31...bxa3 32.Qxa3 c4 33.Qc5 c3 34.Kg2 Rd2 35.Rc1 $201 c2 $2 $16 {
 Stockfish 16.1: 25:+1.91} ( 35...h6 {31:+0.00} 36.Kh3 Re8 37.Qc4+ Kh7 38.
-Qf4 Kh8 39.Ra1 Red8 40.Qf5 R2d5 41.Qe4 Rh5+ 42.Kg2 Rc5 43.Ra2 Rcd5 44.h4 
+Qf4 Kh8 39.Ra1 Red8 40.Qf5 R2d5 41.Qe4 Rh5+ 42.Kg2 Rc5 43.Ra2 Rcd5 44.h4
 Rd2 45.Ra8 c2 46.Rxd8+ Bxd8 47.Qe8+ Kh7 48.h5 c1=R 49.Qg6+ Kg8 50.Qe8+ Kh7
-$10 ) 36.Rxc2 Rxc2 37.Qxc2 g6 $201 38.Qc4+ $6 $14 { Stockfish 16.1: 
-25:+0.82} ( 38.h4 {23:+2.25} 38...Kg7 39.Qc7+ Kg8 40.Qc6 Kf7 41.Qb7+ Kg8 
+$10 ) 36.Rxc2 Rxc2 37.Qxc2 g6 $201 38.Qc4+ $6 $14 { Stockfish 16.1:
+25:+0.82} ( 38.h4 {23:+2.25} 38...Kg7 39.Qc7+ Kg8 40.Qc6 Kf7 41.Qb7+ Kg8
 42.h5 gxh5 43.Qb5 h4 44.g4 h6 45.f4 Kg7 46.g5 hxg5 47.fxg5 h3+ 48.Kxh3 Kg6
-49.gxf6 Kxf6 50.Kg4 Rd4+ 51.Kf3 Rd8 52.Qc5 Ke6 53.Ke4 Rd6 54.Qf5+ Ke7 $16 
-) 38...Kg7 39.Qc7+ Kg8 40.Qb6 Kg7 41.h4 h5 42.Kh3 $201 Rd1 $4 $18 { 
+49.gxf6 Kxf6 50.Kg4 Rd4+ 51.Kf3 Rd8 52.Qc5 Ke6 53.Ke4 Rd6 54.Qf5+ Ke7 $16
+) 38...Kg7 39.Qc7+ Kg8 40.Qb6 Kg7 41.h4 h5 42.Kh3 $201 Rd1 $4 $18 {
 Stockfish 16.1: 25:+4.40} ( 42...Rf8 {35:+0.61} 43.Qd6 Bb2 44.Kg2 Bf6 45.
-f3 Rf7 46.Kh3 Kh7 47.g4 Bh8 48.Qc6 Rf8 49.Qe4 Kh6 50.Qe3+ Kh7 51.Qd3 Kh6 
+f3 Rf7 46.Kh3 Kh7 47.g4 Bh8 48.Qc6 Rf8 49.Qe4 Kh6 50.Qe3+ Kh7 51.Qd3 Kh6
 52.Qe4 Ba1 53.Qe3+ Kh7 54.gxh5 gxh5 55.Qd3+ Kg7 56.f4 Bf6 57.f5 Kg8 58.
-Qd5+ Kh7 $14 ) 43.Qb7+ $201 Kh6 $2 $20 $201 { Stockfish 16.1: 26:+6.65} ( 
-43...Kf8 {25:+4.64} 44.Qh7 Rh1+ 45.Kg2 Re1 46.Qxg6 Bg7 47.f4 Re7 48.Qxh5 
+Qd5+ Kh7 $14 ) 43.Qb7+ $201 Kh6 $2 $20 $201 { Stockfish 16.1: 26:+6.65} (
+43...Kf8 {25:+4.64} 44.Qh7 Rh1+ 45.Kg2 Re1 46.Qxg6 Bg7 47.f4 Re7 48.Qxh5
 Kg8 49.Qd5+ Kh7 50.h5 Re1 51.h6 Kxh6 52.g4 Kh7 53.g5 Re3 54.f5 $18 ) 44.
-Qb6 $4 $14 $201 { Stockfish 16.1: 23:+0.67} ( 44.Qf3 {26:+6.65} 44...Rc1 
+Qb6 $4 $14 $201 { Stockfish 16.1: 23:+0.67} ( 44.Qf3 {26:+6.65} 44...Rc1
 45.Qxf6 Kh7 46.f4 Rh1+ 47.Kg2 Re1 48.Qf7+ Kh8 49.f5 gxf5 50.Qf8+ Kh7 51.
 Qxf5+ Kg7 52.Qxh5 Re6 53.Qg4+ Kf6 54.Qxe6+ Kxe6 55.Kf3 Kf5 56.g4+ Ke6 57.
-Kf4 Kd5 58.Kg5 $20 ) 44...Kg7 $4 $18 $201 { Stockfish 16.1: 25:+4.60} ( 
-44...Bg7 {23:+0.67} 45.f3 Kh7 46.Qc7 Rd3 47.Qc6 Rd8 48.g4 Rf8 49.Qe4 Kg8 
-50.gxh5 gxh5 51.Qd5+ Kh7 52.Qxh5+ Bh6 53.Kg2 Rf6 54.Qd5 Bg7 55.Qe4+ Kh8 
+Kf4 Kd5 58.Kg5 $20 ) 44...Kg7 $4 $18 $201 { Stockfish 16.1: 25:+4.60} (
+44...Bg7 {23:+0.67} 45.f3 Kh7 46.Qc7 Rd3 47.Qc6 Rd8 48.g4 Rf8 49.Qe4 Kg8
+50.gxh5 gxh5 51.Qd5+ Kh7 52.Qxh5+ Bh6 53.Kg2 Rf6 54.Qd5 Bg7 55.Qe4+ Kh8
 56.f4 Rh6 57.f5 Rf6 $14 ) 45.Qe6 $4 $14 $201 { Stockfish 16.1: 33:+0.64} (
-45.Qb7+ {25:+4.60} 45...Kf8 46.Qh7 Rh1+ 47.Kg2 Ra1 48.Qxg6 Ra6 49.Kh3 Re6 
-50.Qf5 Ke7 51.Qc5+ Kd7 52.f4 Bd8 53.Qf5 Be7 54.Qd3+ Kc7 $18 ) 45...Rf1 $4 
+45.Qb7+ {25:+4.60} 45...Kf8 46.Qh7 Rh1+ 47.Kg2 Ra1 48.Qxg6 Ra6 49.Kh3 Re6
+50.Qf5 Ke7 51.Qc5+ Kd7 52.f4 Bd8 53.Qf5 Be7 54.Qd3+ Kc7 $18 ) 45...Rf1 $4
 $18 $201 {****D9 0.6->3.7  Stockfish 16.1: 28:+3.72} ( 45...Rd3 {33:+0.64}
-46.Qc6 Rd8 47.f3 Rf8 48.g4 Rf7 49.Qc4 Kg8 50.Qa2 Kg7 51.Qa5 Kh8 52.gxh5 
-gxh5 53.Qxh5+ Rh7 54.Qe8+ Kg7 55.h5 Rh6 56.Kg4 Kh7 57.Qf7+ Bg7 58.Qe7 Rf6 
+46.Qc6 Rd8 47.f3 Rf8 48.g4 Rf7 49.Qc4 Kg8 50.Qa2 Kg7 51.Qa5 Kh8 52.gxh5
+gxh5 53.Qxh5+ Rh7 54.Qe8+ Kg7 55.h5 Rh6 56.Kg4 Kh7 57.Qf7+ Bg7 58.Qe7 Rf6
 59.Kg5 Rh6 60.Qd8 Rc6 61.Qd3+ Kh8 62.Qd7 Rh6 63.Qd8+ Kh7 64.f4 Rc6 65.Qd3+
-Kh8 $14 ) 46.Kg2 $4 $14 { Stockfish 16.1: 27:+0.64} ( 46.Qd7+ {28:+3.72} 
+Kh8 $14 ) 46.Kg2 $4 $14 { Stockfish 16.1: 27:+0.64} ( 46.Qd7+ {28:+3.72}
 46...Kh6 47.Qd2+ Kh7 48.f4 Bg7 49.Qd7 Rf2 50.Qe7 Rf1 51.Qe6 Rf2 52.Qe3 Rf1
 53.Kg2 Ra1 54.f5 gxf5 55.Qg5 Ra5 56.Qxh5+ Bh6 57.Qf7+ Bg7 58.h5 f4 59.Qg6+
-Kh8 60.g4 Ra8 61.h6 f3+ 62.Kh3 Bb2 63.Qf7 Ra1 64.g5 Rh1+ 65.Kg4 $18 ) 
+Kh8 60.g4 Ra8 61.h6 f3+ 62.Kh3 Bb2 63.Qf7 Ra1 64.g5 Rh1+ 65.Kg4 $18 )
 46...Rd1 47.Qb6 $201 Rd2 $4 $20 $201 { Stockfish 16.1: 28:+5.61} ( 47...
 Rd8 {33:+0.61} 48.f3 Rf8 49.Qd6 Kf7 50.Kh3 Bh8 51.Qd5+ Kg7 52.g4 Rf6 53.
-gxh5 gxh5 54.Qxh5 Rh6 55.Qe8 Kh7 56.h5 Bg7 57.Kg4 Bh8 58.Qe7+ Bg7 59.Kg5 
-Kg8 60.Qe4 Kf8 61.Qa8+ Kf7 62.Qd5+ Kf8 63.f4 Rf6 64.f5 Rh6 65.f6 Rxf6 $14 
-) 48.Kf3 $4 $14 { Stockfish 16.1: 36:+0.63} ( 48.Qc7+ {28:+5.61} 48...Kg8 
+gxh5 gxh5 54.Qxh5 Rh6 55.Qe8 Kh7 56.h5 Bg7 57.Kg4 Bh8 58.Qe7+ Bg7 59.Kg5
+Kg8 60.Qe4 Kf8 61.Qa8+ Kf7 62.Qd5+ Kf8 63.f4 Rf6 64.f5 Rh6 65.f6 Rxf6 $14
+) 48.Kf3 $4 $14 { Stockfish 16.1: 36:+0.63} ( 48.Qc7+ {28:+5.61} 48...Kg8
 49.Qf4 Bxh4 50.Qxd2 Bf6 51.Qd5+ Kg7 52.Qd7+ Kg8 53.f4 h4 54.g4 h3+ 55.Kxh3
-Kh8 56.Qd5 Bg7 57.g5 Bf8 $20 ) 48...Rd3+ 49.Ke4 Rd2 50.f3 Rd1 51.Qc7+ Kg8 
-52.Qc5 Kf7 53.Qb6 Re1+ 54.Kd3 Rd1+ 55.Ke2 $201 Rh1 $4 $18 { Stockfish 
-16.1: 24:+3.87} ( 55...Rd8 {25:+0.67} 56.Kf1 Kg7 57.Qb7+ Kg8 58.Qc6 Rf8 
-59.Qd6 Kg7 60.Kg2 Rf7 61.Qd5 Rf8 62.Qb7+ Kg8 63.Kh3 Bg7 64.Qe4 Kh7 65.g4 
+Kh8 56.Qd5 Bg7 57.g5 Bf8 $20 ) 48...Rd3+ 49.Ke4 Rd2 50.f3 Rd1 51.Qc7+ Kg8
+52.Qc5 Kf7 53.Qb6 Re1+ 54.Kd3 Rd1+ 55.Ke2 $201 Rh1 $4 $18 { Stockfish
+16.1: 24:+3.87} ( 55...Rd8 {25:+0.67} 56.Kf1 Kg7 57.Qb7+ Kg8 58.Qc6 Rf8
+59.Qd6 Kg7 60.Kg2 Rf7 61.Qd5 Rf8 62.Qb7+ Kg8 63.Kh3 Bg7 64.Qe4 Kh7 65.g4
 Rf6 66.Kg2 Rf8 67.Qe7 Rf6 68.Kg3 $14 ) 56.f4 Rh2+ 57.Kf3 $201 Rc2 $4 $20 {
 Stockfish 16.1: 27:M28} ( 57...Rh1 {25:+4.24} 58.Qb7+ Be7 59.Kf2 Rh2+ 60.
-Ke3 Kf6 61.Qc6+ Kg7 62.Qd7 Kf6 63.Qd4+ Kf7 64.Qd5+ Kg7 65.f5 gxf5 66.Qxf5 
-Ra2 67.Kf3 Ra6 68.Qe5+ Rf6+ 69.Kg2 Bd6 70.Qxh5 Bxg3 71.Kxg3 Rg6+ 72.Kh3 
-Kf7 73.Qf5+ Kg7 74.h5 $18 ) 58.Qb3+ Kg7 59.Qxc2 ( 59.Qxc2 Kf7 60.Qc6 Be7 
-61.Ke4 Bf6 62.f5 g5 63.Qd7+ Kg8 64.hxg5 Bxg5 65.f6 Bxf6 66.Kf5 Bd8 67.Kg6 
+Ke3 Kf6 61.Qc6+ Kg7 62.Qd7 Kf6 63.Qd4+ Kf7 64.Qd5+ Kg7 65.f5 gxf5 66.Qxf5
+Ra2 67.Kf3 Ra6 68.Qe5+ Rf6+ 69.Kg2 Bd6 70.Qxh5 Bxg3 71.Kxg3 Rg6+ 72.Kh3
+Kf7 73.Qf5+ Kg7 74.h5 $18 ) 58.Qb3+ Kg7 59.Qxc2 ( 59.Qxc2 Kf7 60.Qc6 Be7
+61.Ke4 Bf6 62.f5 g5 63.Qd7+ Kg8 64.hxg5 Bxg5 65.f6 Bxf6 66.Kf5 Bd8 67.Kg6
 Be7 68.Qxe7 h4 69.Qg7# ) 1-0
 
