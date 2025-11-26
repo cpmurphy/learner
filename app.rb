@@ -135,11 +135,20 @@ class LearnerApp < Sinatra::Base
         # Basic check to ensure the file is within the intended PGN_DIR
         if abs_path.start_with?(File.expand_path(pgn_dir_path))
           game_count = 0
+          white_player = nil
+          black_player = nil
+          date = nil
           begin
             pgn_content_for_count = File.read(abs_path)
             pgn_content_for_count = ensure_pgn_has_result_termination(pgn_content_for_count)
             games_in_file = PGN.parse(pgn_content_for_count)
             game_count = games_in_file.size
+            # Extract header information from the first game
+            if games_in_file.any? && games_in_file.first.tags
+              white_player = games_in_file.first.tags['White']
+              black_player = games_in_file.first.tags['Black']
+              date = games_in_file.first.tags['Date']
+            end
           rescue StandardError => e
             puts "WARNING: Could not parse PGN file #{filename} to count games. Error: #{e.message}. Assuming 0 games."
             game_count = 0
@@ -148,7 +157,10 @@ class LearnerApp < Sinatra::Base
             id: index.to_s,
             name: filename,
             path: abs_path,
-            game_count: game_count
+            game_count: game_count,
+            white: white_player,
+            black: black_player,
+            date: date
           }
         else
           puts "WARNING: File #{file_path} is outside the PGN_DIR and will be ignored."
@@ -174,9 +186,16 @@ class LearnerApp < Sinatra::Base
     # Always scan to get the latest list of files
     scan_pgn_directory
 
-    # Return id, name, and game_count
+    # Return id, name, game_count, and header information
     files_for_client = @available_pgns.map do |pgn_meta|
-      { id: pgn_meta[:id], name: pgn_meta[:name], game_count: pgn_meta[:game_count] }
+      {
+        id: pgn_meta[:id],
+        name: pgn_meta[:name],
+        game_count: pgn_meta[:game_count],
+        white: pgn_meta[:white],
+        black: pgn_meta[:black],
+        date: pgn_meta[:date]
+      }
     end
     json_response(files_for_client)
   end
@@ -452,9 +471,9 @@ class LearnerApp < Sinatra::Base
     analyzer = Analyzer.new
     begin
       is_good_enough = analyzer.good_enough_move?(fen, user_move_uci, good_move_uci)
-      
+
       response = { good_enough: is_good_enough }
-      
+
       # If the move is good enough, calculate the continuation line
       if is_good_enough
         # First convert user's UCI move to SAN so we can apply it
@@ -462,37 +481,37 @@ class LearnerApp < Sinatra::Base
         require_relative 'lib/move_translator'
         uci_converter = UciToSanConverter.new
         user_move_san = uci_converter.convert(fen, user_move_uci)
-        
+
         # Apply the user's move to get the position after their move
         translator = MoveTranslator.new
         translator.load_game_from_fen(fen)
         translator.translate_move(user_move_san)
         fen_after_user_move = translator.board_as_fen
-        
+
         # Get the best continuation from the position after the user's move
         # This will return moves starting with the opponent's response
         continuation_analysis = analyzer.evaluate_best_move(fen_after_user_move)
-        
+
         if continuation_analysis && continuation_analysis[:variation]
           # continuation_analysis[:move] is the opponent's best response (in UCI)
           # continuation_analysis[:variation] is the continuation after that (also UCI)
           # We prepend the user's move to get the full line
           full_variation = [user_move_uci, continuation_analysis[:move]] + continuation_analysis[:variation]
-          
+
           puts "DEBUG: Full variation UCI: #{full_variation.inspect}"
-          
+
           # Convert UCI moves to SAN
           require_relative 'lib/game_editor'
           game_editor = GameEditor.new
           variation_sequence = game_editor.build_variation_sequence(fen, full_variation, 8)
           variation_sans = variation_sequence.map(&:notation)
-          
+
           puts "DEBUG: Variation SAN after conversion: #{variation_sans.inspect}"
-          
+
           response[:variation_sans] = variation_sans
         end
       end
-      
+
       json_response(response)
     rescue Analyzer::EngineError => e
       json_response({ error: "Analysis engine error: #{e.message}" }, 500)
@@ -525,22 +544,22 @@ class LearnerApp < Sinatra::Base
       end
 
       move = session[:game].moves[move_index]
-      
+
       # Build variation sequence from SAN moves
       require_relative 'lib/game_editor'
       game_editor = GameEditor.new
-      
+
       # Get FEN before the move where variation starts
       fen_before = session[:game].positions[move_index].to_fen.to_s
-      
+
       # Build variation sequence from SAN moves
       variation_sequence = []
       current_fen = fen_before
-      
+
       variation_sans.each do |san_move|
         begin
           variation_sequence << PGN::MoveText.new(san_move)
-          
+
           # Update FEN by applying the move
           require_relative 'lib/move_translator'
           translator = MoveTranslator.new
@@ -582,23 +601,23 @@ class LearnerApp < Sinatra::Base
     begin
       require_relative 'lib/pgn_writer'
       require_relative 'lib/game_editor'
-      
+
       # Before saving, unshift annotations back to their original positions
       # (add_blunder_annotations places $201 on move i-1, which is correct for PGN)
       game_editor = GameEditor.new
       game_editor.unshift_critical_annotations(session[:game])
-      
+
       # Serialize the game to PGN
       writer = PGNWriter.new
       annotated_pgn = writer.write(session[:game])
-      
+
       # Write to file
       File.write(session[:pgn_file_path], annotated_pgn)
       puts "Saved game to #{session[:pgn_file_path]}"
-      
+
       # Re-shift annotations for in-memory use (for consistency with loaded games)
       game_editor.shift_critical_annotations(session[:game])
-      
+
       json_response({
         success: true,
         message: 'Game saved successfully',
