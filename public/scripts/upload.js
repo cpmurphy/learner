@@ -48,7 +48,12 @@ export function initializeUpload(onUploadComplete) {
     }
 
     function updateStatus(message, type = 'info') {
-        uploadStatus.textContent = message;
+        // Use innerHTML if message contains HTML, otherwise use textContent
+        if (message && message.includes('<')) {
+            uploadStatus.innerHTML = message;
+        } else {
+            uploadStatus.textContent = message;
+        }
         uploadStatus.className = 'upload-status ' + type;
     }
 
@@ -81,20 +86,20 @@ async function uploadAndAnalyzePGN(pgnContent, callbacks = {}) {
 
     const updateProgressAnimation = () => {
         if (!animationActive) return;
-
+        
         const elapsed = Date.now() - startTime;
         // Asymptotic function: approaches targetPercent as elapsed approaches duration
         // Using exponential approach: percent = target * (1 - e^(-t/duration))
         const t = Math.min(elapsed / duration, 1); // Clamp to 1
         const percent = targetPercent * (1 - Math.exp(-3 * t)); // -3 gives good curve shape
-
+        
         // Ensure we don't exceed targetPercent
         const clampedPercent = Math.min(percent, targetPercent);
-
+        
         if (onProgress) {
-            onProgress(clampedPercent, 'Analyzing game (this may take a while)...');
+            onProgress(clampedPercent, 'Analysis may take a while...');
         }
-
+        
         // Continue animation if we haven't reached the target
         if (clampedPercent < targetPercent) {
             requestAnimationFrame(updateProgressAnimation);
@@ -133,10 +138,15 @@ async function uploadAndAnalyzePGN(pgnContent, callbacks = {}) {
     // Update status: complete
     if (onProgress) onProgress(100, 'Complete!');
     if (onStatusChange) {
-        onStatusChange(
-            `Success! Game analyzed and saved as ${result.filename}`,
-            'success'
-        );
+        let statusMessage;
+        if (result.file_id) {
+            // Provide a link to view the completed analysis
+            statusMessage = `Success! Game analyzed and saved. <a href="/game?id=${encodeURIComponent(result.file_id)}" class="upload-status-link">View completed analysis →</a>`;
+        } else {
+            // Fallback to filename if ID is not available
+            statusMessage = `Success! Game analyzed and saved as ${result.filename}`;
+        }
+        onStatusChange(statusMessage, 'success');
     }
 
     return result;

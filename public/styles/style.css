@@ -238,6 +238,16 @@ h1 {
     border: 1px solid #bee5eb;
 }
 
+.upload-status-link {
+    color: inherit;
+    text-decoration: underline;
+    font-weight: bold;
+}
+
+.upload-status-link:hover {
+    opacity: 0.8;
+}
+
 .upload-progress {
     margin-top: 15px;
 }

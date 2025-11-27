@@ -743,10 +743,15 @@ class LearnerApp < Sinatra::Base
       # Refresh the PGN file list
       scan_pgn_directory
 
+      # Find the ID of the newly saved file
+      saved_file_meta = @available_pgns.find { |pgn_meta| pgn_meta[:path] == File.expand_path(output_path) }
+      file_id = saved_file_meta ? saved_file_meta[:id] : nil
+
       json_response({
         success: true,
         filename: unique_filename,
         path: output_path,
+        file_id: file_id,
         game_count: 1,
         message: 'Game annotated and saved successfully'
       })
