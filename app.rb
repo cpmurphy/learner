@@ -3,6 +3,7 @@
 require 'sinatra'
 require 'pgn'
 require 'json'
+require 'digest'
 require_relative 'lib/game_editor'
 require_relative 'lib/app_helpers' # Require the new helpers
 require_relative 'lib/analyzer'
@@ -85,6 +86,13 @@ class LearnerApp < Sinatra::Base
       abs_pgn_dir = File.expand_path(pgn_dir)
       abs_file_path.start_with?(abs_pgn_dir)
     end
+
+    # Generate a stable ID for a file based on its absolute path
+    # This ID will remain constant even when new files are added
+    def generate_stable_file_id(file_path)
+      abs_path = File.expand_path(file_path)
+      Digest::SHA256.hexdigest(abs_path)
+    end
   end
   # --- End Helpers ---
 
@@ -128,7 +136,7 @@ class LearnerApp < Sinatra::Base
     if pgn_files.empty?
       puts "No PGN files found in #{pgn_dir_path}."
     else
-      pgn_files.each_with_index do |file_path, index|
+      pgn_files.each do |file_path|
         filename = File.basename(file_path)
         # Ensure path is absolute and normalized for security/consistency
         abs_path = File.expand_path(file_path)
@@ -153,8 +161,10 @@ class LearnerApp < Sinatra::Base
             puts "WARNING: Could not parse PGN file #{filename} to count games. Error: #{e.message}. Assuming 0 games."
             game_count = 0
           end
+          # Generate stable ID based on file path (not position)
+          stable_id = generate_stable_file_id(abs_path)
           @available_pgns << {
-            id: index.to_s,
+            id: stable_id,
             name: filename,
             path: abs_path,
             game_count: game_count,
@@ -743,9 +753,9 @@ class LearnerApp < Sinatra::Base
       # Refresh the PGN file list
       scan_pgn_directory
 
-      # Find the ID of the newly saved file
-      saved_file_meta = @available_pgns.find { |pgn_meta| pgn_meta[:path] == File.expand_path(output_path) }
-      file_id = saved_file_meta ? saved_file_meta[:id] : nil
+      # Generate stable ID for the newly saved file
+      # This ID will remain constant even when new files are added
+      file_id = generate_stable_file_id(output_path)
 
       json_response({
         success: true,
