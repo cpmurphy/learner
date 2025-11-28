@@ -99,6 +99,12 @@ Before you begin, ensure you have the following installed:
 
 Critical moments are automatically annotated with `$201` (SCID's standard annotation for critical positions).
 
+### To Get the Most of Your Analysis
+
+Do it soon after the game so your memory is still fresh. When you reach a move where you made a mistake, remember your thinking process. Did you understand what your opponent was trying to do? Did you understand where your position had weaknesses? Did you understand what you should be trying for in the position? If you had a time machine, what could you have done differently to avoid the mistake? How can you adjust your thinking to avoid it in future?
+
+Given all the mistakes that can be made it takes a long time to fix all of them. But if you notice patterns that can really help.
+
 ## Security Warning
 
 ⚠️ **Important**: This application is designed for local use and is not hardened for public internet exposure. Do not run this tool on a server that is directly accessible from the internet without proper security measures (firewall rules, authentication, HTTPS, etc.). The application does not include authentication or rate limiting and may be vulnerable to various attacks if exposed publicly.
