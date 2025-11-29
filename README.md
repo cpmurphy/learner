@@ -149,6 +149,24 @@ npm run test_once
 
 **Note:** The default `rake test` task automatically excludes integration tests. Integration tests that require Stockfish are located in `test/integration/` and must be run separately.
 
+### Fixing Stockfish Gem Warning
+
+The stockfish gem (version 0.3.1) generates a frozen string literal warning in Ruby 3.4+. To silence this warning, you can run the fix script:
+
+```bash
+ruby scripts/fix_stockfish_warning.rb
+```
+
+This script will:
+- Find the stockfish gem installation (works regardless of gem location)
+- Show a preview of the changes
+- Ask for your permission before modifying the gem file
+- Create a backup of the original file
+- Add `# frozen_string_literal: true` at the top of the gem file
+- Fix mutable string issues (e.g., `output = ""` → `output = String.new`) that would cause test failures
+
+**Note:** This modifies the gem file in place. If you reinstall the gem, you'll need to run this script again. The script fixes both the warning and the test failures caused by frozen strings.
+
 ### Code Linting
 
 Ruby:
