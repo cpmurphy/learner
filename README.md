@@ -135,7 +135,7 @@ bundle exec ruby -Itest test/game_editor_test.rb
 
 **Integration Tests** (requires Stockfish):
 ```bash
-bundle exec rake test:integration
+bundle exec rake integration
 # Or run a specific integration test file:
 bundle exec ruby -Itest test/integration/game_editor_integration_test.rb
 ```

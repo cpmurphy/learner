@@ -16,3 +16,5 @@ group :development, :test do
   gem 'rubocop-minitest', require: false
   gem 'simplecov', require: false
 end
+
+gem "rake", "~> 13.3"
