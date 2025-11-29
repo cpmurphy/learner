@@ -17,6 +17,11 @@ The tool is intended for beginning or intermediate players. Unlike the "game rev
 - never shows an engine evaluation (this is often a distraction)
 - allows good moves even if not the top engine choice (though lichess does this too)
 
+## What You Might Miss
+
+- **No Positive Feedback**: this tool won't tell you if you made a brilliant sacrifice or found a cunning tactic
+- **No Nuance**: if you slowly get ground down in a positional slugfest, this tool won't tell you where you went wrong
+
 ## Prerequisites
 
 Before you begin, ensure you have the following installed:
