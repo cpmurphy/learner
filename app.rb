@@ -91,7 +91,7 @@ class LearnerApp < Sinatra::Base
     # This ID will remain constant even when new files are added
     def generate_stable_file_id(file_path)
       abs_path = File.expand_path(file_path)
-      Digest::SHA256.hexdigest(abs_path)
+      Digest::MD5.hexdigest(abs_path)
     end
   end
   # --- End Helpers ---
