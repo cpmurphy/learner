@@ -69,7 +69,7 @@ Automate the manual SCID annotation workflow by allowing users to upload PGN fil
 - Parse PGN content
 - **Output:** Returns parsed game info or error
 
-**Step 3.2: Add annotation + save endpoint** (`POST /api/annotate_and_save`)
+**Step 3.2: Add annotation + save endpoint** (`POST /api/analyze_and_save`)
 - Accept uploaded PGN content
 - Run analysis and annotation (GameEditor)
 - Serialize back to PGN format (PGNWriter)
@@ -101,7 +101,7 @@ Automate the manual SCID annotation workflow by allowing users to upload PGN fil
 
 **Step 4.3: Add annotation trigger**
 - Add "Annotate with Stockfish" button/checkbox
-- Call POST /api/annotate_and_save
+- Call POST /api/analyze_and_save
 - Show progress during analysis (can be slow)
 - Refresh PGN file list after completion
 - **Output:** User sees annotated game in file list

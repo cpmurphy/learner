@@ -98,8 +98,8 @@ class AppUploadTest < Minitest::Test
     tempfile.unlink
   end
 
-  def test_annotate_and_save_with_json_content
-    post '/api/annotate_and_save',
+  def test_analyze_and_save_with_json_content
+    post '/api/analyze_and_save',
          { pgn_content: @valid_pgn, filename: 'test_game.pgn' }.to_json,
          'CONTENT_TYPE' => 'application/json'
 
@@ -123,8 +123,8 @@ class AppUploadTest < Minitest::Test
     end
   end
 
-  def test_annotate_and_save_without_content
-    post '/api/annotate_and_save',
+  def test_analyze_and_save_without_content
+    post '/api/analyze_and_save',
          { filename: 'test.pgn' }.to_json,
          'CONTENT_TYPE' => 'application/json'
 
@@ -134,8 +134,8 @@ class AppUploadTest < Minitest::Test
     assert json['error'].include?('No PGN content')
   end
 
-  def test_annotate_and_save_with_invalid_json
-    post '/api/annotate_and_save',
+  def test_analyze_and_save_with_invalid_json
+    post '/api/analyze_and_save',
          'not valid json',
          'CONTENT_TYPE' => 'application/json'
 
@@ -147,7 +147,7 @@ class AppUploadTest < Minitest::Test
 
   def test_sanitize_filename_removes_unsafe_characters
     # Test the helper method indirectly through the endpoint
-    post '/api/annotate_and_save',
+    post '/api/analyze_and_save',
          { pgn_content: @valid_pgn, filename: '../../../etc/passwd.pgn' }.to_json,
          'CONTENT_TYPE' => 'application/json'
 
@@ -165,7 +165,7 @@ class AppUploadTest < Minitest::Test
 
   def test_unique_filename_generation
     # Upload same file twice, should get different filenames
-    post '/api/annotate_and_save',
+    post '/api/analyze_and_save',
          { pgn_content: @valid_pgn, filename: 'test.pgn' }.to_json,
          'CONTENT_TYPE' => 'application/json'
 
@@ -174,7 +174,7 @@ class AppUploadTest < Minitest::Test
     # Wait a second to ensure different timestamp
     sleep(1)
 
-    post '/api/annotate_and_save',
+    post '/api/analyze_and_save',
          { pgn_content: @valid_pgn, filename: 'test.pgn' }.to_json,
          'CONTENT_TYPE' => 'application/json'
 

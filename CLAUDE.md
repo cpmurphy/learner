@@ -70,7 +70,7 @@ The Stockfish directory contains a git submodule for the Stockfish chess engine.
 Key API endpoints:
 - `GET /api/pgn_files` - List available PGN files in PGN_DIR
 - `POST /api/upload_pgn` - Upload and validate a PGN file (doesn't save yet)
-- `POST /api/annotate_and_save` - Annotate a PGN with Stockfish and save to PGN_DIR
+- `POST /api/analyze_and_save` - Annotate a PGN with Stockfish and save to PGN_DIR
   - Accepts either file upload or JSON with `pgn_content` and `filename`
   - Automatically adds blunder annotations ($201) and variations
   - Generates unique filename with timestamp to prevent collisions
