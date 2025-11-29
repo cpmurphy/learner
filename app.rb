@@ -124,7 +124,6 @@ class LearnerApp < Sinatra::Base
       return
     end
 
-    puts "Scanning PGN directory: #{pgn_dir_path}"
     pgn_files = Dir.glob(File.join(pgn_dir_path, '*.pgn'))
     # Sort files by last modified time descending (newest first)
     begin
@@ -176,7 +175,6 @@ class LearnerApp < Sinatra::Base
           puts "WARNING: File #{file_path} is outside the PGN_DIR and will be ignored."
         end
       end
-      puts "Found #{@available_pgns.size} PGN files. Ready for selection via API."
     end
   end
 
@@ -253,16 +251,13 @@ class LearnerApp < Sinatra::Base
         game_editor.shift_critical_annotations(session[:game])
       else
         # No existing annotations, so analyze and add them.
-        puts 'No critical moments found in PGN, analyzing for blunders...'
         game_editor.add_blunder_annotations(session[:game])
-        puts 'Blunder analysis complete.'
         # Note: We do NOT call shift_critical_annotations here because annotations
         # added by add_blunder_annotations are already on the correct move.
       end
 
       session[:current_move_index] = 0
 
-      puts "Loaded game from PGN: #{pgn_meta[:name]}. Board positions: #{session[:game].positions.size}"
       last_move = get_last_move_info(session[:game], session[:current_move_index]) # Will be nil for index 0
 
       # Check for initial critical moment for White (default learning side on frontend)
@@ -508,15 +503,11 @@ class LearnerApp < Sinatra::Base
           # We prepend the user's move to get the full line
           full_variation = [user_move_uci, continuation_analysis[:move]] + continuation_analysis[:variation]
 
-          puts "DEBUG: Full variation UCI: #{full_variation.inspect}"
-
           # Convert UCI moves to SAN
           require_relative 'lib/game_editor'
           game_editor = GameEditor.new
           variation_sequence = game_editor.build_variation_sequence(fen, full_variation, 8)
           variation_sans = variation_sequence.map(&:notation)
-
-          puts "DEBUG: Variation SAN after conversion: #{variation_sans.inspect}"
 
           response[:variation_sans] = variation_sans
         end
@@ -623,7 +614,6 @@ class LearnerApp < Sinatra::Base
 
       # Write to file
       File.write(session[:pgn_file_path], annotated_pgn)
-      puts "Saved game to #{session[:pgn_file_path]}"
 
       # Re-shift annotations for in-memory use (for consistency with loaded games)
       game_editor.shift_critical_annotations(session[:game])
@@ -726,11 +716,9 @@ class LearnerApp < Sinatra::Base
       game = games.first
       game_editor = GameEditor.new
 
-      puts "Annotating game with Stockfish..."
       game_editor.add_blunder_annotations(game)
       # Note: shift_critical_annotations is NOT called because annotations
       # added by add_blunder_annotations are already on the correct move.
-      puts "Annotation complete."
 
       # Serialize to PGN
       writer = PGNWriter.new
@@ -746,9 +734,7 @@ class LearnerApp < Sinatra::Base
         return json_response({ error: 'Invalid file path' }, 400)
       end
 
-      # Write to file
       File.write(output_path, annotated_pgn)
-      puts "Saved annotated PGN to #{output_path}"
 
       # Refresh the PGN file list
       scan_pgn_directory
