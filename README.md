@@ -124,19 +124,30 @@ For local development and personal use on your own machine, it's safe. If you ne
 
 ### Running Tests
 
-Ruby tests:
+The test suite is split into unit tests and integration tests. Unit tests don't require external dependencies, while integration tests require Stockfish to be installed and available.
+
+**Unit Tests** (default, no Stockfish required):
 ```bash
 bundle exec rake test
 # Or run a specific test file:
-bundle exec ruby -Ilib:test test/game_editor_test.rb
+bundle exec ruby -Itest test/game_editor_test.rb
 ```
 
-JavaScript tests:
+**Integration Tests** (requires Stockfish):
+```bash
+bundle exec rake test:integration
+# Or run a specific integration test file:
+bundle exec ruby -Itest test/integration/game_editor_integration_test.rb
+```
+
+**JavaScript tests:**
 ```bash
 npm test
 # Or run once (non-watch mode):
 npm run test_once
 ```
+
+**Note:** The default `rake test` task automatically excludes integration tests. Integration tests that require Stockfish are located in `test/integration/` and must be run separately.
 
 ### Code Linting
 

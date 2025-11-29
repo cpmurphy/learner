@@ -8,12 +8,12 @@ class GameEditor
   BLUNDER_THRESHOLD = 140 # In centipawns. A drop of 1.4 pawn value is a blunder.
 
   def initialize
-    @translator = MoveTranslator.new
     @uci_converter = UciToSanConverter.new
   end
 
   def add_blunder_annotations(game)
     analyzer = Analyzer.new
+    translator = MoveTranslator.new
     begin
       (0...game.moves.size).each do |i|
         move = game.moves[i]
@@ -23,7 +23,8 @@ class GameEditor
         best_move_analysis = analyzer.evaluate_best_move(fen)
         next unless best_move_analysis&.[](:score)
 
-        uci_move = @translator.translate_move(move.notation)
+        translator.load_game_from_fen(fen)
+        uci_move = translator.translate_move(move.notation)
         played_move_analysis = analyzer.evaluate_move(fen, uci_move)
         next unless played_move_analysis&.[](:score)
 
