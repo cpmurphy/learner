@@ -150,3 +150,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - The frontend uses vanilla JavaScript (no framework) with the `cm-chessboard` package for the chessboard UI
 - Game analysis is performed using the Stockfish engine via the `stockfish` Ruby gem
 - PGN parsing is handled by the `pgn2` gem
+
+Notable third party libraries used:
+- [cm-chessboard](https://github.com/shaack/cm-chessboard) (MIT License), chessboard UI
+- [chess.js](https://github.com/jhlywa/chess.js) (BSD-2-Clause License), chess logic
