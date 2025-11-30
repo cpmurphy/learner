@@ -54,8 +54,8 @@ class GameEditor
           # The variation includes the best move plus the continuation
           full_variation = [best_move_uci] + continuation_moves
 
-          # Build a variation with 8 ply (4 full moves) to show the continuation
-          variation_sequence = build_variation_sequence(fen, full_variation, 8)
+          # Build a variation with 12 ply (6 full moves) to show the continuation
+          variation_sequence = build_variation_sequence(fen, full_variation, 12)
 
           unless variation_sequence.empty?
             # Add a comment to the first move explaining the advantage
