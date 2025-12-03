@@ -217,4 +217,22 @@ class MoveTranslatorTest < Minitest::Test
     assert_equal('e2e4', @translator.translate_move('e4'))
     assert_equal('--', @translator.translate_move('--'))
   end
+
+  def test_late_en_passant_capture
+    @translator.load_game_from_fen('6r1/1pk2pp1/p1p1p2p/P2r3P/4KP2/R2P4/1P6/7R b - - 5 24')
+    @translator.translate_move('g5')
+    @translator.translate_move('hxg6')
+
+    assert_equal('6r1/1pk2p2/p1p1p1Pp/P2r4/4KP2/R2P4/1P6/7R b - - 0 25', @translator.board_as_fen)
+  end
+
+  def test_en_passant_capture_after_loading_from_fen_with_ep_target
+    # Test the bug scenario: loading from FEN with en passant target already set
+    # This simulates what happens in GameEditor when loading positions from PGN
+    @translator.load_game_from_fen('6r1/1pk2p2/p1p1p2p/P2r2pP/4KP2/R2P4/1P6/7R w - g6 0 25')
+    result = @translator.translate_move('hxg6')
+
+    assert_equal('h5g6', result)
+    assert_equal('6r1/1pk2p2/p1p1p1Pp/P2r4/4KP2/R2P4/1P6/7R b - - 0 25', @translator.board_as_fen)
+  end
 end

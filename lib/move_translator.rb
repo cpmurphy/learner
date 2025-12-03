@@ -153,6 +153,7 @@ class MoveTranslator
     initialize_current_player(components[:active_color])
     initialize_castling_rights(components[:castling])
     initialize_en_passant_target(components[:en_passant])
+    initialize_last_move_from_en_passant(components[:en_passant], components[:active_color])
     initialize_clock_values(components[:halfmove], components[:fullmove])
   end
 
@@ -166,6 +167,35 @@ class MoveTranslator
 
   def initialize_en_passant_target(en_passant)
     @board.en_passant_target = en_passant.empty? ? '-' : en_passant
+  end
+
+  def initialize_last_move_from_en_passant(en_passant, active_color)
+    return if en_passant.empty? || en_passant == '-'
+
+    # Reconstruct the last move that created this en passant opportunity
+    # The en passant target is where the capturing pawn would land
+    # The captured pawn would be on the same file, one rank back from target
+    # The moving pawn would be two ranks back from target
+    ep_file, ep_rank = en_passant.chars
+    ep_rank_num = ep_rank.to_i
+
+    # Determine which side made the double-step pawn move
+    # If it's white to move, black just moved (so black pawn moved from rank 7 to rank 5)
+    # If it's black to move, white just moved (so white pawn moved from rank 2 to rank 4)
+    if active_color == 'w'
+      # Black just moved: from rank 7 to rank 5
+      from_rank = ep_rank_num + 1
+      to_rank = ep_rank_num - 1
+    else
+      # White just moved: from rank 2 to rank 4
+      from_rank = ep_rank_num - 1
+      to_rank = ep_rank_num + 1
+    end
+
+    from_square = "#{ep_file}#{from_rank}"
+    to_square = "#{ep_file}#{to_rank}"
+
+    @board.last_move = { moves: ["#{from_square}-#{to_square}"] }
   end
 
   def initialize_clock_values(halfmove, fullmove)
