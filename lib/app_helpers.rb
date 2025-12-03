@@ -14,17 +14,25 @@ module AppHelpers
     return nil if game_moves.nil? || game_moves.empty?
 
     (start_search_from_move_index...game_moves.size).each do |move_array_idx|
-      move = game_moves[move_array_idx]
-      # Determine turn for game_moves[move_array_idx]
-      # move_array_idx 0 is White's 1st move (leading to position 1)
-      # move_array_idx 1 is Black's 1st move (leading to position 2)
-      move_turn = move_array_idx.even? ? 'white' : 'black'
-
-      if move_turn == learning_side_to_check && move.annotation&.include?('$201')
-        return move_array_idx + 1 # Position index
-      end
+      position_index = check_move_for_critical_moment(game_moves, move_array_idx, learning_side_to_check)
+      return position_index if position_index
     end
     nil # No critical moment found
+  end
+
+  def check_move_for_critical_moment(game_moves, move_array_idx, learning_side_to_check)
+    move = game_moves[move_array_idx]
+    move_turn = determine_move_turn(move_array_idx)
+    return nil unless move_turn == learning_side_to_check
+    return nil unless move.annotation&.include?('$201')
+
+    move_array_idx + 1 # Position index
+  end
+
+  def determine_move_turn(move_array_idx)
+    # move_array_idx 0 is White's 1st move (leading to position 1)
+    # move_array_idx 1 is Black's 1st move (leading to position 2)
+    move_array_idx.even? ? 'white' : 'black'
   end
 
   # Retrieves information about the move that LED to the current_position_index.
@@ -34,53 +42,61 @@ module AppHelpers
   #                         1 is the state after the first move (game.moves[0]), etc.
   # Returns a hash with move details, or nil if current_position_index is 0.
   def get_last_move_info(game, current_position_index)
-    return nil if current_position_index.zero? || game.nil? || game.moves.empty?
+    return nil unless valid_move_info_params?(game, current_position_index)
 
-    # The move that LED to the current_position_index
-    # game.positions[0] is initial, game.moves[0] is the 1st move, leading to game.positions[1]
-    actual_move_index_in_game_array = current_position_index - 1
+    actual_move_index = current_position_index - 1
+    return nil unless valid_move_index?(game, actual_move_index)
 
-    # Ensure actual_move_index_in_game_array is valid for game.moves
-    return nil if actual_move_index_in_game_array.negative? || actual_move_index_in_game_array >= game.moves.size
+    move = game.moves[actual_move_index]
+    return nil unless move
 
-    move = game.moves[actual_move_index_in_game_array]
-    return nil unless move # Should exist if index is valid
+    build_move_info_hash(move, actual_move_index, game)
+  end
 
-    # Ensure actual_move_index_in_game_array is valid for game.positions (for fen_before_this_move)
-    return nil if actual_move_index_in_game_array >= game.positions.size
+  def valid_move_info_params?(game, current_position_index)
+    !current_position_index.zero? && !game.nil? && !game.moves.empty?
+  end
 
-    fen_before_this_move = game.positions[actual_move_index_in_game_array].to_fen.to_s
+  def valid_move_index?(game, move_index)
+    move_index >= 0 && move_index < game.moves.size && move_index < game.positions.size
+  end
 
+  def build_move_info_hash(move, actual_move_index, game)
+    fen_before_this_move = game.positions[actual_move_index].to_fen.to_s
     is_critical_moment = move.annotation&.include?('$201')
-    good_san = nil
-    variation_sans = [] # Initialize as empty array
-
-    if is_critical_moment && move.variations && !move.variations.empty?
-      first_variation_line = move.variations.first # This is an array of PGN::MoveText objects
-      if first_variation_line && !first_variation_line.empty?
-        good_san = first_variation_line.first.notation.to_s
-        # Populate the already initialized variation_sans
-        variation_sans = first_variation_line.map { |var_move| var_move.notation.to_s }
-      end
-    end
-
-    # Corrected move number calculation
-    # actual_move_index_in_game_array 0 (White's 1st) -> (0/2)+1 = 1
-    # actual_move_index_in_game_array 1 (Black's 1st) -> (1/2)+1 = 1
-    # actual_move_index_in_game_array 2 (White's 2nd) -> (2/2)+1 = 2
-    display_move_number = (actual_move_index_in_game_array / 2) + 1
-    current_turn = actual_move_index_in_game_array.even? ? 'white' : 'black'
+    variation_data = extract_variation_data(move, is_critical_moment)
+    move_metadata = calculate_move_metadata(actual_move_index)
 
     {
-      number: display_move_number, # Corrected display move number
-      turn: current_turn,
+      number: move_metadata[:display_move_number],
+      turn: move_metadata[:current_turn],
       san: move.notation.to_s,
       comment: move.comment,
       annotation: move.annotation, # NAGs (Numeric Annotation Glyphs)
       is_critical: is_critical_moment,
-      good_move_san: good_san,
-      variation_sans: variation_sans, # Add the SANs for the first variation
+      good_move_san: variation_data[:good_san],
+      variation_sans: variation_data[:variation_sans],
       fen_before_move: fen_before_this_move
     }
+  end
+
+  def extract_variation_data(move, is_critical_moment)
+    return { good_san: nil, variation_sans: [] } unless is_critical_moment && move.variations && !move.variations.empty?
+
+    first_variation_line = move.variations.first
+    return { good_san: nil, variation_sans: [] } unless first_variation_line && !first_variation_line.empty?
+
+    good_san = first_variation_line.first.notation.to_s
+    variation_sans = first_variation_line.map { |var_move| var_move.notation.to_s }
+    { good_san: good_san, variation_sans: variation_sans }
+  end
+
+  def calculate_move_metadata(actual_move_index)
+    # actual_move_index 0 (White's 1st) -> (0/2)+1 = 1
+    # actual_move_index 1 (Black's 1st) -> (1/2)+1 = 1
+    # actual_move_index 2 (White's 2nd) -> (2/2)+1 = 2
+    display_move_number = (actual_move_index / 2) + 1
+    current_turn = actual_move_index.even? ? 'white' : 'black'
+    { display_move_number: display_move_number, current_turn: current_turn }
   end
 end
