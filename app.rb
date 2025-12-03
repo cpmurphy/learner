@@ -107,75 +107,107 @@ class LearnerApp < Sinatra::Base
     @available_pgns = []
     pgn_dir_path = ENV.fetch('PGN_DIR', nil)
 
-    if pgn_dir_path.nil? || pgn_dir_path.empty?
-      puts '---------------------------------------------------------------------------------------'
-      puts 'ERROR: PGN_DIR environment variable not set.'
-      puts 'Please provide the path to a directory containing PGN files.'
-      puts 'Example: PGN_DIR=./test/data bundle exec puma config.ru'
-      puts 'The application will start, but game functionality will be disabled until a PGN is loaded via API.'
-      puts '---------------------------------------------------------------------------------------'
-      return
-    elsif !Dir.exist?(pgn_dir_path)
-      puts '---------------------------------------------------------------------------------------'
-      puts "ERROR: PGN directory not found at path: #{pgn_dir_path}"
-      puts 'Please ensure the PGN_DIR environment variable points to an existing directory.'
-      puts 'The application will start, but game functionality will be disabled.'
-      puts '---------------------------------------------------------------------------------------'
-      return
-    end
+    return unless pgn_directory_valid?(pgn_dir_path)
 
     pgn_files = Dir.glob(File.join(pgn_dir_path, '*.pgn'))
-    # Sort files by last modified time descending (newest first)
+    sorted_files = sort_pgn_files_by_mtime(pgn_files)
+
+    if sorted_files.empty?
+      puts "No PGN files found in #{pgn_dir_path}."
+    else
+      process_pgn_files(sorted_files, pgn_dir_path)
+    end
+  end
+
+  def pgn_directory_valid?(pgn_dir_path)
+    if pgn_dir_path.nil? || pgn_dir_path.empty?
+      print_pgn_dir_error('PGN_DIR environment variable not set.',
+                          'Please provide the path to a directory containing PGN files.',
+                          'Example: PGN_DIR=./test/data bundle exec puma config.ru')
+      return false
+    elsif !Dir.exist?(pgn_dir_path)
+      print_pgn_dir_error("PGN directory not found at path: #{pgn_dir_path}",
+                          'Please ensure the PGN_DIR environment variable points to an existing directory.')
+      return false
+    end
+    true
+  end
+
+  def print_pgn_dir_error(*messages)
+    puts '---------------------------------------------------------------------------------------'
+    messages.each { |msg| puts "ERROR: #{msg}" }
+    puts 'The application will start, but game functionality will be disabled.'
+    puts '---------------------------------------------------------------------------------------'
+  end
+
+  def sort_pgn_files_by_mtime(pgn_files)
     begin
       pgn_files.sort_by! { |file_path| File.mtime(file_path) }
       pgn_files.reverse!
     rescue StandardError => e
       puts "WARNING: Failed to sort PGN files by modified time: #{e.message}. Falling back to default order."
     end
-    if pgn_files.empty?
-      puts "No PGN files found in #{pgn_dir_path}."
-    else
-      pgn_files.each do |file_path|
-        filename = File.basename(file_path)
-        # Ensure path is absolute and normalized for security/consistency
-        abs_path = File.expand_path(file_path)
-        # Basic check to ensure the file is within the intended PGN_DIR
-        if abs_path.start_with?(File.expand_path(pgn_dir_path))
-          game_count = 0
-          white_player = nil
-          black_player = nil
-          date = nil
-          begin
-            pgn_content_for_count = File.read(abs_path)
-            pgn_content_for_count = ensure_pgn_has_result_termination(pgn_content_for_count)
-            games_in_file = PGN.parse(pgn_content_for_count)
-            game_count = games_in_file.size
-            # Extract header information from the first game
-            if games_in_file.any? && games_in_file.first.tags
-              white_player = games_in_file.first.tags['White']
-              black_player = games_in_file.first.tags['Black']
-              date = games_in_file.first.tags['Date']
-            end
-          rescue StandardError => e
-            puts "WARNING: Could not parse PGN file #{filename} to count games. Error: #{e.message}. Assuming 0 games."
-            game_count = 0
-          end
-          # Generate stable ID based on file path (not position)
-          stable_id = generate_stable_file_id(abs_path)
-          @available_pgns << {
-            id: stable_id,
-            name: filename,
-            path: abs_path,
-            game_count: game_count,
-            white: white_player,
-            black: black_player,
-            date: date
-          }
-        else
-          puts "WARNING: File #{file_path} is outside the PGN_DIR and will be ignored."
-        end
-      end
+    pgn_files
+  end
+
+  def process_pgn_files(pgn_files, pgn_dir_path)
+    pgn_files.each do |file_path|
+      process_single_pgn_file(file_path, pgn_dir_path)
     end
+  end
+
+  def process_single_pgn_file(file_path, pgn_dir_path)
+    filename = File.basename(file_path)
+    abs_path = File.expand_path(file_path)
+
+    unless abs_path.start_with?(File.expand_path(pgn_dir_path))
+      puts "WARNING: File #{file_path} is outside the PGN_DIR and will be ignored."
+      return
+    end
+
+    metadata = extract_pgn_file_metadata(abs_path, filename)
+    return unless metadata
+
+    stable_id = generate_stable_file_id(abs_path)
+    @available_pgns << {
+      id: stable_id,
+      name: filename,
+      path: abs_path,
+      game_count: metadata[:game_count],
+      white: metadata[:white],
+      black: metadata[:black],
+      date: metadata[:date]
+    }
+  end
+
+  def extract_pgn_file_metadata(abs_path, filename)
+    game_count = 0
+    white_player = nil
+    black_player = nil
+    date = nil
+
+    begin
+      pgn_content = File.read(abs_path)
+      pgn_content = ensure_pgn_has_result_termination(pgn_content)
+      games_in_file = PGN.parse(pgn_content)
+      game_count = games_in_file.size
+
+      if games_in_file.any? && games_in_file.first.tags
+        white_player = games_in_file.first.tags['White']
+        black_player = games_in_file.first.tags['Black']
+        date = games_in_file.first.tags['Date']
+      end
+    rescue StandardError => e
+      puts "WARNING: Could not parse PGN file #{filename} to count games. Error: #{e.message}. Assuming 0 games."
+      game_count = 0
+    end
+
+    {
+      game_count: game_count,
+      white: white_player,
+      black: black_player,
+      date: date
+    }
   end
 
   # --- Routes ---
@@ -210,80 +242,103 @@ class LearnerApp < Sinatra::Base
 
   # API endpoint to load the first game from a selected PGN file
   post '/api/load_game' do
-    # Ensure the PGN list (and IDs) reflect the latest directory state and sort order
     scan_pgn_directory
-
-    begin
-      params = JSON.parse(request.body.read)
-    rescue JSON::ParserError
-      return json_response({ error: 'Invalid JSON in request body' }, 400)
-    end
+    params = parse_json_body
+    return params if params.is_a?(Hash) && params[:error]
 
     pgn_file_id = params['pgn_file_id']
-
     return json_response({ error: 'Missing pgn_file_id parameter' }, 400) unless pgn_file_id
 
     pgn_meta = @available_pgns.find { |p| p[:id] == pgn_file_id }
-
     return json_response({ error: "PGN file not found for ID: #{pgn_file_id}" }, 404) unless pgn_meta
 
-    begin
-      pgn_content = File.read(pgn_meta[:path])
-      pgn_content = ensure_pgn_has_result_termination(pgn_content)
-      games_in_file = PGN.parse(pgn_content)
+    load_game_from_pgn_file(pgn_meta)
+  end
 
-      if games_in_file.empty?
-        session[:game] = nil # Unload any previously loaded game
-        session[:current_move_index] = 0
-        return json_response({ error: "No games found in PGN file: #{pgn_meta[:name]}" }, 400)
-      end
+  def parse_json_body
+    JSON.parse(request.body.read)
+  rescue JSON::ParserError
+    json_response({ error: 'Invalid JSON in request body' }, 400)
+  end
 
-      session[:game] = games_in_file.first # Load the first game
-      session[:pgn_file_path] = pgn_meta[:path] # Store the file path for saving
+  def load_game_from_pgn_file(pgn_meta)
+    games_in_file = parse_pgn_file(pgn_meta[:path])
+    return handle_empty_pgn_file(pgn_meta) if games_in_file.empty?
 
-      # If the PGN has no critical moment annotations, analyze it to find them.
-      has_critical_moments = session[:game].moves.any? { |m| m.annotation&.include?('$201') }
-      game_editor = GameEditor.new
+    initialize_game_session(games_in_file.first, pgn_meta[:path])
+    build_load_game_response(pgn_meta)
+  rescue StandardError => e
+    handle_pgn_load_error(pgn_meta, e)
+  end
 
-      if has_critical_moments
-        # PGN already has $201 annotations (likely from SCID or another tool).
-        # These might be associated with the wrong move by the parser, so shift them.
-        game_editor.shift_critical_annotations(session[:game])
-      else
-        # No existing annotations, so analyze and add them.
-        game_editor.add_blunder_annotations(session[:game])
-        # NOTE: We do NOT call shift_critical_annotations here because annotations
-        # added by add_blunder_annotations are already on the correct move.
-      end
+  def parse_pgn_file(file_path)
+    pgn_content = File.read(file_path)
+    pgn_content = ensure_pgn_has_result_termination(pgn_content)
+    PGN.parse(pgn_content)
+  end
 
-      session[:current_move_index] = 0
+  def handle_empty_pgn_file(pgn_meta)
+    clear_game_session
+    json_response({ error: "No games found in PGN file: #{pgn_meta[:name]}" }, 400)
+  end
 
-      last_move = get_last_move_info(session[:game], session[:current_move_index]) # Will be nil for index 0
+  def initialize_game_session(game, file_path)
+    session[:game] = game
+    session[:pgn_file_path] = file_path
+    process_critical_moments_for_game
+    session[:current_move_index] = 0
+  end
 
-      # Check for initial critical moment for White (default learning side on frontend)
-      # Search from the very first move (index 0 of session[:game].moves)
-      has_initial_critical_for_white = !find_critical_moment_position_index(session[:game].moves, 0, 'white').nil?
+  def clear_game_session
+    session[:game] = nil
+    session[:current_move_index] = 0
+  end
 
-      white_player = session[:game].tags['White'] || 'Unknown White'
-      black_player = session[:game].tags['Black'] || 'Unknown Black'
+  def handle_pgn_load_error(pgn_meta, error)
+    clear_game_session
+    puts "ERROR: Could not parse PGN file: #{pgn_meta[:path]}."
+    puts "Details: #{error.message}"
+    json_response({ error: "Could not parse PGN file: #{pgn_meta[:name]}. Details: #{error.message}" }, 500)
+  end
 
-      json_response({
-                      fen: current_board_fen,
-                      move_index: session[:current_move_index],
-                      total_positions: session[:game].positions.size,
-                      last_move: last_move,
-                      message: "Successfully loaded game from #{pgn_meta[:name]}",
-                      has_initial_critical_moment_for_white: has_initial_critical_for_white,
-                      white_player: white_player,
-                      black_player: black_player
-                    })
-    rescue StandardError => e
-      session[:game] = nil # Ensure game is not partially loaded
-      session[:current_move_index] = 0
-      puts "ERROR: Could not parse PGN file: #{pgn_meta[:path]}."
-      puts "Details: #{e.message}"
-      json_response({ error: "Could not parse PGN file: #{pgn_meta[:name]}. Details: #{e.message}" }, 500)
+  def process_critical_moments_for_game
+    has_critical_moments = session[:game].moves.any? { |m| m.annotation&.include?('$201') }
+    game_editor = GameEditor.new
+
+    if has_critical_moments
+      game_editor.shift_critical_annotations(session[:game])
+    else
+      game_editor.add_blunder_annotations(session[:game])
     end
+  end
+
+  def build_load_game_response(pgn_meta)
+    response_data = build_load_game_response_data(pgn_meta)
+    json_response(response_data)
+  end
+
+  def build_load_game_response_data(pgn_meta)
+    {
+      fen: current_board_fen,
+      move_index: session[:current_move_index],
+      total_positions: session[:game].positions.size,
+      last_move: get_last_move_info(session[:game], session[:current_move_index]),
+      message: "Successfully loaded game from #{pgn_meta[:name]}",
+      has_initial_critical_moment_for_white: initial_critical_moment_for_white?,
+      white_player: extract_player_names[:white],
+      black_player: extract_player_names[:black]
+    }
+  end
+
+  def initial_critical_moment_for_white?
+    !find_critical_moment_position_index(session[:game].moves, 0, 'white').nil?
+  end
+
+  def extract_player_names
+    {
+      white: session[:game].tags['White'] || 'Unknown White',
+      black: session[:game].tags['Black'] || 'Unknown Black'
+    }
   end
 
   # API endpoint to get the current FEN of the loaded game
@@ -319,8 +374,12 @@ class LearnerApp < Sinatra::Base
       json_response({ fen: current_board_fen, move_index: session[:current_move_index], last_move: last_move })
     else
       last_move = get_last_move_info(session[:game], session[:current_move_index])
-      json_response({ fen: current_board_fen, move_index: session[:current_move_index], message: 'Already at the last move.',
-                      last_move: last_move })
+      json_response({
+                      fen: current_board_fen,
+                      move_index: session[:current_move_index],
+                      message: 'Already at the last move.',
+                      last_move: last_move
+                    })
     end
   end
 
@@ -337,60 +396,56 @@ class LearnerApp < Sinatra::Base
       json_response({ fen: current_board_fen, move_index: session[:current_move_index], last_move: last_move })
     else
       last_move = get_last_move_info(session[:game], session[:current_move_index]) # Will be nil for index 0
-      json_response({ fen: current_board_fen, move_index: session[:current_move_index], message: 'Already at the first move.',
-                      last_move: last_move })
+      json_response({
+                      fen: current_board_fen,
+                      move_index: session[:current_move_index],
+                      message: 'Already at the first move.',
+                      last_move: last_move
+                    })
     end
   end
 
   # API endpoint to go to the next critical move for the learning side
   post '/game/next_critical_moment' do
     unless game_loaded?
-      return json_response({ error: 'No game loaded. Please select a PGN file and load a game.' },
-                           404)
+      return json_response({ error: 'No game loaded. Please select a PGN file and load a game.' }, 404)
     end
 
-    begin
-      params = JSON.parse(request.body.read)
-      learning_side = params['learning_side'] # 'white' or 'black'
-    rescue JSON::ParserError
-      return json_response({ error: 'Invalid JSON in request body' }, 400)
-    end
+    params = parse_json_body
+    return params if params.is_a?(Hash) && params[:error]
 
+    learning_side = params['learning_side']
     unless %w[white black].include?(learning_side)
       return json_response({ error: "Invalid learning_side parameter. Must be 'white' or 'black'." }, 400)
     end
 
-    # session[:current_move_index] is the current position index.
-    # If current position is 0 (start), session[:game].moves[0] is the first move to check.
-    # If current position is N, session[:game].moves[N] is the next move to check.
-    # So, start_search_from_move_idx is session[:current_move_index].
-    start_search_from_move_idx = session[:current_move_index]
+    find_and_jump_to_next_critical_moment(learning_side)
+  end
 
-    new_critical_position_index = find_critical_moment_position_index(session[:game].moves, start_search_from_move_idx,
+  def find_and_jump_to_next_critical_moment(learning_side)
+    start_search_from_move_idx = session[:current_move_index]
+    new_critical_position_index = find_critical_moment_position_index(session[:game].moves,
+                                                                      start_search_from_move_idx,
                                                                       learning_side)
 
     if new_critical_position_index
       session[:current_move_index] = new_critical_position_index
-      last_move = get_last_move_info(session[:game], session[:current_move_index])
-      json_response({
-                      fen: current_board_fen,
-                      move_index: session[:current_move_index],
-                      total_positions: session[:game].positions.size,
-                      last_move: last_move,
-                      message: "Jumped to next critical moment for #{learning_side}."
-                    })
+      build_critical_moment_response(learning_side, "Jumped to next critical moment for #{learning_side}.")
     else
-      # No more critical moves found for this side from the current position
-      # Return current state but with a message; session[:current_move_index] is unchanged.
-      last_move = get_last_move_info(session[:game], session[:current_move_index])
-      json_response({
-                      fen: current_board_fen,
-                      move_index: session[:current_move_index],
-                      total_positions: session[:game].positions.size,
-                      last_move: last_move,
-                      message: "No further critical moments found for #{learning_side} from this point."
-                    }, 200) # HTTP 200 OK, but with a specific message in the payload
+      build_critical_moment_response(learning_side,
+                                     "No further critical moments found for #{learning_side} from this point.")
     end
+  end
+
+  def build_critical_moment_response(_learning_side, message)
+    last_move = get_last_move_info(session[:game], session[:current_move_index])
+    json_response({
+                    fen: current_board_fen,
+                    move_index: session[:current_move_index],
+                    total_positions: session[:game].positions.size,
+                    last_move: last_move,
+                    message: message
+                  })
   end
 
   # API endpoint to go to the start of the game
@@ -434,7 +489,8 @@ class LearnerApp < Sinatra::Base
       return json_response({ error: 'Invalid JSON in request body' }, 400)
     end
 
-    unless target_move_index.is_a?(Integer) && target_move_index >= 0 && target_move_index < session[:game].positions.size
+    unless target_move_index.is_a?(Integer) && target_move_index >= 0 &&
+           target_move_index < session[:game].positions.size
       return json_response({ error: "Invalid move_index: #{target_move_index}" }, 400)
     end
 
@@ -460,57 +516,29 @@ class LearnerApp < Sinatra::Base
   post '/game/validate_critical_move' do
     return json_response({ error: 'No game loaded.' }, 404) unless game_loaded?
 
-    begin
-      params = JSON.parse(request.body.read)
-      fen = params['fen']
-      user_move_uci = params['user_move_uci']
-      good_move_uci = params['good_move_uci']
-    rescue JSON::ParserError
-      return json_response({ error: 'Invalid JSON in request body' }, 400)
-    end
+    params = parse_json_body
+    return params if params.is_a?(Hash) && params[:error]
+
+    fen = params['fen']
+    user_move_uci = params['user_move_uci']
+    good_move_uci = params['good_move_uci']
 
     unless fen && user_move_uci && good_move_uci
       return json_response({ error: 'Missing fen, user_move_uci, or good_move_uci' }, 400)
     end
 
+    validate_and_get_continuation(fen, user_move_uci, good_move_uci)
+  end
+
+  def validate_and_get_continuation(fen, user_move_uci, good_move_uci)
     analyzer = Analyzer.new
     begin
       is_good_enough = analyzer.good_enough_move?(fen, user_move_uci, good_move_uci)
-
       response = { good_enough: is_good_enough }
 
-      # If the move is good enough, calculate the continuation line
       if is_good_enough
-        # First convert user's UCI move to SAN so we can apply it
-        require_relative 'lib/uci_to_san_converter'
-        require_relative 'lib/move_translator'
-        uci_converter = UciToSanConverter.new
-        user_move_san = uci_converter.convert(fen, user_move_uci)
-
-        # Apply the user's move to get the position after their move
-        translator = MoveTranslator.new
-        translator.load_game_from_fen(fen)
-        translator.translate_move(user_move_san)
-        fen_after_user_move = translator.board_as_fen
-
-        # Get the best continuation from the position after the user's move
-        # This will return moves starting with the opponent's response
-        continuation_analysis = analyzer.evaluate_best_move(fen_after_user_move)
-
-        if continuation_analysis && continuation_analysis[:variation]
-          # continuation_analysis[:move] is the opponent's best response (in UCI)
-          # continuation_analysis[:variation] is the continuation after that (also UCI)
-          # We prepend the user's move to get the full line
-          full_variation = [user_move_uci, continuation_analysis[:move]] + continuation_analysis[:variation]
-
-          # Convert UCI moves to SAN
-          require_relative 'lib/game_editor'
-          game_editor = GameEditor.new
-          variation_sequence = game_editor.build_variation_sequence(fen, full_variation, 8)
-          variation_sans = variation_sequence.map(&:notation)
-
-          response[:variation_sans] = variation_sans
-        end
+        variation_sans = calculate_continuation_line(fen, user_move_uci, analyzer)
+        response[:variation_sans] = variation_sans if variation_sans
       end
 
       json_response(response)
@@ -521,73 +549,98 @@ class LearnerApp < Sinatra::Base
     end
   end
 
+  def calculate_continuation_line(fen, user_move_uci, analyzer)
+    require_relative 'lib/uci_to_san_converter'
+    require_relative 'lib/move_translator'
+    uci_converter = UciToSanConverter.new
+    user_move_san = uci_converter.convert(fen, user_move_uci)
+
+    translator = MoveTranslator.new
+    translator.load_game_from_fen(fen)
+    translator.translate_move(user_move_san)
+    fen_after_user_move = translator.board_as_fen
+
+    continuation_analysis = analyzer.evaluate_best_move(fen_after_user_move)
+    return nil unless continuation_analysis && continuation_analysis[:variation]
+
+    full_variation = [user_move_uci, continuation_analysis[:move]] + continuation_analysis[:variation]
+    require_relative 'lib/game_editor'
+    game_editor = GameEditor.new
+    variation_sequence = game_editor.build_variation_sequence(fen, full_variation, 8)
+    variation_sequence.map(&:notation)
+  end
+
   # API endpoint to add a variation to the current move in the loaded game
   post '/game/add_variation' do
     return json_response({ error: 'No game loaded.' }, 404) unless game_loaded?
 
-    begin
-      params = JSON.parse(request.body.read)
-      move_index = params['move_index'] # The move index before the variation starts
-      variation_sans = params['variation_sans'] # Array of SAN moves for the variation
-      user_move_san = params['user_move_san'] # The user's move in SAN
-    rescue JSON::ParserError
-      return json_response({ error: 'Invalid JSON in request body' }, 400)
-    end
+    params = parse_json_body
+    return params if params.is_a?(Hash) && params[:error]
+
+    move_index = params['move_index']
+    variation_sans = params['variation_sans']
+    user_move_san = params['user_move_san']
 
     unless move_index && variation_sans && user_move_san
       return json_response({ error: 'Missing move_index, variation_sans, or user_move_san' }, 400)
     end
 
-    begin
-      # Ensure move_index is valid
-      unless move_index.is_a?(Integer) && move_index >= 0 && move_index < session[:game].moves.size
-        return json_response({ error: "Invalid move_index: #{move_index}" }, 400)
-      end
+    add_variation_to_move(move_index, variation_sans)
+  end
 
-      move = session[:game].moves[move_index]
+  def add_variation_to_move(move_index, variation_sans)
+    validation_error = validate_move_index(move_index)
+    return validation_error if validation_error
 
-      # Build variation sequence from SAN moves
-      require_relative 'lib/game_editor'
-      GameEditor.new
+    move = session[:game].moves[move_index]
+    variation_sequence = build_and_annotate_variation(move_index, variation_sans)
+    attach_variation_to_move(move, variation_sequence)
+  rescue StandardError => e
+    puts "ERROR: Failed to add variation: #{e.message}"
+    puts e.backtrace.join("\n")
+    json_response({ error: "Failed to add variation: #{e.message}" }, 500)
+  end
 
-      # Get FEN before the move where variation starts
-      fen_before = session[:game].positions[move_index].to_fen.to_s
+  def validate_move_index(move_index)
+    return nil if move_index.is_a?(Integer) && move_index >= 0 && move_index < session[:game].moves.size
 
-      # Build variation sequence from SAN moves
-      variation_sequence = []
-      current_fen = fen_before
+    json_response({ error: "Invalid move_index: #{move_index}" }, 400)
+  end
 
-      variation_sans.each do |san_move|
-        variation_sequence << PGN::MoveText.new(san_move)
+  def build_and_annotate_variation(move_index, variation_sans)
+    fen_before = session[:game].positions[move_index].to_fen.to_s
+    variation_sequence = build_variation_sequence(fen_before, variation_sans)
+    variation_sequence[0].comment = 'Alternative line found during review' if variation_sequence.any?
+    variation_sequence
+  end
 
-        # Update FEN by applying the move
-        require_relative 'lib/move_translator'
-        translator = MoveTranslator.new
-        translator.load_game_from_fen(current_fen)
-        translator.translate_move(san_move)
-        current_fen = translator.board_as_fen
-      rescue StandardError => e
-        puts "Warning: Failed to process variation move #{san_move}: #{e.message}"
-        break
-      end
+  def attach_variation_to_move(move, variation_sequence)
+    move.variations ||= []
+    move.variations << variation_sequence
+    json_response({
+                    success: true,
+                    message: 'Variation added successfully',
+                    variation_count: move.variations.size
+                  })
+  end
 
-      # Add comment to first move
-      variation_sequence[0].comment = 'Alternative line found during review' if variation_sequence.any?
+  def build_variation_sequence(fen_before, variation_sans)
+    variation_sequence = []
+    current_fen = fen_before
 
-      # Add variation to the move
-      move.variations ||= []
-      move.variations << variation_sequence
-
-      json_response({
-                      success: true,
-                      message: 'Variation added successfully',
-                      variation_count: move.variations.size
-                    })
+    variation_sans.each do |san_move|
+      variation_sequence << PGN::MoveText.new(san_move)
+      require_relative 'lib/move_translator'
+      translator = MoveTranslator.new
+      translator.load_game_from_fen(current_fen)
+      translator.translate_move(san_move)
+      current_fen = translator.board_as_fen
     rescue StandardError => e
-      puts "ERROR: Failed to add variation: #{e.message}"
-      puts e.backtrace.join("\n")
-      json_response({ error: "Failed to add variation: #{e.message}" }, 500)
+      puts "Warning: Failed to process variation move #{san_move}: #{e.message}"
+      break
     end
+
+    variation_sequence
   end
 
   # API endpoint to save the current game back to its PGN file
@@ -673,79 +726,102 @@ class LearnerApp < Sinatra::Base
   post '/api/analyze_and_save' do
     require_relative 'lib/pgn_writer'
 
-    # Check if PGN_DIR is configured
     pgn_dir = ENV.fetch('PGN_DIR', nil)
     if pgn_dir.nil? || pgn_dir.empty? || !Dir.exist?(pgn_dir)
       return json_response({ error: 'PGN_DIR not configured or directory does not exist' }, 500)
     end
 
-    begin
-      # Parse request body
-      if params[:file] && params[:file][:tempfile]
-        # File upload
-        tempfile = params[:file][:tempfile]
-        original_filename = params[:file][:filename]
-        pgn_content = tempfile.read
-      elsif request.content_type&.include?('application/json')
-        # JSON body with PGN content
-        body_params = JSON.parse(request.body.read)
-        pgn_content = body_params['pgn_content']
-        original_filename = body_params['filename'] || 'uploaded_game.pgn'
-      else
-        return json_response({ error: 'Invalid request. Provide either file upload or JSON with pgn_content.' }, 400)
-      end
+    pgn_data = extract_pgn_from_request
+    return pgn_data if pgn_data.is_a?(String) # Error response (JSON string)
+    return pgn_data if pgn_data.is_a?(Hash) && pgn_data[:error]
 
-      return json_response({ error: 'No PGN content provided' }, 400) unless pgn_content && !pgn_content.empty?
+    analyze_and_save_pgn(pgn_data[:content], pgn_data[:filename], pgn_dir)
+  end
 
-      # Parse PGN
-      pgn_content = ensure_pgn_has_result_termination(pgn_content)
-      games = PGN.parse(pgn_content.dup)
-      return json_response({ error: 'No valid games found in PGN' }, 400) if games.empty?
-
-      # Analyze the first game with Stockfish
-      game = games.first
-      game_editor = GameEditor.new
-
-      game_editor.add_blunder_annotations(game)
-      # NOTE: shift_critical_annotations is NOT called because annotations
-      # added by add_blunder_annotations are already on the correct move.
-
-      # Serialize to PGN
-      writer = PGNWriter.new
-      annotated_pgn = writer.write(game)
-
-      # Generate safe filename
-      safe_filename = sanitize_filename(original_filename)
-      unique_filename = generate_unique_filename(safe_filename)
-      output_path = File.join(pgn_dir, unique_filename)
-
-      # Security check: ensure output path is within PGN_DIR
-      return json_response({ error: 'Invalid file path' }, 400) unless within_pgn_dir?(output_path)
-
-      File.write(output_path, annotated_pgn)
-
-      # Refresh the PGN file list
-      scan_pgn_directory
-
-      # Generate stable ID for the newly saved file
-      # This ID will remain constant even when new files are added
-      file_id = generate_stable_file_id(output_path)
-
-      json_response({
-                      success: true,
-                      filename: unique_filename,
-                      path: output_path,
-                      file_id: file_id,
-                      game_count: 1,
-                      message: 'Game annotated and saved successfully'
-                    })
-    rescue JSON::ParserError
-      json_response({ error: 'Invalid JSON in request body' }, 400)
-    rescue StandardError => e
-      puts "ERROR: Failed to analyze and save PGN: #{e.message}"
-      puts e.backtrace.join("\n")
-      json_response({ error: "Failed to process PGN: #{e.message}" }, 500)
+  def extract_pgn_from_request
+    if file_uploaded?
+      extract_from_file_upload
+    elsif json_request?
+      extract_from_json_body
+    else
+      json_response({ error: 'Invalid request. Provide either file upload or JSON with pgn_content.' }, 400)
     end
+  end
+
+  def file_uploaded?
+    params[:file] && params[:file][:tempfile]
+  end
+
+  def json_request?
+    request.content_type&.include?('application/json')
+  end
+
+  def extract_from_file_upload
+    tempfile = params[:file][:tempfile]
+    original_filename = params[:file][:filename]
+    pgn_content = tempfile.read
+    validate_and_return_pgn_data(pgn_content, original_filename)
+  end
+
+  def extract_from_json_body
+    body_params = JSON.parse(request.body.read)
+    pgn_content = body_params['pgn_content']
+    original_filename = body_params['filename'] || 'uploaded_game.pgn'
+    validate_and_return_pgn_data(pgn_content, original_filename)
+  rescue JSON::ParserError
+    json_response({ error: 'Invalid JSON in request body' }, 400)
+  end
+
+  def validate_and_return_pgn_data(pgn_content, original_filename)
+    return json_response({ error: 'No PGN content provided' }, 400) unless pgn_content && !pgn_content.empty?
+
+    { content: pgn_content, filename: original_filename }
+  end
+
+  def analyze_and_save_pgn(pgn_content, original_filename, pgn_dir)
+    pgn_content = ensure_pgn_has_result_termination(pgn_content)
+    games = PGN.parse(pgn_content.dup)
+    return json_response({ error: 'No valid games found in PGN' }, 400) if games.empty?
+
+    game = games.first
+    annotated_pgn = annotate_game_with_blunders(game)
+    output_path = save_annotated_pgn(annotated_pgn, original_filename, pgn_dir)
+    return output_path if output_path.is_a?(Hash) && output_path[:error]
+
+    scan_pgn_directory
+    file_id = generate_stable_file_id(output_path)
+
+    json_response({
+                    success: true,
+                    filename: File.basename(output_path),
+                    path: output_path,
+                    file_id: file_id,
+                    game_count: 1,
+                    message: 'Game annotated and saved successfully'
+                  })
+  rescue StandardError => e
+    puts "ERROR: Failed to analyze and save PGN: #{e.message}"
+    puts e.backtrace.join("\n")
+    json_response({ error: "Failed to process PGN: #{e.message}" }, 500)
+  end
+
+  def annotate_game_with_blunders(game)
+    game_editor = GameEditor.new
+    game_editor.add_blunder_annotations(game)
+    require_relative 'lib/pgn_writer'
+    writer = PGNWriter.new
+    writer.write(game)
+  end
+
+  def save_annotated_pgn(annotated_pgn, original_filename, pgn_dir)
+    safe_filename = sanitize_filename(original_filename)
+    unique_filename = generate_unique_filename(safe_filename)
+    output_path = File.join(pgn_dir, unique_filename)
+
+    return json_response({ error: 'Invalid file path' }, 400) unless within_pgn_dir?(output_path)
+
+    File.write(output_path, annotated_pgn)
+    output_path
   end
   # --- End Routes ---
 end

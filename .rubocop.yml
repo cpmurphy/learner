@@ -25,6 +25,7 @@ Metrics/ClassLength:
   Exclude:
     - 'lib/move_translator.rb'
     - 'test/**/*'
+    - 'app.rb'
 
 Metrics/ModuleLength:
   Max: 120
@@ -46,6 +47,7 @@ Metrics/BlockLength:
   Exclude:
     - 'test/**/*'
     - 'config/routes.rb'
+    - 'app.rb'
 
 Layout/LineLength:
   Max: 120
