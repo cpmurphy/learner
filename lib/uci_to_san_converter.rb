@@ -29,99 +29,126 @@ class UciToSanConverter
   def convert(fen, uci_move)
     return uci_move if uci_move == '--' # Null move
 
+    context = parse_move_context(fen, uci_move)
+    return uci_move unless context[:piece] # Invalid move
+
+    castling_move = detect_castling(context)
+    return castling_move if castling_move
+
+    san = build_san(context)
+    validate_and_fix_san(context, san)
+  end
+
+  private
+
+  # Parse UCI move and FEN into a context hash
+  #
+  # @param fen [String] the position in FEN format
+  # @param uci_move [String] the move in UCI format
+  # @return [Hash] context hash with position, piece, squares, etc.
+  def parse_move_context(fen, uci_move)
     fen_obj = PGN::FEN.new(fen)
     position = fen_obj.to_position
     from_square = uci_move[0..1]
     to_square = uci_move[2..3]
     promotion = uci_move[4]&.upcase
-
     piece = position.board.at(from_square)
-    return uci_move unless piece # Invalid move
-
-    # Handle castling
-    if piece.upcase == 'K' && (from_square[0].ord - to_square[0].ord).abs > 1
-      return to_square[0] > from_square[0] ? 'O-O' : 'O-O-O'
-    end
-
-    # Build SAN notation (pass en_passant from FEN object)
     en_passant_square = fen_obj.en_passant == '-' ? nil : fen_obj.en_passant
-    san = build_san(position, piece, from_square, to_square, promotion, en_passant_square)
 
-    # Check if move results in check or checkmate
-    begin
-      position.move(san)
-      # Try to detect check by seeing if the opponent's king is attacked
-      # For simplicity, we'll skip check detection for now
-      # The move is valid if we got here
-    rescue StandardError
-      # If the simple SAN doesn't work, we might need disambiguation
-      san = build_san_with_disambiguation(position, piece, from_square, to_square, promotion, en_passant_square)
-    end
-
-    san
+    {
+      position: position,
+      piece: piece,
+      from_square: from_square,
+      to_square: to_square,
+      promotion: promotion,
+      en_passant_square: en_passant_square
+    }
   end
 
-  private
+  # Detect if move is castling and return SAN notation
+  #
+  # @param context [Hash] move context
+  # @return [String, nil] castling notation or nil
+  def detect_castling(context)
+    piece = context[:piece]
+    from_square = context[:from_square]
+    to_square = context[:to_square]
 
-  def build_san(position, piece, from_square, to_square, promotion, en_passant_square)
+    return nil unless piece.upcase == 'K'
+    return nil unless (from_square[0].ord - to_square[0].ord).abs > 1
+
+    to_square[0] > from_square[0] ? 'O-O' : 'O-O-O'
+  end
+
+  # Build SAN notation from move context
+  #
+  # @param context [Hash] move context
+  # @return [String] SAN notation
+  def build_san(context)
+    position = context[:position]
+    piece = context[:piece]
+    from_square = context[:from_square]
+    to_square = context[:to_square]
+    promotion = context[:promotion]
+    en_passant_square = context[:en_passant_square]
+
     piece_symbol = PIECE_SYMBOLS[piece]
-    is_capture = position.board.at(to_square) || is_en_passant?(piece, from_square, to_square, en_passant_square)
-
-    san = ''
+    is_capture = position.board.at(to_square) || en_passant?(piece, from_square, to_square, en_passant_square)
 
     if piece.upcase == 'P'
-      # Pawn moves
-      if is_capture
-        san += from_square[0] # File of origin for pawn captures
-        san += 'x'
-      end
-      san += to_square
-      san += "=#{promotion}" if promotion
+      build_pawn_san(from_square, to_square, promotion, is_capture)
     else
-      # Piece moves - check if disambiguation is needed
-      san += piece_symbol
-
-      # Check for disambiguation
-      disambiguation = find_disambiguation(position, piece, from_square, to_square)
-      san += disambiguation if disambiguation
-
-      san += 'x' if is_capture
-      san += to_square
+      build_piece_san(context, piece_symbol, is_capture)
     end
-
-    san
   end
 
-  def build_san_with_disambiguation(position, piece, from_square, to_square, promotion, en_passant_square)
-    piece_symbol = PIECE_SYMBOLS[piece]
-    is_capture = position.board.at(to_square) || is_en_passant?(piece, from_square, to_square, en_passant_square)
-
+  # Build SAN notation for a pawn move
+  #
+  # @param from_square [String] source square
+  # @param to_square [String] destination square
+  # @param promotion [String, nil] promotion piece
+  # @param is_capture [Boolean] whether this is a capture
+  # @return [String] SAN notation
+  def build_pawn_san(from_square, to_square, promotion, is_capture)
     san = ''
-
-    if piece.upcase == 'P'
-      # Pawn moves
-      if is_capture
-        san += from_square[0]
-        san += 'x'
-      end
-      san += to_square
-      san += "=#{promotion}" if promotion
-    else
-      # Piece moves with disambiguation
-      san += piece_symbol
-
-      # Find other pieces of the same type that can move to the same square
-      disambiguation = find_disambiguation(position, piece, from_square, to_square)
-      san += disambiguation if disambiguation
-
-      san += 'x' if is_capture
-      san += to_square
-    end
-
+    san += "#{from_square[0]}x" if is_capture
+    san += to_square
+    san += "=#{promotion}" if promotion
     san
   end
 
-  def is_en_passant?(piece, from_square, to_square, en_passant_square)
+  # Build SAN notation for a piece move
+  #
+  # @param context [Hash] move context
+  # @param piece_symbol [String] SAN piece symbol
+  # @param is_capture [Boolean] whether this is a capture
+  # @return [String] SAN notation
+  def build_piece_san(context, piece_symbol, is_capture)
+    position = context[:position]
+    piece = context[:piece]
+    from_square = context[:from_square]
+    to_square = context[:to_square]
+
+    san = piece_symbol
+    disambiguation = find_disambiguation(position, piece, from_square, to_square)
+    san += disambiguation if disambiguation
+    san += 'x' if is_capture
+    san + to_square
+  end
+
+  # Validate SAN and fix if needed
+  #
+  # @param context [Hash] move context
+  # @param san [String] initial SAN attempt
+  # @return [String] validated SAN
+  def validate_and_fix_san(context, san)
+    context[:position].move(san)
+    san
+  rescue StandardError
+    build_san(context) # Rebuild with disambiguation
+  end
+
+  def en_passant?(piece, from_square, to_square, en_passant_square)
     return false unless piece.upcase == 'P'
     return false unless en_passant_square
 
@@ -130,10 +157,22 @@ class UciToSanConverter
   end
 
   def find_disambiguation(position, piece, from_square, to_square)
-    # Find all pieces of the same type and color that could legally move to to_square
+    same_piece_squares = find_ambiguous_pieces(position, piece, from_square, to_square)
+    return nil if same_piece_squares.empty?
+
+    determine_disambiguation_string(from_square, same_piece_squares)
+  end
+
+  # Find all pieces of the same type that could move to the destination
+  #
+  # @param position [PGN::Position] chess position
+  # @param piece [String] piece character
+  # @param from_square [String] source square
+  # @param to_square [String] destination square
+  # @return [Array<String>] array of squares with ambiguous pieces
+  def find_ambiguous_pieces(position, piece, from_square, to_square)
     same_piece_squares = []
 
-    # Iterate through all squares on the board
     ('a'..'h').each do |file|
       ('1'..'8').each do |rank|
         square = "#{file}#{rank}"
@@ -141,17 +180,19 @@ class UciToSanConverter
         next unless square_piece == piece
         next if square == from_square
 
-        # Check if this piece can actually move to the destination
         same_piece_squares << square if can_piece_move?(position, square, to_square, piece)
       end
     end
 
-    return nil if same_piece_squares.empty?
+    same_piece_squares
+  end
 
-    # Check if any other piece can legally move to the destination
-    # Use file disambiguation if pieces are on different files
-    # or rank disambiguation if they're on the same file
-
+  # Determine the disambiguation string needed
+  #
+  # @param from_square [String] source square
+  # @param same_piece_squares [Array<String>] squares with ambiguous pieces
+  # @return [String] disambiguation string
+  def determine_disambiguation_string(from_square, same_piece_squares)
     same_file = same_piece_squares.any? { |sq| sq[0] == from_square[0] }
     same_rank = same_piece_squares.any? { |sq| sq[1] == from_square[1] }
 
