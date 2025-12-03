@@ -77,49 +77,14 @@ class PGNWriter
     move_number = 1
 
     game.moves.each_with_index do |move, index|
-      # Determine if this is white's or black's move
       is_white = index.even?
-
-      # Add move number for white, or for black if starting mid-game
-      if is_white
-        moves_text += ' ' unless moves_text.empty?
-        moves_text += "#{move_number}."
-      elsif index.zero?
-        # If starting with black's move, use ellipsis
-        moves_text += "#{move_number}..."
-      else
-        # Black's move after white's move - add space
-        moves_text += ' '
-      end
-
-      # Add the move notation
-      moves_text += move.notation.to_s
-
-      # Add annotations (NAGs like $201, $2, etc.)
-      if move.annotation && !move.annotation.empty?
-        move.annotation.each do |nag|
-          moves_text += " #{nag}"
-        end
-      end
-
-      # Add comment if present
-      moves_text += " {#{move.comment}}" if move.comment && !move.comment.empty?
-
-      # Add variations if present
-      if move.variations && !move.variations.empty?
-        move.variations.each do |variation|
-          moves_text += " #{write_variation(variation, move_number, !is_white)}"
-        end
-      end
-
-      # Increment move number after black's move
+      prefix = format_move_number_prefix(is_white, index.zero?, move_number, moves_text)
+      moves_text += prefix
+      moves_text += format_move_with_annotations(move, move_number, is_white)
       move_number += 1 unless is_white
     end
 
-    # Add result
     moves_text += " #{game.result}" if game.result
-
-    # Wrap text
     wrap_moves_text(moves_text.strip)
   end
 
@@ -137,42 +102,63 @@ class PGNWriter
 
     variation.each_with_index do |move, index|
       is_white = starts_with_black ? index.odd? : index.even?
-
-      # Add move number
-      if is_white
-        var_text += ' ' unless var_text.empty?
-        var_text += "#{move_number}."
-      elsif index.zero?
-        var_text += "#{move_number}..."
-      else
-        # Black's move after white's move - add space
-        var_text += ' '
-      end
-
-      # Add move
-      var_text += move.notation.to_s
-
-      # Add annotations
-      if move.annotation && !move.annotation.empty?
-        move.annotation.each do |nag|
-          var_text += " #{nag}"
-        end
-      end
-
-      # Add comment
-      var_text += " {#{move.comment}}" if move.comment && !move.comment.empty?
-
-      # Add nested variations
-      if move.variations && !move.variations.empty?
-        move.variations.each do |nested_var|
-          var_text += " #{write_variation(nested_var, move_number, !is_white)}"
-        end
-      end
-
+      prefix = format_move_number_prefix(is_white, index.zero?, move_number, var_text)
+      var_text += prefix
+      var_text += format_move_with_annotations(move, move_number, is_white)
       move_number += 1 unless is_white
     end
 
     "(#{var_text})"
+  end
+
+  # Format the move number prefix (e.g., "1.", "1...", or " ")
+  #
+  # @param is_white [Boolean] whether this is white's move
+  # @param is_first [Boolean] whether this is the first move
+  # @param move_number [Integer] the current move number
+  # @param existing_text [String] existing text to check if we need a space
+  # @return [String] the formatted prefix
+  def format_move_number_prefix(is_white, is_first, move_number, existing_text)
+    if is_white
+      prefix = existing_text.empty? ? '' : ' '
+      "#{prefix}#{move_number}."
+    elsif is_first
+      "#{move_number}..."
+    else
+      ' '
+    end
+  end
+
+  # Format a move with its annotations, comments, and variations
+  #
+  # @param move [PGN::MoveText] the move to format
+  # @param move_number [Integer] the current move number
+  # @param is_white [Boolean] whether this is white's move
+  # @return [String] the formatted move string
+  def format_move_with_annotations(move, move_number, is_white)
+    text = move.notation.to_s
+    text += format_annotations(move.annotation) if move.annotation && !move.annotation.empty?
+    text += " {#{move.comment}}" if move.comment && !move.comment.empty?
+    text += format_variations(move.variations, move_number, is_white) if move.variations && !move.variations.empty?
+    text
+  end
+
+  # Format annotations (NAGs) for a move
+  #
+  # @param annotations [Array] array of annotation strings
+  # @return [String] formatted annotations
+  def format_annotations(annotations)
+    annotations.map { |nag| " #{nag}" }.join
+  end
+
+  # Format variations for a move
+  #
+  # @param variations [Array] array of variation arrays
+  # @param move_number [Integer] the current move number
+  # @param is_white [Boolean] whether current move is white's
+  # @return [String] formatted variations
+  def format_variations(variations, move_number, is_white)
+    variations.map { |variation| " #{write_variation(variation, move_number, !is_white)}" }.join
   end
 
   # Wrap moves text to standard line width
