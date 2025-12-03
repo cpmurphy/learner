@@ -3,10 +3,10 @@
 source 'https://rubygems.org'
 
 gem 'json' # Standard JSON library, Sinatra often includes it
-gem 'stockfish'
 gem 'pgn2'
 gem 'puma', '>= 5.0'    # A recommended server for Sinatra
 gem 'sinatra', '>= 3.2' # Using a recent stable version
+gem 'stockfish'
 
 group :development, :test do
   gem 'debug', '>= 1.0.0'
@@ -17,4 +17,4 @@ group :development, :test do
   gem 'simplecov', require: false
 end
 
-gem "rake", "~> 13.3"
+gem 'rake', '~> 13.3'

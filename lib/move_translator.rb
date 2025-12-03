@@ -68,7 +68,7 @@ class MoveTranslator
   end
 
   def convert_to_uci(game_move)
-    return '--' unless game_move && game_move[:moves].size > 0
+    return '--' unless game_move && game_move[:moves].size.positive?
     return game_move[:moves][0] if game_move[:moves][0] =~ /^O-O(-O)?[+#]?$/
 
     uci = game_move[:moves][0].sub('-', '') # Remove the dash from the move

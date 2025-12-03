@@ -53,10 +53,10 @@ class LearnerApp < Sinatra::Base
       return pgn_text unless result_tag
 
       normalized_result = result_tag.strip
-      return pgn_text unless ["1-0", "0-1", "1/2-1/2", "*"].include?(normalized_result)
+      return pgn_text unless ['1-0', '0-1', '1/2-1/2', '*'].include?(normalized_result)
 
       trimmed = pgn_text.rstrip
-      return pgn_text if trimmed.match?(/(1-0|0-1|1\/2-1\/2|\*)\s*\z/)
+      return pgn_text if trimmed.match?(%r{(1-0|0-1|1/2-1/2|\*)\s*\z})
 
       "#{trimmed} #{normalized_result}\n"
     end
@@ -252,7 +252,7 @@ class LearnerApp < Sinatra::Base
       else
         # No existing annotations, so analyze and add them.
         game_editor.add_blunder_annotations(session[:game])
-        # Note: We do NOT call shift_critical_annotations here because annotations
+        # NOTE: We do NOT call shift_critical_annotations here because annotations
         # added by add_blunder_annotations are already on the correct move.
       end
 
@@ -548,7 +548,7 @@ class LearnerApp < Sinatra::Base
 
       # Build variation sequence from SAN moves
       require_relative 'lib/game_editor'
-      game_editor = GameEditor.new
+      GameEditor.new
 
       # Get FEN before the move where variation starts
       fen_before = session[:game].positions[move_index].to_fen.to_s
@@ -558,35 +558,31 @@ class LearnerApp < Sinatra::Base
       current_fen = fen_before
 
       variation_sans.each do |san_move|
-        begin
-          variation_sequence << PGN::MoveText.new(san_move)
+        variation_sequence << PGN::MoveText.new(san_move)
 
-          # Update FEN by applying the move
-          require_relative 'lib/move_translator'
-          translator = MoveTranslator.new
-          translator.load_game_from_fen(current_fen)
-          translator.translate_move(san_move)
-          current_fen = translator.board_as_fen
-        rescue StandardError => e
-          puts "Warning: Failed to process variation move #{san_move}: #{e.message}"
-          break
-        end
+        # Update FEN by applying the move
+        require_relative 'lib/move_translator'
+        translator = MoveTranslator.new
+        translator.load_game_from_fen(current_fen)
+        translator.translate_move(san_move)
+        current_fen = translator.board_as_fen
+      rescue StandardError => e
+        puts "Warning: Failed to process variation move #{san_move}: #{e.message}"
+        break
       end
 
       # Add comment to first move
-      if variation_sequence.any?
-        variation_sequence[0].comment = "Alternative line found during review"
-      end
+      variation_sequence[0].comment = 'Alternative line found during review' if variation_sequence.any?
 
       # Add variation to the move
       move.variations ||= []
       move.variations << variation_sequence
 
       json_response({
-        success: true,
-        message: 'Variation added successfully',
-        variation_count: move.variations.size
-      })
+                      success: true,
+                      message: 'Variation added successfully',
+                      variation_count: move.variations.size
+                    })
     rescue StandardError => e
       puts "ERROR: Failed to add variation: #{e.message}"
       puts e.backtrace.join("\n")
@@ -619,10 +615,10 @@ class LearnerApp < Sinatra::Base
       game_editor.shift_critical_annotations(session[:game])
 
       json_response({
-        success: true,
-        message: 'Game saved successfully',
-        file_path: session[:pgn_file_path]
-      })
+                      success: true,
+                      message: 'Game saved successfully',
+                      file_path: session[:pgn_file_path]
+                    })
     rescue StandardError => e
       puts "ERROR: Failed to save game: #{e.message}"
       puts e.backtrace.join("\n")
@@ -659,17 +655,15 @@ class LearnerApp < Sinatra::Base
       # Validate it's parseable PGN
       pgn_content = ensure_pgn_has_result_termination(pgn_content)
       games = PGN.parse(pgn_content.dup)
-      if games.empty?
-        return json_response({ error: 'No valid games found in PGN file' }, 400)
-      end
+      return json_response({ error: 'No valid games found in PGN file' }, 400) if games.empty?
 
       # Return info about the uploaded file
       json_response({
-        filename: original_filename,
-        game_count: games.size,
-        size: pgn_content.bytesize,
-        message: 'PGN file validated successfully. Use /api/analyze_and_save to process and save it.'
-      })
+                      filename: original_filename,
+                      game_count: games.size,
+                      size: pgn_content.bytesize,
+                      message: 'PGN file validated successfully. Use /api/analyze_and_save to process and save it.'
+                    })
     rescue StandardError => e
       json_response({ error: "Invalid PGN file: #{e.message}" }, 400)
     end
@@ -701,23 +695,19 @@ class LearnerApp < Sinatra::Base
         return json_response({ error: 'Invalid request. Provide either file upload or JSON with pgn_content.' }, 400)
       end
 
-      unless pgn_content && !pgn_content.empty?
-        return json_response({ error: 'No PGN content provided' }, 400)
-      end
+      return json_response({ error: 'No PGN content provided' }, 400) unless pgn_content && !pgn_content.empty?
 
       # Parse PGN
       pgn_content = ensure_pgn_has_result_termination(pgn_content)
       games = PGN.parse(pgn_content.dup)
-      if games.empty?
-        return json_response({ error: 'No valid games found in PGN' }, 400)
-      end
+      return json_response({ error: 'No valid games found in PGN' }, 400) if games.empty?
 
       # Analyze the first game with Stockfish
       game = games.first
       game_editor = GameEditor.new
 
       game_editor.add_blunder_annotations(game)
-      # Note: shift_critical_annotations is NOT called because annotations
+      # NOTE: shift_critical_annotations is NOT called because annotations
       # added by add_blunder_annotations are already on the correct move.
 
       # Serialize to PGN
@@ -730,9 +720,7 @@ class LearnerApp < Sinatra::Base
       output_path = File.join(pgn_dir, unique_filename)
 
       # Security check: ensure output path is within PGN_DIR
-      unless within_pgn_dir?(output_path)
-        return json_response({ error: 'Invalid file path' }, 400)
-      end
+      return json_response({ error: 'Invalid file path' }, 400) unless within_pgn_dir?(output_path)
 
       File.write(output_path, annotated_pgn)
 
@@ -744,13 +732,13 @@ class LearnerApp < Sinatra::Base
       file_id = generate_stable_file_id(output_path)
 
       json_response({
-        success: true,
-        filename: unique_filename,
-        path: output_path,
-        file_id: file_id,
-        game_count: 1,
-        message: 'Game annotated and saved successfully'
-      })
+                      success: true,
+                      filename: unique_filename,
+                      path: output_path,
+                      file_id: file_id,
+                      game_count: 1,
+                      message: 'Game annotated and saved successfully'
+                    })
     rescue JSON::ParserError
       json_response({ error: 'Invalid JSON in request body' }, 400)
     rescue StandardError => e

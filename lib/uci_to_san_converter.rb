@@ -49,7 +49,7 @@ class UciToSanConverter
 
     # Check if move results in check or checkmate
     begin
-      new_position = position.move(san)
+      position.move(san)
       # Try to detect check by seeing if the opponent's king is attacked
       # For simplicity, we'll skip check detection for now
       # The move is valid if we got here
@@ -142,9 +142,7 @@ class UciToSanConverter
         next if square == from_square
 
         # Check if this piece can actually move to the destination
-        if can_piece_move?(position, square, to_square, piece)
-          same_piece_squares << square
-        end
+        same_piece_squares << square if can_piece_move?(position, square, to_square, piece)
       end
     end
 
@@ -195,7 +193,7 @@ class UciToSanConverter
   def can_bishop_move?(position, from_square, to_square)
     file_diff = (from_square[0].ord - to_square[0].ord).abs
     rank_diff = (from_square[1].to_i - to_square[1].to_i).abs
-    return false unless file_diff == rank_diff && file_diff > 0
+    return false unless file_diff == rank_diff && file_diff.positive?
 
     path_clear?(position, from_square, to_square)
   end
@@ -216,7 +214,7 @@ class UciToSanConverter
   def can_king_move?(from_square, to_square)
     file_diff = (from_square[0].ord - to_square[0].ord).abs
     rank_diff = (from_square[1].to_i - to_square[1].to_i).abs
-    file_diff <= 1 && rank_diff <= 1 && (file_diff > 0 || rank_diff > 0)
+    file_diff <= 1 && rank_diff <= 1 && (file_diff.positive? || rank_diff.positive?)
   end
 
   def path_clear?(position, from_square, to_square)

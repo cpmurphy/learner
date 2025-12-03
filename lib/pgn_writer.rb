@@ -84,7 +84,7 @@ class PGNWriter
       if is_white
         moves_text += ' ' unless moves_text.empty?
         moves_text += "#{move_number}."
-      elsif index == 0
+      elsif index.zero?
         # If starting with black's move, use ellipsis
         moves_text += "#{move_number}..."
       else
@@ -103,9 +103,7 @@ class PGNWriter
       end
 
       # Add comment if present
-      if move.comment && !move.comment.empty?
-        moves_text += " {#{move.comment}}"
-      end
+      moves_text += " {#{move.comment}}" if move.comment && !move.comment.empty?
 
       # Add variations if present
       if move.variations && !move.variations.empty?
@@ -144,7 +142,7 @@ class PGNWriter
       if is_white
         var_text += ' ' unless var_text.empty?
         var_text += "#{move_number}."
-      elsif index == 0
+      elsif index.zero?
         var_text += "#{move_number}..."
       else
         # Black's move after white's move - add space
@@ -162,9 +160,7 @@ class PGNWriter
       end
 
       # Add comment
-      if move.comment && !move.comment.empty?
-        var_text += " {#{move.comment}}"
-      end
+      var_text += " {#{move.comment}}" if move.comment && !move.comment.empty?
 
       # Add nested variations
       if move.variations && !move.variations.empty?

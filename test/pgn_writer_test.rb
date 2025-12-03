@@ -231,7 +231,7 @@ class PGNWriterTest < Minitest::Test
     movetext_lines = lines.drop_while { |line| line.start_with?('[') || line.strip.empty? }
 
     # At least some lines should be present due to wrapping
-    assert movetext_lines.size > 1, 'Expected multiple lines due to wrapping'
+    assert_operator movetext_lines.size, :>, 1, 'Expected multiple lines due to wrapping'
   end
 
   def test_write_standard_tag_order

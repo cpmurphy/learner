@@ -46,10 +46,11 @@ class AppGameEndpointsTest < Minitest::Test
     FileUtils.rm_rf(@test_dir) if @test_dir && Dir.exist?(@test_dir)
   end
 
-  def load_game_in_session
+  def test_load_game_in_session
     # Set up a session with a loaded game
     get '/api/pgn_files'
-    assert last_response.ok?, "Failed to get PGN files: #{last_response.body}"
+
+    assert_predicate last_response, :ok?, "Failed to get PGN files: #{last_response.body}"
 
     files = JSON.parse(last_response.body)
     test_file = files.find { |f| f['name'] == 'test_game.pgn' }
@@ -64,7 +65,8 @@ class AppGameEndpointsTest < Minitest::Test
       puts "Response status: #{last_response.status}"
       puts "Response body: #{last_response.body}"
     end
-    assert last_response.ok?, "Failed to load game: #{last_response.body}"
+
+    assert_predicate last_response, :ok?, "Failed to load game: #{last_response.body}"
   end
 
   def test_add_variation_without_loaded_game
@@ -74,7 +76,8 @@ class AppGameEndpointsTest < Minitest::Test
 
     assert_equal 404, last_response.status
     json = JSON.parse(last_response.body)
-    assert json['error'].include?('No game loaded')
+
+    assert_includes json['error'], 'No game loaded'
   end
 
   def test_add_variation_with_valid_move
@@ -82,14 +85,15 @@ class AppGameEndpointsTest < Minitest::Test
 
     # Add a variation to move index 0 (before the first move, e4)
     # This creates an alternative first move
-    variation_sans = ['d4', 'd5', 'Nf3', 'Nf6']
+    variation_sans = %w[d4 d5 Nf3 Nf6]
     post '/game/add_variation',
          { move_index: 0, variation_sans: variation_sans, user_move_san: 'd4' }.to_json,
          'CONTENT_TYPE' => 'application/json'
 
-    assert last_response.ok?, "Expected OK, got #{last_response.status}: #{last_response.body}"
+    assert_predicate last_response, :ok?, "Expected OK, got #{last_response.status}: #{last_response.body}"
 
     json = JSON.parse(last_response.body)
+
     assert json['success']
     assert_equal 1, json['variation_count']
 
@@ -99,7 +103,7 @@ class AppGameEndpointsTest < Minitest::Test
          {},
          'CONTENT_TYPE' => 'application/json'
 
-    assert last_response.ok?, "Failed to save game: #{last_response.body}"
+    assert_predicate last_response, :ok?, "Failed to save game: #{last_response.body}"
 
     # Reload and verify variation exists
     saved_content = File.read(@test_pgn_file)
@@ -108,13 +112,14 @@ class AppGameEndpointsTest < Minitest::Test
 
     # Check that the move has variations
     move_with_variation = saved_game.moves[0] # Move index 0 is the first move (e4)
-    assert move_with_variation.variations, "Move should have variations"
-    assert move_with_variation.variations.any?, "Move should have at least one variation"
+
+    assert move_with_variation.variations, 'Move should have variations'
+    assert_predicate move_with_variation.variations, :any?, 'Move should have at least one variation'
 
     # Check variation content
     variation = move_with_variation.variations.first
     # Some moves might fail to process, so check that we got at least the first move
-    assert variation.length > 0, "Variation should have at least one move"
+    assert_predicate variation.length, :positive?, 'Variation should have at least one move'
     # The first move might not be d4 if d4 failed to process, so just check that variation exists
     # The actual content depends on which moves were successfully processed
   end
@@ -129,7 +134,8 @@ class AppGameEndpointsTest < Minitest::Test
 
     assert_equal 400, last_response.status
     json = JSON.parse(last_response.body)
-    assert json['error'].include?('Invalid move_index')
+
+    assert_includes json['error'], 'Invalid move_index'
   end
 
   def test_add_variation_with_missing_parameters
@@ -142,7 +148,8 @@ class AppGameEndpointsTest < Minitest::Test
 
     assert_equal 400, last_response.status
     json = JSON.parse(last_response.body)
-    assert json['error'].include?('Missing')
+
+    assert_includes json['error'], 'Missing'
 
     # Missing variation_sans
     post '/game/add_variation',
@@ -161,7 +168,8 @@ class AppGameEndpointsTest < Minitest::Test
 
     assert_equal 400, last_response.status
     json = JSON.parse(last_response.body)
-    assert json['error'].include?('Invalid JSON')
+
+    assert_includes json['error'], 'Invalid JSON'
   end
 
   def test_save_without_loaded_game
@@ -171,7 +179,8 @@ class AppGameEndpointsTest < Minitest::Test
 
     assert_equal 404, last_response.status
     json = JSON.parse(last_response.body)
-    assert json['error'].include?('No game loaded')
+
+    assert_includes json['error'], 'No game loaded'
   end
 
   def test_save_without_file_path
@@ -187,9 +196,10 @@ class AppGameEndpointsTest < Minitest::Test
          'CONTENT_TYPE' => 'application/json'
 
     # Should succeed because load_game sets the path
-    assert last_response.ok?, "Save should succeed when game is loaded: #{last_response.body}"
+    assert_predicate last_response, :ok?, "Save should succeed when game is loaded: #{last_response.body}"
 
     json = JSON.parse(last_response.body)
+
     assert json['success']
     assert json['file_path']
   end
@@ -198,38 +208,38 @@ class AppGameEndpointsTest < Minitest::Test
     load_game_in_session
 
     # Add a variation
-    variation_sans = ['d4', 'd5']
+    variation_sans = %w[d4 d5]
     post '/game/add_variation',
          { move_index: 1, variation_sans: variation_sans, user_move_san: 'd4' }.to_json,
          'CONTENT_TYPE' => 'application/json'
 
-    assert last_response.ok?
+    assert_predicate last_response, :ok?
 
     # Save the game
     post '/game/save',
          {},
          'CONTENT_TYPE' => 'application/json'
 
-    assert last_response.ok?
+    assert_predicate last_response, :ok?
 
     # Verify the file was updated
     saved_content = File.read(@test_pgn_file)
 
     # The variation should be in the saved content
     # Variations are saved in parentheses format
-    assert saved_content.include?('d4'), "Saved PGN should contain variation move d4"
-    assert saved_content.include?('('), "Saved PGN should contain variation marker"
+    assert_includes saved_content, 'd4', 'Saved PGN should contain variation move d4'
+    assert_includes saved_content, '(', 'Saved PGN should contain variation marker'
   end
 
   def test_add_variation_adds_comment
     load_game_in_session
 
-    variation_sans = ['d4', 'd5']
+    variation_sans = %w[d4 d5]
     post '/game/add_variation',
          { move_index: 0, variation_sans: variation_sans, user_move_san: 'd4' }.to_json,
          'CONTENT_TYPE' => 'application/json'
 
-    assert last_response.ok?
+    assert_predicate last_response, :ok?
 
     # Save and reload to check comment
     post '/game/save'
@@ -241,16 +251,16 @@ class AppGameEndpointsTest < Minitest::Test
     variation = move_with_variation.variations.first
 
     # Check that variation exists and has moves
-    assert variation, "Variation should exist"
-    assert variation.length > 0, "Variation should have at least one move"
+    assert variation, 'Variation should exist'
+    assert_predicate variation.length, :positive?, 'Variation should have at least one move'
 
     # Check that first move has a comment (if it was successfully processed)
     first_move = variation.first
     # The comment might not be present if moves failed to process
     # So we just check that the variation exists and has content
-    if first_move.respond_to?(:comment) && first_move.comment
-      assert first_move.comment.include?('Alternative line'), "Comment should mention alternative line"
-    end
+    skip unless first_move.respond_to?(:comment) && first_move.comment
+
+    assert_includes first_move.comment, 'Alternative line', 'Comment should mention alternative line'
   end
 
   def test_add_variation_at_move_zero
@@ -262,9 +272,10 @@ class AppGameEndpointsTest < Minitest::Test
          { move_index: 0, variation_sans: variation_sans, user_move_san: 'd4' }.to_json,
          'CONTENT_TYPE' => 'application/json'
 
-    assert last_response.ok?, "Should be able to add variation at move 0"
+    assert_predicate last_response, :ok?, 'Should be able to add variation at move 0'
 
     json = JSON.parse(last_response.body)
+
     assert json['success']
   end
 end

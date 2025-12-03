@@ -1,5 +1,5 @@
 # frozen_string_literal: true
-#
+
 require_relative 'move_translator'
 require_relative 'analyzer'
 require_relative 'uci_to_san_converter'
@@ -42,31 +42,29 @@ class GameEditor
 
         # Add the $201 annotation to the PREVIOUS move to mark the critical moment
         # (PGN convention: $201 indicates a critical position where the next player can err)
-        if i > 0
-          add_201_to_move(game.moves[i - 1])
-        end
+        add_201_to_move(game.moves[i - 1]) if i.positive?
 
         # Add variation with the best move and continuation
         best_move_uci = best_move_analysis[:move]
         continuation_moves = best_move_analysis[:variation] || []
 
-        if best_move_uci
-          # The variation includes the best move plus the continuation
-          full_variation = [best_move_uci] + continuation_moves
+        next unless best_move_uci
 
-          # Build a variation with 12 ply (6 full moves) to show the continuation
-          variation_sequence = build_variation_sequence(fen, full_variation, 12)
+        # The variation includes the best move plus the continuation
+        full_variation = [best_move_uci] + continuation_moves
 
-          unless variation_sequence.empty?
-            # Add a comment to the first move explaining the advantage
-            score_diff = (best_score - played_score).abs
-            variation_sequence[0].comment = "Better line (advantage: #{format_centipawns(score_diff)})"
+        # Build a variation with 12 ply (6 full moves) to show the continuation
+        variation_sequence = build_variation_sequence(fen, full_variation, 12)
 
-            # Add the variation to the move
-            move.variations ||= []
-            move.variations << variation_sequence
-          end
-        end
+        next if variation_sequence.empty?
+
+        # Add a comment to the first move explaining the advantage
+        score_diff = (best_score - played_score).abs
+        variation_sequence[0].comment = "Better line (advantage: #{format_centipawns(score_diff)})"
+
+        # Add the variation to the move
+        move.variations ||= []
+        move.variations << variation_sequence
       end
     ensure
       analyzer&.close
@@ -84,20 +82,19 @@ class GameEditor
 
     uci_moves.take(max_moves).each do |uci_move|
       # Convert UCI to SAN using the current position
-      begin
-        san_move = @uci_converter.convert(current_fen, uci_move)
-        sequence << PGN::MoveText.new(san_move)
 
-        # Update the position by applying the move
-        translator = MoveTranslator.new
-        translator.load_game_from_fen(current_fen)
-        translator.translate_move(san_move)
-        current_fen = translator.board_as_fen
-      rescue StandardError => e
-        # If we can't convert or apply a move, stop the variation here
-        puts "Warning: Failed to process variation move #{uci_move}: #{e.message}"
-        break
-      end
+      san_move = @uci_converter.convert(current_fen, uci_move)
+      sequence << PGN::MoveText.new(san_move)
+
+      # Update the position by applying the move
+      translator = MoveTranslator.new
+      translator.load_game_from_fen(current_fen)
+      translator.translate_move(san_move)
+      current_fen = translator.board_as_fen
+    rescue StandardError => e
+      # If we can't convert or apply a move, stop the variation here
+      puts "Warning: Failed to process variation move #{uci_move}: #{e.message}"
+      break
     end
 
     sequence
@@ -128,13 +125,11 @@ class GameEditor
       current_move = moves[i]
       prev_move = moves[i - 1]
 
-      if prev_move.respond_to?(:annotation) && prev_move.annotation&.include?('$201')
-        # Only shift annotation to a real move, not MoveText.
-        if current_move.respond_to?(:annotation)
-          remove_201_from_move(prev_move)
+      # Only shift annotation to a real move, not MoveText.
+      if prev_move.respond_to?(:annotation) && prev_move.annotation&.include?('$201') && current_move.respond_to?(:annotation)
+        remove_201_from_move(prev_move)
 
-          add_201_to_move(current_move)
-        end
+        add_201_to_move(current_move)
       end
       i -= 1
     end
@@ -153,14 +148,14 @@ class GameEditor
       current_move = moves[i]
       prev_move = moves[i - 1]
 
-      if current_move.respond_to?(:annotation) && current_move.annotation&.include?('$201')
-        # Only unshift annotation if previous move is a real move
-        if prev_move.respond_to?(:annotation)
-          remove_201_from_move(current_move)
+      next unless current_move.respond_to?(:annotation) && current_move.annotation&.include?('$201')
 
-          add_201_to_move(prev_move)
-        end
-      end
+      # Only unshift annotation if previous move is a real move
+      next unless prev_move.respond_to?(:annotation)
+
+      remove_201_from_move(current_move)
+
+      add_201_to_move(prev_move)
     end
   end
 
