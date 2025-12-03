@@ -16,59 +16,84 @@ class GameEditor
     translator = MoveTranslator.new
     begin
       (0...game.moves.size).each do |i|
-        move = game.moves[i]
-        position = game.positions[i]
-        fen = position.to_fen.to_s
-
-        best_move_analysis = analyzer.evaluate_best_move(fen)
-        next unless best_move_analysis&.[](:score)
-
-        translator.load_game_from_fen(fen)
-        uci_move = translator.translate_move(move.notation)
-        played_move_analysis = analyzer.evaluate_move(fen, uci_move)
-        next unless played_move_analysis&.[](:score)
-
-        best_score = best_move_analysis[:score]
-        # The score from evaluate_move is from the perspective of the side whose turn it is
-        # AFTER the move has been made. We want the score from the perspective of the player
-        # who MADE the move, so we negate it.
-        played_score = -played_move_analysis[:score]
-
-        # Now both scores are from the perspective of the player who is about to move.
-        # A blunder means the evaluation drops significantly (for both White and Black).
-        is_blunder = (best_score - played_score) > BLUNDER_THRESHOLD
-
-        next unless is_blunder
-
-        # Add the $201 annotation to the PREVIOUS move to mark the critical moment
-        # (PGN convention: $201 indicates a critical position where the next player can err)
-        add_201_to_move(game.moves[i - 1]) if i.positive?
-
-        # Add variation with the best move and continuation
-        best_move_uci = best_move_analysis[:move]
-        continuation_moves = best_move_analysis[:variation] || []
-
-        next unless best_move_uci
-
-        # The variation includes the best move plus the continuation
-        full_variation = [best_move_uci] + continuation_moves
-
-        # Build a variation with 12 ply (6 full moves) to show the continuation
-        variation_sequence = build_variation_sequence(fen, full_variation, 12)
-
-        next if variation_sequence.empty?
-
-        # Add a comment to the first move explaining the advantage
-        score_diff = (best_score - played_score).abs
-        variation_sequence[0].comment = "Better line (advantage: #{format_centipawns(score_diff)})"
-
-        # Add the variation to the move
-        move.variations ||= []
-        move.variations << variation_sequence
+        process_move_for_blunders(game, i, analyzer, translator)
       end
     ensure
       analyzer&.close
     end
+  end
+
+  def process_move_for_blunders(game, move_index, analyzer, translator)
+    move = game.moves[move_index]
+    position = game.positions[move_index]
+    fen = position.to_fen.to_s
+
+    analysis_data = analyze_move_position(fen, move, analyzer, translator)
+    return unless analysis_data
+
+    return unless blunder_detected?(analysis_data[:best_score], analysis_data[:played_score])
+
+    annotate_critical_moment(game, move_index)
+    add_best_move_variation(move, fen, analysis_data)
+  end
+
+  def analyze_move_position(fen, move, analyzer, translator)
+    best_move_analysis = analyzer.evaluate_best_move(fen)
+    return nil unless best_move_analysis&.[](:score)
+
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(move.notation)
+    played_move_analysis = analyzer.evaluate_move(fen, uci_move)
+    return nil unless played_move_analysis&.[](:score)
+
+    best_score = best_move_analysis[:score]
+    # The score from evaluate_move is from the perspective of the side whose turn it is
+    # AFTER the move has been made. We want the score from the perspective of the player
+    # who MADE the move, so we negate it.
+    played_score = -played_move_analysis[:score]
+
+    {
+      best_score: best_score,
+      played_score: played_score,
+      best_move_analysis: best_move_analysis
+    }
+  end
+
+  def blunder_detected?(best_score, played_score)
+    # Now both scores are from the perspective of the player who is about to move.
+    # A blunder means the evaluation drops significantly (for both White and Black).
+    (best_score - played_score) > BLUNDER_THRESHOLD
+  end
+
+  def annotate_critical_moment(game, move_index)
+    # Add the $201 annotation to the PREVIOUS move to mark the critical moment
+    # (PGN convention: $201 indicates a critical position where the next player can err)
+    add_201_to_move(game.moves[move_index - 1]) if move_index.positive?
+  end
+
+  def add_best_move_variation(move, fen, analysis_data)
+    best_move_analysis = analysis_data[:best_move_analysis]
+    best_move_uci = best_move_analysis[:move]
+    return unless best_move_uci
+
+    continuation_moves = best_move_analysis[:variation] || []
+    full_variation = [best_move_uci] + continuation_moves
+
+    # Build a variation with 12 ply (6 full moves) to show the continuation
+    variation_sequence = build_variation_sequence(fen, full_variation, 12)
+    return if variation_sequence.empty?
+
+    add_variation_comment(variation_sequence, analysis_data[:best_score], analysis_data[:played_score])
+
+    # Add the variation to the move
+    move.variations ||= []
+    move.variations << variation_sequence
+  end
+
+  def add_variation_comment(variation_sequence, best_score, played_score)
+    # Add a comment to the first move explaining the advantage
+    score_diff = (best_score - played_score).abs
+    variation_sequence[0].comment = "Better line (advantage: #{format_centipawns(score_diff)})"
   end
 
   # Build a sequence of moves for a variation
@@ -126,9 +151,8 @@ class GameEditor
       prev_move = moves[i - 1]
 
       # Only shift annotation to a real move, not MoveText.
-      if prev_move.respond_to?(:annotation) && prev_move.annotation&.include?('$201') && current_move.respond_to?(:annotation)
+      if should_shift_annotation?(prev_move, current_move)
         remove_201_from_move(prev_move)
-
         add_201_to_move(current_move)
       end
       i -= 1
@@ -167,5 +191,11 @@ class GameEditor
   def add_201_to_move(move)
     move.annotation ||= [] # Initialize if nil
     move.annotation << '$201' unless move.annotation.include?('$201')
+  end
+
+  def should_shift_annotation?(prev_move, current_move)
+    prev_move.respond_to?(:annotation) &&
+      prev_move.annotation&.include?('$201') &&
+      current_move.respond_to?(:annotation)
   end
 end
