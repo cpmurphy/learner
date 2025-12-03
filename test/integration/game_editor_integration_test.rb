@@ -27,10 +27,10 @@ class GameEditorIntegrationTest < Minitest::Test
       # Convert b4 to UCI format
       translator = MoveTranslator.new
       translator.load_game_from_fen(fen_position)
-      uci_b4 = translator.translate_move('b4')
+      uci_b4_move = translator.translate_move('b4')
 
       # Evaluate b4 move
-      played_move_analysis = analyzer.evaluate_move(fen_position, uci_b4)
+      played_move_analysis = analyzer.evaluate_move(fen_position, uci_b4_move)
 
       # Calculate scores from White's perspective (the player making the move)
       best_score = best_move_analysis[:score]
@@ -53,8 +53,8 @@ class GameEditorIntegrationTest < Minitest::Test
 
       # Verify the best move is Qa4
       best_move_uci = best_move_analysis[:move]
-      translator2 = MoveTranslator.new
-      translator2.load_game_from_fen(fen_position)
+      best_move_translator = MoveTranslator.new
+      best_move_translator.load_game_from_fen(fen_position)
       uci_converter = UciToSanConverter.new
       best_move_san = uci_converter.convert(fen_position, best_move_uci)
 

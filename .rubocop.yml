@@ -24,6 +24,7 @@ Metrics/ClassLength:
   Max: 150
   Exclude:
     - 'lib/move_translator.rb'
+    - 'lib/uci_to_san_converter.rb'
     - 'test/**/*'
     - 'app.rb'
 
@@ -66,3 +67,6 @@ Style/ClassAndModuleChildren:
 
 Naming/MethodParameterName:
   AllowedNames: ['id', 'ip', 'to', 'x', 'y']
+
+Minitest/MultipleAssertions:
+  Max: 5

@@ -81,11 +81,11 @@ class PGNWriterTest < Minitest::Test
     game = PGN::Game.new(moves, { 'Result' => '*' }, '*')
 
     # Add variation to black's first move: 1...c5 2.Nf3
-    var_move1 = PGN::MoveText.new('c5')
-    var_move1.comment = 'Sicilian Defense'
-    var_move2 = PGN::MoveText.new('Nf3')
+    var_move_1 = PGN::MoveText.new('c5')
+    var_move_1.comment = 'Sicilian Defense'
+    var_move_2 = PGN::MoveText.new('Nf3')
 
-    game.moves[1].variations = [[var_move1, var_move2]]
+    game.moves[1].variations = [[var_move_1, var_move_2]]
 
     result = @writer.write(game)
 
@@ -234,6 +234,7 @@ class PGNWriterTest < Minitest::Test
     assert_operator movetext_lines.size, :>, 1, 'Expected multiple lines due to wrapping'
   end
 
+  # rubocop:disable Minitest/MultipleAssertions
   def test_write_standard_tag_order
     game = PGN::Game.new(
       %w[e4 e5],
@@ -265,4 +266,5 @@ class PGNWriterTest < Minitest::Test
     # Extra tag comes after
     assert_match(/\[WhiteElo/, lines[7])
   end
+  # rubocop:enable Minitest/MultipleAssertions
 end

@@ -205,65 +205,78 @@ class TestGameEditor < Minitest::Test
     # 1.e4 e5 2.Qh5?? - This is a blunder, better is 2.Nf3
     game = PGN::Game.new(%w[e4 e5 Qh5 Nc6])
 
-    # Mock the Analyzer to avoid slow Stockfish calls
+    mock_analyzer = setup_blunder_mock_analyzer(game)
+    run_blunder_annotation(game, mock_analyzer)
+    verify_blunder_annotations(game, mock_analyzer)
+  end
+
+  def setup_blunder_mock_analyzer(game)
     mock_analyzer = Minitest::Mock.new
     translator = MoveTranslator.new
 
-    # Mock analysis for each move (the code iterates over game.moves.size)
     (0...game.moves.size).each do |i|
       next unless game.positions[i] && game.moves[i]
 
-      fen = game.positions[i].to_fen.to_s
-
-      # Mock best move analysis - return a good score with a variation
-      # For move index 2 (Qh5), the best move should be Nf3
-      best_move_uci = i == 2 ? 'g1f3' : 'e2e4' # Nf3 for move 2, e4 otherwise
-      mock_analyzer.expect :evaluate_best_move,
-                           { score: 200, move: best_move_uci, variation: [best_move_uci, 'e7e5'] },
-                           [fen]
-
-      # Mock played move analysis - return a worse score to trigger blunder detection
-      translator.load_game_from_fen(fen)
-      uci_move = translator.translate_move(game.moves[i].notation)
-      # Return a score that makes this a blunder (difference > 140)
-      # For Qh5 (move index 2), make it a clear blunder
-      played_score = i == 2 ? -200 : 50 # Qh5 is a blunder
-      mock_analyzer.expect :evaluate_move, { score: played_score }, [fen, uci_move]
+      setup_move_mock_expectations(mock_analyzer, game, translator, i)
     end
     mock_analyzer.expect :close, nil
+    mock_analyzer
+  end
 
-    # Analyze and annotate with mocked analyzer
+  def setup_move_mock_expectations(mock_analyzer, game, translator, move_index)
+    fen = game.positions[move_index].to_fen.to_s
+    best_move_uci = move_index == 2 ? 'g1f3' : 'e2e4'
+    mock_analyzer.expect :evaluate_best_move,
+                         { score: 200, move: best_move_uci, variation: [best_move_uci, 'e7e5'] },
+                         [fen]
+
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[move_index].notation)
+    played_score = move_index == 2 ? -200 : 50
+    mock_analyzer.expect :evaluate_move, { score: played_score }, [fen, uci_move]
+  end
+
+  def run_blunder_annotation(game, mock_analyzer)
     Analyzer.stub :new, mock_analyzer do
       @editor.add_blunder_annotations(game)
     end
+  end
 
-    # Find moves with $201 annotation
-    critical_moves = game.moves.select { |m| m.annotation&.include?('$201') }
+  def verify_blunder_annotations(game, mock_analyzer)
+    critical_moves = find_critical_moves(game)
+    verify_blunders_detected(critical_moves)
+    verify_variations_exist(critical_moves)
+    mock_analyzer.verify
+  end
 
-    # Should have at least one blunder (Qh5)
+  def find_critical_moves(game)
+    game.moves.select { |m| m.annotation&.include?('$201') }
+  end
+
+  def verify_blunders_detected(critical_moves)
     assert_predicate critical_moves.size, :positive?, 'Should detect at least one blunder'
+  end
 
-    # Check that at least one critical move has variations
+  def verify_variations_exist(critical_moves)
     has_variation = critical_moves.any? { |m| m.variations && !m.variations.empty? }
 
     assert has_variation, 'At least one blunder should have a variation with a better move'
 
-    # Check the structure of the variation
     move_with_variation = critical_moves.find { |m| m.variations && !m.variations.empty? }
-    if move_with_variation
-      variation = move_with_variation.variations.first
+    verify_variation_structure(move_with_variation) if move_with_variation
+  end
 
-      assert_kind_of Array, variation, 'Variation should be an array of moves'
-      assert_predicate variation.size, :positive?, 'Variation should have at least one move'
+  def verify_variation_structure(move_with_variation)
+    variation = move_with_variation.variations.first
 
-      first_var_move = variation.first
+    assert_kind_of Array, variation, 'Variation should be an array of moves'
+    assert_predicate variation.size, :positive?, 'Variation should have at least one move'
 
-      assert_kind_of PGN::MoveText, first_var_move, 'Variation move should be a PGN::MoveText'
-      assert first_var_move.notation, 'Variation move should have notation'
-      assert first_var_move.comment, 'Variation move should have a comment explaining the advantage'
-    end
+    first_var_move = variation.first
 
-    mock_analyzer.verify
+    assert_kind_of PGN::MoveText, first_var_move, 'Variation move should be a PGN::MoveText'
+    assert first_var_move.notation, 'Variation move should have notation'
+    assert first_var_move.comment, 'Variation move should have a comment explaining the advantage'
   end
 
   def test_format_centipawns

@@ -13,8 +13,6 @@ class AnalyzerTest < Minitest::Test
     end
   end
 
-  # rubocop:disable Minitest/MultipleAssertions
-
   def test_best_moves_returns_moves_with_scores_and_notations
     @mock_engine.expect :multipv, nil, [3]
     mock_analysis_result(standard_analysis)
@@ -162,5 +160,4 @@ class AnalyzerTest < Minitest::Test
       "info depth 18 seldepth 4 multipv 3 score mate 4 nodes 9700 nps 1212500 hashfull 0 tbhits 0 time 8 pv h7h5 g4h3 f5f3\n" \
       'bestmove h7h5 ponder g4h3'
   end
-  # rubocop:enable Minitest/MultipleAssertions
 end

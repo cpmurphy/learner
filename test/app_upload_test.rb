@@ -146,21 +146,24 @@ class AppUploadTest < Minitest::Test
       assert_predicate last_response, :ok?, "Expected OK, got #{last_response.status}: #{last_response.body}"
 
       json = JSON.parse(last_response.body)
-
-      assert json['success']
-      assert json['filename']
-      assert json['filename'].end_with?('.pgn')
-
-      # Verify file was created
-      saved_file = File.join(@test_dir, json['filename'])
-
-      assert_path_exists saved_file, "Expected file #{saved_file} to exist"
-
-      # Verify content is valid PGN
-      content = File.read(saved_file)
-
-      assert_includes content, '[Event "Test Game"]'
+      verify_json_response(json)
+      verify_saved_file(json)
     end
+  end
+
+  def verify_json_response(json)
+    assert json['success']
+    assert json['filename']
+    assert json['filename'].end_with?('.pgn')
+  end
+
+  def verify_saved_file(json)
+    saved_file = File.join(@test_dir, json['filename'])
+
+    assert_path_exists saved_file, "Expected file #{saved_file} to exist"
+    content = File.read(saved_file)
+
+    assert_includes content, '[Event "Test Game"]'
   end
 
   def test_analyze_and_save_without_content

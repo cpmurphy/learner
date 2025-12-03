@@ -42,7 +42,7 @@ def get_target_file(gem_dir)
   File.join(gem_dir, 'lib', 'stockfish', 'engine.rb')
 end
 
-def check_file_exists(file_path)
+def file_exists?(file_path)
   return true if File.exist?(file_path)
 
   warn "Error: File not found: #{file_path}"
@@ -78,7 +78,9 @@ def apply_fix(file_path)
       first_newline = fixed_content.index("\n")
       if first_newline
         # Insert after shebang line
-        fixed_content = "#{fixed_content[0..first_newline]}# frozen_string_literal: true\n#{fixed_content[(first_newline + 1)..]}"
+        shebang_line = fixed_content[0..first_newline]
+        rest_of_content = fixed_content[(first_newline + 1)..]
+        fixed_content = "#{shebang_line}# frozen_string_literal: true\n#{rest_of_content}"
       else
         # No newline after shebang (unlikely), just prepend
         fixed_content = "# frozen_string_literal: true\n#{fixed_content}"
@@ -99,18 +101,33 @@ end
 
 def show_preview(file_path, will_add_frozen_comment)
   lines = File.readlines(file_path)
-  has_shebang = lines.first&.start_with?('#!')
+  show_before_preview(lines)
+  show_after_preview(lines, will_add_frozen_comment)
+end
 
+def show_before_preview(lines)
   puts "\nPreview of first 10 lines before fix:"
   puts '-' * 60
   lines.first(10).each_with_index do |line, i|
     puts "#{i + 1}: #{line.chomp}"
   end
   puts '-' * 60
+end
 
+def show_after_preview(lines, will_add_frozen_comment)
+  has_shebang = lines.first&.start_with?('#!')
   puts "\nPreview after fix:"
   puts '-' * 60
+
+  line_num, start_idx = determine_preview_start(lines, has_shebang, will_add_frozen_comment)
+  show_remaining_preview_lines(lines, start_idx, line_num)
+  puts '-' * 60
+end
+
+def determine_preview_start(lines, has_shebang, will_add_frozen_comment)
   line_num = 1
+  start_idx = 0
+
   if has_shebang && will_add_frozen_comment
     puts "#{line_num}: #{lines[0].chomp}"
     line_num += 1
@@ -121,16 +138,17 @@ def show_preview(file_path, will_add_frozen_comment)
     puts "#{line_num}: # frozen_string_literal: true"
     line_num += 1
     start_idx = 0
-  else
-    start_idx = 0
   end
 
+  [line_num, start_idx]
+end
+
+def show_remaining_preview_lines(lines, start_idx, line_num)
   remaining_lines = lines[start_idx, 10 - (line_num - 1)]
   remaining_lines.each do |line|
     puts "#{line_num}: #{line.chomp}"
     line_num += 1
   end
-  puts '-' * 60
 end
 
 # Main execution
@@ -150,7 +168,7 @@ puts "Found stockfish gem at: #{gem_dir}"
 
 target_file = get_target_file(gem_dir)
 
-unless check_file_exists(target_file)
+unless file_exists?(target_file)
   warn 'Error: Could not find engine.rb file'
   exit 1
 end

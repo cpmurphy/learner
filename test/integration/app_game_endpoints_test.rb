@@ -93,35 +93,8 @@ class AppGameEndpointsTest < Minitest::Test
     assert_predicate last_response, :ok?, "Expected OK, got #{last_response.status}: #{last_response.body}"
 
     json = JSON.parse(last_response.body)
-
-    assert json['success']
-    assert_equal 1, json['variation_count']
-
-    # Verify variation was added to the game in session
-    # (We can't directly access session in tests, but we can save and reload)
-    post '/game/save',
-         {},
-         'CONTENT_TYPE' => 'application/json'
-
-    assert_predicate last_response, :ok?, "Failed to save game: #{last_response.body}"
-
-    # Reload and verify variation exists
-    saved_content = File.read(@test_pgn_file)
-    saved_games = PGN.parse(saved_content.dup)
-    saved_game = saved_games.first
-
-    # Check that the move has variations
-    move_with_variation = saved_game.moves[0] # Move index 0 is the first move (e4)
-
-    assert move_with_variation.variations, 'Move should have variations'
-    assert_predicate move_with_variation.variations, :any?, 'Move should have at least one variation'
-
-    # Check variation content
-    variation = move_with_variation.variations.first
-    # Some moves might fail to process, so check that we got at least the first move
-    assert_predicate variation.length, :positive?, 'Variation should have at least one move'
-    # The first move might not be d4 if d4 failed to process, so just check that variation exists
-    # The actual content depends on which moves were successfully processed
+    verify_variation_response(json)
+    verify_variation_saved
   end
 
   def test_add_variation_with_invalid_move_index
@@ -277,5 +250,40 @@ class AppGameEndpointsTest < Minitest::Test
     json = JSON.parse(last_response.body)
 
     assert json['success']
+  end
+
+  private
+
+  def verify_variation_response(json)
+    assert json['success']
+    assert_equal 1, json['variation_count']
+  end
+
+  def verify_variation_saved
+    # Verify variation was added to the game in session
+    # (We can't directly access session in tests, but we can save and reload)
+    post '/game/save',
+         {},
+         'CONTENT_TYPE' => 'application/json'
+
+    assert_predicate last_response, :ok?, "Failed to save game: #{last_response.body}"
+
+    # Reload and verify variation exists
+    saved_content = File.read(@test_pgn_file)
+    saved_games = PGN.parse(saved_content.dup)
+    saved_game = saved_games.first
+
+    # Check that the move has variations
+    move_with_variation = saved_game.moves[0] # Move index 0 is the first move (e4)
+
+    assert move_with_variation.variations, 'Move should have variations'
+    assert_predicate move_with_variation.variations, :any?, 'Move should have at least one variation'
+
+    # Check variation content
+    variation = move_with_variation.variations.first
+    # Some moves might fail to process, so check that we got at least the first move
+    assert_predicate variation.length, :positive?, 'Variation should have at least one move'
+    # The first move might not be d4 if d4 failed to process, so just check that variation exists
+    # The actual content depends on which moves were successfully processed
   end
 end
