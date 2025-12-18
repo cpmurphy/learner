@@ -11,6 +11,7 @@ gem 'stockfish'
 group :development, :test do
   gem 'debug', '>= 1.0.0'
   gem 'minitest'
+  gem 'minitest-mock'
   gem 'rack-test'
   gem 'rubocop', require: false
   gem 'rubocop-minitest', require: false
