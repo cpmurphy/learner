@@ -106,20 +106,24 @@ class GameEditor
     current_fen = fen
 
     uci_moves.take(max_moves).each do |uci_move|
-      # Convert UCI to SAN using the current position
+      # Skip invalid moves
+      next unless uci_move && uci_move != '--'
 
-      san_move = @uci_converter.convert(current_fen, uci_move)
-      sequence << PGN::MoveText.new(san_move)
+      begin
+        # Convert UCI to SAN using the current position
+        san_move = @uci_converter.convert(current_fen, uci_move)
+        sequence << PGN::MoveText.new(san_move)
 
-      # Update the position by applying the move
-      translator = MoveTranslator.new
-      translator.load_game_from_fen(current_fen)
-      translator.translate_move(san_move)
-      current_fen = translator.board_as_fen
-    rescue StandardError => e
-      # If we can't convert or apply a move, stop the variation here
-      puts "Warning: Failed to process variation move #{uci_move}: #{e.message}"
-      break
+        # Update the position by applying the move
+        translator = MoveTranslator.new
+        translator.load_game_from_fen(current_fen)
+        translator.translate_move(san_move)
+        current_fen = translator.board_as_fen
+      rescue StandardError
+        # If a move is invalid, stop building the variation
+        # This can happen if the variation contains moves that aren't valid for the position
+        break
+      end
     end
 
     sequence
