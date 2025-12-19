@@ -166,36 +166,7 @@ class TestGameEditor < Minitest::Test
   def test_game_evaluation
     games = PGN.parse(File.read('test/data/quill-2025-08-06.pgn'))
     game = games[0]
-
-    # Mock the Analyzer to avoid slow Stockfish calls
-    mock_analyzer = Minitest::Mock.new
-    translator = MoveTranslator.new
-
-    # For each move, we need to mock evaluate_best_move and evaluate_move
-    (0...game.moves.size).each do |i|
-      next unless game.positions[i] && game.moves[i]
-
-      fen = game.positions[i].to_fen.to_s
-      # cheat: mock best move using the move actually played
-      translator.load_game_from_fen(fen)
-      uci_move = translator.translate_move(game.moves[i].notation)
-      best_move_uci = uci_move
-
-      # cheat: mock variation to be moves actually played
-      translator.load_game_from_fen(fen)
-      variation = (i...i+2).map do |j|
-        break unless game.positions[j] && game.moves[j]
-        translator.translate_move(game.moves[j].notation)
-      end
-
-      # Mock best move analysis - return a good score
-      mock_analyzer.expect :evaluate_best_move, { score: 200, move: best_move_uci, variation: variation }, [fen]
-
-      # Return a score that makes this a blunder (difference > 140)
-      # Make every 3rd move a blunder to ensure we get some results
-      played_score = (i % 3).zero? ? -200 : 150
-      mock_analyzer.expect :evaluate_move, { score: played_score }, [fen, uci_move]
-    end
+    mock_analyzer = setup_mock_for_game_evaluation(game)
     mock_analyzer.expect :close, nil
 
     Analyzer.stub :new, mock_analyzer do
@@ -207,6 +178,51 @@ class TestGameEditor < Minitest::Test
 
     assert_predicate blunders.size, :positive?, 'Should find at least one blunder in the game'
     mock_analyzer.verify
+  end
+
+  def setup_mock_for_game_evaluation(game)
+    # Mock the Analyzer to avoid slow Stockfish calls
+    mock_analyzer = Minitest::Mock.new
+    translator = MoveTranslator.new
+
+    # For each move, we need to mock evaluate_best_move and evaluate_move
+    (0...game.moves.size).each do |i|
+      next unless game.positions[i] && game.moves[i]
+
+      setup_move_expectations(mock_analyzer, game, translator, i)
+    end
+    mock_analyzer
+  end
+
+  def setup_move_expectations(mock_analyzer, game, translator, move_index)
+    fen = game.positions[move_index].to_fen.to_s
+    uci_move = translate_move_for_position(translator, fen, game.moves[move_index].notation)
+    variation = build_variation(game, translator, move_index, fen)
+
+    mock_analyzer.expect :evaluate_best_move, { score: 200, move: uci_move, variation: variation }, [fen]
+
+    played_score = calculate_played_score(move_index)
+    mock_analyzer.expect :evaluate_move, { score: played_score }, [fen, uci_move]
+  end
+
+  def translate_move_for_position(translator, fen, notation)
+    translator.load_game_from_fen(fen)
+    translator.translate_move(notation)
+  end
+
+  def build_variation(game, translator, start_index, fen)
+    translator.load_game_from_fen(fen)
+    (start_index...(start_index + 2)).map do |j|
+      break unless game.positions[j] && game.moves[j]
+
+      translator.translate_move(game.moves[j].notation)
+    end
+  end
+
+  def calculate_played_score(move_index)
+    # Return a score that makes this a blunder (difference > 140)
+    # Make every 3rd move a blunder to ensure we get some results
+    (move_index % 3).zero? ? -200 : 150
   end
 
   def test_add_blunder_annotations_adds_variations
@@ -243,8 +259,9 @@ class TestGameEditor < Minitest::Test
 
     # cheat: mock variation to be moves actually played
     translator.load_game_from_fen(fen)
-    variation = (move_index...move_index+2).map do |j|
+    variation = (move_index...(move_index + 2)).map do |j|
       break unless game.positions[j] && game.moves[j]
+
       translator.translate_move(game.moves[j].notation)
     end
 
@@ -311,7 +328,6 @@ class TestGameEditor < Minitest::Test
     # Mate scores are typically > 900 centipawns
     assert_match(/\+M\d+/, @editor.format_centipawns(950))
   end
-
 end
 
 # --- Tests for AppHelpers ---
