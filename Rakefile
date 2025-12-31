@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'rake/testtask'
+require 'bundler/setup'
 
 desc 'Run unit tests (excludes integration tests that require Stockfish)'
 Rake::TestTask.new do |t|
