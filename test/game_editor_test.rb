@@ -163,6 +163,7 @@ class TestGameEditor < Minitest::Test
     assert_nil game.moves[5].annotation # This is Black's third move, which is index 5
   end
 
+  # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
   def test_game_evaluation
     games = PGN.parse(File.read('test/data/quill-2025-08-06.pgn'))
     game = games[0]
@@ -211,7 +212,9 @@ class TestGameEditor < Minitest::Test
     assert_predicate blunders.size, :positive?, 'Should find at least one blunder in the game'
     mock_analyzer.verify
   end
+  # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
+  # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
   def test_add_blunder_annotations_adds_variations
     # Create a simple game where we know there's a blunder
     # 1.e4 e5 2.Qh5?? - This is a blunder, better is 2.Nf3
@@ -284,6 +287,289 @@ class TestGameEditor < Minitest::Test
       assert first_var_move.notation, 'Variation move should have notation'
       assert first_var_move.comment, 'Variation move should have a comment explaining the advantage'
     end
+
+    mock_analyzer.verify
+  end
+  # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+
+  def test_move_with_500_centipawns_advantage_not_blunder_when_best_move_not_mate
+    # A move that is 500+ centipawns in favor should NOT be considered a blunder
+    # unless the best move is a forced mate in 1, 2, or 3 moves
+    game = PGN::Game.new(%w[e4 e5])
+
+    mock_analyzer = Minitest::Mock.new
+    translator = MoveTranslator.new
+
+    # Setup mock for move 0 (e4)
+    fen = game.positions[0].to_fen.to_s
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[0].notation)
+    # Use empty variation - doesn't matter for this test
+    variation = []
+
+    # Best move score: 200, played move score: -600 (so played_score = 600, advantage of 600)
+    # Difference: 200 - 600 = -400, but since played_score is 600 (500+), should NOT be blunder
+    mock_analyzer.expect :evaluate_best_move, { score: 200, move: uci_move, variation: variation }, [fen]
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[0].notation)
+    # Score from engine perspective after move: -600, so played_score = 600 (600 centipawns advantage)
+    mock_analyzer.expect :evaluate_move, { score: -600 }, [fen, uci_move]
+
+    # Setup mock for move 1 (e5) - not relevant for this test
+    # Make sure this move is NOT a blunder (best and played scores should be similar)
+    fen = game.positions[1].to_fen.to_s
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[1].notation)
+    variation = []
+    # Best move score: 150
+    mock_analyzer.expect :evaluate_best_move, { score: 150, move: uci_move, variation: variation }, [fen]
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[1].notation)
+    # Played move score: -150 (so played_score = 150, same as best_score, difference = 0, not a blunder)
+    mock_analyzer.expect :evaluate_move, { score: -150 }, [fen, uci_move]
+
+    mock_analyzer.expect :close, nil
+
+    Analyzer.stub :new, mock_analyzer do
+      @editor.add_blunder_annotations(game)
+    end
+
+    # Move 0 should NOT have a blunder annotation (even though best_score - played_score = -400)
+    # because played_score is 600 (500+ centipawns advantage)
+    critical_moves = game.moves.select { |m| m.annotation&.include?('$201') }
+
+    assert_empty critical_moves, 'Move with 500+ centipawns advantage should not be blunder when best move is not mate'
+
+    mock_analyzer.verify
+  end
+
+  def test_move_with_500_centipawns_advantage_is_blunder_when_best_move_mate_in_1
+    # A move that is 500+ centipawns in favor SHOULD be considered a blunder
+    # if the best move is a forced mate in 1 move
+    game = PGN::Game.new(%w[e4 e5])
+
+    mock_analyzer = Minitest::Mock.new
+    translator = MoveTranslator.new
+
+    # Setup mock for move 0 (e4) - not a blunder
+    fen = game.positions[0].to_fen.to_s
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[0].notation)
+    variation = []
+    mock_analyzer.expect :evaluate_best_move, { score: 200, move: uci_move, variation: variation }, [fen]
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[0].notation)
+    mock_analyzer.expect :evaluate_move, { score: -200 }, [fen, uci_move]
+
+    # Setup mock for move 1 (e5) - this should be a blunder because best move is mate in 1
+    fen = game.positions[1].to_fen.to_s
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[1].notation)
+    variation = []
+    # Best move is mate in 1: score 999 (1000 - 1)
+    mock_analyzer.expect :evaluate_best_move, { score: 999, move: uci_move, variation: variation }, [fen]
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[1].notation)
+    # Played move score: -600 (so played_score = 600, advantage of 600)
+    # Difference: 999 - 600 = 399, but since best move is mate in 1, should BE blunder
+    mock_analyzer.expect :evaluate_move, { score: -600 }, [fen, uci_move]
+
+    mock_analyzer.expect :close, nil
+
+    Analyzer.stub :new, mock_analyzer do
+      @editor.add_blunder_annotations(game)
+    end
+
+    # Move 0 SHOULD have a blunder annotation (added because move 1 is a blunder)
+    critical_moves = game.moves.select { |m| m.annotation&.include?('$201') }
+
+    assert_predicate critical_moves.size, :positive?, 'Move with 500+ centipawns advantage should be blunder when best move is mate in 1'
+
+    mock_analyzer.verify
+  end
+
+  def test_move_with_500_centipawns_advantage_is_blunder_when_best_move_mate_in_2
+    # A move that is 500+ centipawns in favor SHOULD be considered a blunder
+    # if the best move is a forced mate in 2 moves
+    game = PGN::Game.new(%w[e4 e5])
+
+    mock_analyzer = Minitest::Mock.new
+    translator = MoveTranslator.new
+
+    # Setup mock for move 0 (e4) - not a blunder
+    fen = game.positions[0].to_fen.to_s
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[0].notation)
+    variation = []
+    mock_analyzer.expect :evaluate_best_move, { score: 200, move: uci_move, variation: variation }, [fen]
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[0].notation)
+    mock_analyzer.expect :evaluate_move, { score: -200 }, [fen, uci_move]
+
+    # Setup mock for move 1 (e5) - this should be a blunder because best move is mate in 2
+    fen = game.positions[1].to_fen.to_s
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[1].notation)
+    variation = []
+    # Best move is mate in 2: score 998 (1000 - 2)
+    mock_analyzer.expect :evaluate_best_move, { score: 998, move: uci_move, variation: variation }, [fen]
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[1].notation)
+    # Played move score: -600 (so played_score = 600, advantage of 600)
+    mock_analyzer.expect :evaluate_move, { score: -600 }, [fen, uci_move]
+
+    mock_analyzer.expect :close, nil
+
+    Analyzer.stub :new, mock_analyzer do
+      @editor.add_blunder_annotations(game)
+    end
+
+    # Move 0 SHOULD have a blunder annotation (added because move 1 is a blunder)
+    critical_moves = game.moves.select { |m| m.annotation&.include?('$201') }
+
+    assert_predicate critical_moves.size, :positive?, 'Move with 500+ centipawns advantage should be blunder when best move is mate in 2'
+
+    mock_analyzer.verify
+  end
+
+  def test_move_with_500_centipawns_advantage_is_blunder_when_best_move_mate_in_3
+    # A move that is 500+ centipawns in favor SHOULD be considered a blunder
+    # if the best move is a forced mate in 3 moves
+    game = PGN::Game.new(%w[e4 e5])
+
+    mock_analyzer = Minitest::Mock.new
+    translator = MoveTranslator.new
+
+    # Setup mock for move 0 (e4) - not a blunder
+    fen = game.positions[0].to_fen.to_s
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[0].notation)
+    variation = []
+    mock_analyzer.expect :evaluate_best_move, { score: 200, move: uci_move, variation: variation }, [fen]
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[0].notation)
+    mock_analyzer.expect :evaluate_move, { score: -200 }, [fen, uci_move]
+
+    # Setup mock for move 1 (e5) - this should be a blunder because best move is mate in 3
+    fen = game.positions[1].to_fen.to_s
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[1].notation)
+    variation = []
+    # Best move is mate in 3: score 997 (1000 - 3)
+    mock_analyzer.expect :evaluate_best_move, { score: 997, move: uci_move, variation: variation }, [fen]
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[1].notation)
+    # Played move score: -600 (so played_score = 600, advantage of 600)
+    mock_analyzer.expect :evaluate_move, { score: -600 }, [fen, uci_move]
+
+    mock_analyzer.expect :close, nil
+
+    Analyzer.stub :new, mock_analyzer do
+      @editor.add_blunder_annotations(game)
+    end
+
+    # Move 0 SHOULD have a blunder annotation (added because move 1 is a blunder)
+    critical_moves = game.moves.select { |m| m.annotation&.include?('$201') }
+
+    assert_predicate critical_moves.size, :positive?, 'Move with 500+ centipawns advantage should be blunder when best move is mate in 3'
+
+    mock_analyzer.verify
+  end
+
+  def test_move_with_500_centipawns_advantage_not_blunder_when_best_move_mate_in_4
+    # A move that is 500+ centipawns in favor should NOT be considered a blunder
+    # if the best move is a forced mate in 4 moves (only 1, 2, 3 count)
+    game = PGN::Game.new(%w[e4 e5])
+
+    mock_analyzer = Minitest::Mock.new
+    translator = MoveTranslator.new
+
+    # Setup mock for move 0 (e4)
+    fen = game.positions[0].to_fen.to_s
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[0].notation)
+    # Use empty variation - doesn't matter for this test
+    variation = []
+
+    # Best move is mate in 4: score 996 (1000 - 4)
+    # Played move score: -600 (so played_score = 600, advantage of 600)
+    mock_analyzer.expect :evaluate_best_move, { score: 996, move: uci_move, variation: variation }, [fen]
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[0].notation)
+    mock_analyzer.expect :evaluate_move, { score: -600 }, [fen, uci_move]
+
+    # Setup mock for move 1 (e5) - not relevant for this test
+    # Make sure this move is NOT a blunder (best and played scores should be similar)
+    fen = game.positions[1].to_fen.to_s
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[1].notation)
+    variation = []
+    # Best move score: 100
+    mock_analyzer.expect :evaluate_best_move, { score: 100, move: uci_move, variation: variation }, [fen]
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[1].notation)
+    # Played move score: -100 (so played_score = 100, same as best_score, difference = 0, not a blunder)
+    mock_analyzer.expect :evaluate_move, { score: -100 }, [fen, uci_move]
+
+    mock_analyzer.expect :close, nil
+
+    Analyzer.stub :new, mock_analyzer do
+      @editor.add_blunder_annotations(game)
+    end
+
+    # Move 0 should NOT have a blunder annotation because best move is mate in 4 (not 1, 2, or 3)
+    critical_moves = game.moves.select { |m| m.annotation&.include?('$201') }
+
+    assert_empty critical_moves, 'Move with 500+ centipawns advantage should not be blunder when best move is mate in 4'
+
+    mock_analyzer.verify
+  end
+
+  def test_move_with_less_than_500_centipawns_advantage_still_checked_normally
+    # A move with less than 500 centipawns advantage should still be checked normally
+    # (existing behavior should be preserved)
+    game = PGN::Game.new(%w[e4 e5])
+
+    mock_analyzer = Minitest::Mock.new
+    translator = MoveTranslator.new
+
+    # Setup mock for move 0 (e4)
+    fen = game.positions[0].to_fen.to_s
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[0].notation)
+    # Use empty variation - doesn't matter for this test
+    variation = []
+
+    # Best move score: 200, played move score: -200 (so played_score = 200, advantage of 200)
+    # Difference: 200 - 200 = 0, which is less than threshold, so NOT a blunder
+    mock_analyzer.expect :evaluate_best_move, { score: 200, move: uci_move, variation: variation }, [fen]
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[0].notation)
+    mock_analyzer.expect :evaluate_move, { score: -200 }, [fen, uci_move]
+
+    # Setup mock for move 1 (e5) - make this a blunder to verify normal behavior still works
+    fen = game.positions[1].to_fen.to_s
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[1].notation)
+    variation = []
+    # Best move score: 200, played move score: -50 (so played_score = 50)
+    # Difference: 200 - 50 = 150, which is > 140 threshold, so SHOULD be blunder
+    mock_analyzer.expect :evaluate_best_move, { score: 200, move: uci_move, variation: variation }, [fen]
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[1].notation)
+    # Score from engine: -50 (after move, from black's perspective), so played_score = 50 (from white's perspective)
+    mock_analyzer.expect :evaluate_move, { score: -50 }, [fen, uci_move]
+
+    mock_analyzer.expect :close, nil
+
+    Analyzer.stub :new, mock_analyzer do
+      @editor.add_blunder_annotations(game)
+    end
+
+    # Move 1 should have a blunder annotation (normal behavior)
+    critical_moves = game.moves.select { |m| m.annotation&.include?('$201') }
+
+    assert_predicate critical_moves.size, :positive?, 'Normal blunder detection should still work for moves with < 500 centipawns advantage'
 
     mock_analyzer.verify
   end

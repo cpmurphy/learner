@@ -62,6 +62,15 @@ class GameEditor
   def blunder_detected?(best_score, played_score)
     # Now both scores are from the perspective of the player who is about to move.
     # A blunder means the evaluation drops significantly (for both White and Black).
+
+    # A move should not be considered a blunder if it is 500 centipawns (or more) in favor
+    # of the player making the move, unless the winning move is a forced mate in one, two or three moves.
+    if played_score >= 500
+      # Check if best move is mate in 1, 2, or 3 (scores 999, 998, or 997)
+      is_forced_mate_in_1_2_or_3 = best_score.between?(997, 999)
+      return false unless is_forced_mate_in_1_2_or_3
+    end
+
     (best_score - played_score) > BLUNDER_THRESHOLD
   end
 
