@@ -71,6 +71,14 @@ class GameEditor
       return false unless is_forced_mate_in_1_2_or_3
     end
 
+    # A move should not be considered a blunder if it is more than 250 centipawns in favor
+    # of the player making it, unless the best move has an evaluation more than 30% better.
+    if played_score > 250
+      # Check if best move is more than 30% better (best_score > played_score * 1.3)
+      is_more_than_30_percent_better = best_score > (played_score * 1.3)
+      return false unless is_more_than_30_percent_better
+    end
+
     (best_score - played_score) > BLUNDER_THRESHOLD
   end
 

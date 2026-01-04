@@ -574,6 +574,188 @@ class TestGameEditor < Minitest::Test
     mock_analyzer.verify
   end
 
+  def test_move_with_more_than_250_centipawns_advantage_not_blunder_when_best_move_less_than_30_percent_better
+    # A move that is more than 250 centipawns in favor should NOT be considered a blunder
+    # unless the best move has an evaluation more than 30% better
+    game = PGN::Game.new(%w[e4 e5])
+
+    mock_analyzer = Minitest::Mock.new
+    translator = MoveTranslator.new
+
+    # Setup mock for move 0 (e4) - not a blunder
+    fen = game.positions[0].to_fen.to_s
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[0].notation)
+    variation = []
+    mock_analyzer.expect :evaluate_best_move, { score: 200, move: uci_move, variation: variation }, [fen]
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[0].notation)
+    mock_analyzer.expect :evaluate_move, { score: -200 }, [fen, uci_move]
+
+    # Setup mock for move 1 (e5) - played_score = 500, best_score = 650
+    # 650/500 = 1.3 (exactly 30% better) - not more than 30%
+    # Difference: 650 - 500 = 150, which is > 140 threshold
+    # But since it's exactly 30% (not more than 30%), it should NOT be a blunder
+    fen = game.positions[1].to_fen.to_s
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[1].notation)
+    variation = []
+    # Best move score: 650 (exactly 30% better than 500: 650/500 = 1.3)
+    mock_analyzer.expect :evaluate_best_move, { score: 650, move: uci_move, variation: variation }, [fen]
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[1].notation)
+    # Played move score: -500 (so played_score = 500, advantage of 500)
+    mock_analyzer.expect :evaluate_move, { score: -500 }, [fen, uci_move]
+
+    mock_analyzer.expect :close, nil
+
+    Analyzer.stub :new, mock_analyzer do
+      @editor.add_blunder_annotations(game)
+    end
+
+    # Move 0 should NOT have a blunder annotation because best move is exactly 30% better (not more than 30%)
+    # Even though the difference (150) exceeds the threshold (140)
+    critical_moves = game.moves.select { |m| m.annotation&.include?('$201') }
+    assert_empty critical_moves, 'Move with >250 centipawns advantage should not be blunder when best move is exactly 30% better (not more than 30%), even if difference exceeds threshold'
+
+    mock_analyzer.verify
+  end
+
+  def test_move_with_more_than_250_centipawns_advantage_is_blunder_when_best_move_more_than_30_percent_better
+    # A move that is more than 250 centipawns in favor SHOULD be considered a blunder
+    # if the best move has an evaluation more than 30% better AND the difference exceeds threshold
+    game = PGN::Game.new(%w[e4 e5])
+
+    mock_analyzer = Minitest::Mock.new
+    translator = MoveTranslator.new
+
+    # Setup mock for move 0 (e4) - not a blunder
+    fen = game.positions[0].to_fen.to_s
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[0].notation)
+    variation = []
+    mock_analyzer.expect :evaluate_best_move, { score: 200, move: uci_move, variation: variation }, [fen]
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[0].notation)
+    mock_analyzer.expect :evaluate_move, { score: -200 }, [fen, uci_move]
+
+    # Setup mock for move 1 (e5) - played_score = 300, best_score = 450
+    # 450 is 50% better than 300 (450/300 = 1.5), more than 30% better
+    # Difference: 450 - 300 = 150, which is > 140 threshold, so SHOULD be blunder
+    fen = game.positions[1].to_fen.to_s
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[1].notation)
+    variation = []
+    # Best move score: 450 (50% better than 300)
+    mock_analyzer.expect :evaluate_best_move, { score: 450, move: uci_move, variation: variation }, [fen]
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[1].notation)
+    # Played move score: -300 (so played_score = 300, advantage of 300)
+    mock_analyzer.expect :evaluate_move, { score: -300 }, [fen, uci_move]
+
+    mock_analyzer.expect :close, nil
+
+    Analyzer.stub :new, mock_analyzer do
+      @editor.add_blunder_annotations(game)
+    end
+
+    # Move 0 SHOULD have a blunder annotation because best move is more than 30% better and difference exceeds threshold
+    critical_moves = game.moves.select { |m| m.annotation&.include?('$201') }
+    assert_predicate critical_moves.size, :positive?, 'Move with >250 centipawns advantage should be blunder when best move is more than 30% better and difference exceeds threshold'
+
+    mock_analyzer.verify
+  end
+
+  def test_move_with_more_than_250_centipawns_advantage_not_blunder_when_best_move_less_than_30_percent_better_even_with_large_difference
+    # Edge case: If best move is less than 30% better, it should NOT be a blunder
+    # even if the difference exceeds the threshold
+    game = PGN::Game.new(%w[e4 e5])
+
+    mock_analyzer = Minitest::Mock.new
+    translator = MoveTranslator.new
+
+    # Setup mock for move 0 (e4) - not a blunder
+    fen = game.positions[0].to_fen.to_s
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[0].notation)
+    variation = []
+    mock_analyzer.expect :evaluate_best_move, { score: 200, move: uci_move, variation: variation }, [fen]
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[0].notation)
+    mock_analyzer.expect :evaluate_move, { score: -200 }, [fen, uci_move]
+
+    fen = game.positions[1].to_fen.to_s
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[1].notation)
+    variation = []
+    # Best move score: 623 (29.8% better than 480: 623/480 = 1.298)
+    # Difference: 623 - 480 = 143, which is > 140 threshold
+    # But since it's less than 30% better, it should NOT be a blunder
+    mock_analyzer.expect :evaluate_best_move, { score: 623, move: uci_move, variation: variation }, [fen]
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[1].notation)
+    # Played move score: -480 (so played_score = 480, advantage of 480, > 250 but < 500)
+    mock_analyzer.expect :evaluate_move, { score: -480 }, [fen, uci_move]
+
+    mock_analyzer.expect :close, nil
+
+    Analyzer.stub :new, mock_analyzer do
+      @editor.add_blunder_annotations(game)
+    end
+
+    # Move 0 should NOT have a blunder annotation because best move is less than 30% better
+    # Even though the difference (290) exceeds the threshold (140)
+    critical_moves = game.moves.select { |m| m.annotation&.include?('$201') }
+    assert_empty critical_moves, 'Move with >250 centipawns advantage should not be blunder when best move is less than 30% better, even if difference exceeds threshold'
+
+    mock_analyzer.verify
+  end
+
+  def test_move_with_250_or_less_centipawns_advantage_still_checked_normally
+    # A move with 250 or less centipawns advantage should still be checked normally
+    # (existing behavior should be preserved)
+    game = PGN::Game.new(%w[e4 e5])
+
+    mock_analyzer = Minitest::Mock.new
+    translator = MoveTranslator.new
+
+    # Setup mock for move 0 (e4) - not a blunder
+    fen = game.positions[0].to_fen.to_s
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[0].notation)
+    variation = []
+    mock_analyzer.expect :evaluate_best_move, { score: 200, move: uci_move, variation: variation }, [fen]
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[0].notation)
+    mock_analyzer.expect :evaluate_move, { score: -200 }, [fen, uci_move]
+
+    # Setup mock for move 1 (e5) - played_score = 250 (exactly 250, not more than 250)
+    # This should be checked normally, not subject to the 30% rule
+    fen = game.positions[1].to_fen.to_s
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[1].notation)
+    variation = []
+    # Best move score: 400, played_score = 250
+    # Difference: 400 - 250 = 150, which is > 140 threshold, so SHOULD be blunder
+    mock_analyzer.expect :evaluate_best_move, { score: 400, move: uci_move, variation: variation }, [fen]
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(game.moves[1].notation)
+    # Played move score: -250 (so played_score = 250, advantage of 250)
+    mock_analyzer.expect :evaluate_move, { score: -250 }, [fen, uci_move]
+
+    mock_analyzer.expect :close, nil
+
+    Analyzer.stub :new, mock_analyzer do
+      @editor.add_blunder_annotations(game)
+    end
+
+    # Move 1 should have a blunder annotation (normal behavior, not subject to 30% rule)
+    critical_moves = game.moves.select { |m| m.annotation&.include?('$201') }
+    assert_predicate critical_moves.size, :positive?, 'Normal blunder detection should still work for moves with <= 250 centipawns advantage'
+
+    mock_analyzer.verify
+  end
+
   def test_format_centipawns
     assert_equal '+1.4', @editor.format_centipawns(140)
     assert_equal '+2.5', @editor.format_centipawns(250)
