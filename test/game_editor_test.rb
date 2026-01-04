@@ -616,6 +616,7 @@ class TestGameEditor < Minitest::Test
     # Move 0 should NOT have a blunder annotation because best move is exactly 30% better (not more than 30%)
     # Even though the difference (150) exceeds the threshold (140)
     critical_moves = game.moves.select { |m| m.annotation&.include?('$201') }
+
     assert_empty critical_moves, 'Move with >250 centipawns advantage should not be blunder when best move is exactly 30% better (not more than 30%), even if difference exceeds threshold'
 
     mock_analyzer.verify
@@ -661,6 +662,7 @@ class TestGameEditor < Minitest::Test
 
     # Move 0 SHOULD have a blunder annotation because best move is more than 30% better and difference exceeds threshold
     critical_moves = game.moves.select { |m| m.annotation&.include?('$201') }
+
     assert_predicate critical_moves.size, :positive?, 'Move with >250 centipawns advantage should be blunder when best move is more than 30% better and difference exceeds threshold'
 
     mock_analyzer.verify
@@ -706,6 +708,7 @@ class TestGameEditor < Minitest::Test
     # Move 0 should NOT have a blunder annotation because best move is less than 30% better
     # Even though the difference (290) exceeds the threshold (140)
     critical_moves = game.moves.select { |m| m.annotation&.include?('$201') }
+
     assert_empty critical_moves, 'Move with >250 centipawns advantage should not be blunder when best move is less than 30% better, even if difference exceeds threshold'
 
     mock_analyzer.verify
@@ -751,6 +754,7 @@ class TestGameEditor < Minitest::Test
 
     # Move 1 should have a blunder annotation (normal behavior, not subject to 30% rule)
     critical_moves = game.moves.select { |m| m.annotation&.include?('$201') }
+
     assert_predicate critical_moves.size, :positive?, 'Normal blunder detection should still work for moves with <= 250 centipawns advantage'
 
     mock_analyzer.verify
