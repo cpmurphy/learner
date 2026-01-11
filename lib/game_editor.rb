@@ -2,13 +2,15 @@
 
 require_relative 'move_translator'
 require_relative 'analyzer'
-require_relative 'uci_to_san_converter'
+require_relative 'blunder_detector'
+require_relative 'variation_builder'
+require_relative 'annotation_shifter'
 
 class GameEditor
-  BLUNDER_THRESHOLD = 140 # In centipawns. A drop of 1.4 pawn value is a blunder.
-
   def initialize
-    @uci_converter = UciToSanConverter.new
+    @blunder_detector = BlunderDetector.new
+    @variation_builder = VariationBuilder.new
+    @annotation_shifter = AnnotationShifter.new
   end
 
   def add_blunder_annotations(game)
@@ -34,10 +36,10 @@ class GameEditor
     # Store centipawn loss for all moves (not just blunders)
     store_centipawn_loss(move, analysis_data[:centipawn_loss])
 
-    return unless blunder_detected?(analysis_data[:best_score], analysis_data[:played_score])
+    return unless @blunder_detector.blunder_detected?(analysis_data[:best_score], analysis_data[:played_score])
 
     annotate_critical_moment(game, move_index)
-    add_best_move_variation(move, fen, analysis_data)
+    @variation_builder.add_best_move_variation(move, fen, analysis_data)
   end
 
   def store_centipawn_loss(move, centipawn_loss)
@@ -92,105 +94,10 @@ class GameEditor
     }
   end
 
-  def blunder_detected?(best_score, played_score)
-    # Now both scores are from the perspective of the player who is about to move.
-    # A blunder means the evaluation drops significantly (for both White and Black).
-
-    # A move should not be considered a blunder if it is 500 centipawns (or more) in favor
-    # of the player making the move, unless the winning move is a forced mate in one, two or three moves.
-    if played_score >= 500
-      # Check if best move is mate in 1, 2, or 3 (scores 999, 998, or 997)
-      is_forced_mate_in_1_2_or_3 = best_score.between?(997, 999)
-      return false unless is_forced_mate_in_1_2_or_3
-    end
-
-    # A move should not be considered a blunder if it is more than 250 centipawns in favor
-    # of the player making it, unless the best move has an evaluation more than 30% better.
-    if played_score > 250
-      # Check if best move is more than 30% better (best_score > played_score * 1.3)
-      is_more_than_30_percent_better = best_score > (played_score * 1.3)
-      return false unless is_more_than_30_percent_better
-    end
-
-    (best_score - played_score) > BLUNDER_THRESHOLD
-  end
-
   def annotate_critical_moment(game, move_index)
     # Add the $201 annotation to the PREVIOUS move to mark the critical moment
     # (PGN convention: $201 indicates a critical position where the next player can err)
-    add_201_to_move(game.moves[move_index - 1]) if move_index.positive?
-  end
-
-  def add_best_move_variation(move, fen, analysis_data)
-    best_move_analysis = analysis_data[:best_move_analysis]
-    best_move_uci = best_move_analysis[:move]
-    return unless best_move_uci
-
-    continuation_moves = best_move_analysis[:variation] || []
-    full_variation = [best_move_uci] + continuation_moves
-
-    # Build a variation with 12 ply (6 full moves) to show the continuation
-    variation_sequence = build_variation_sequence(fen, full_variation, 12)
-    return if variation_sequence.empty?
-
-    add_variation_comment(variation_sequence, analysis_data[:best_score], analysis_data[:played_score])
-
-    # Add the variation to the move
-    move.variations ||= []
-    move.variations << variation_sequence
-  end
-
-  def add_variation_comment(variation_sequence, best_score, played_score)
-    # Add a comment to the first move explaining the advantage
-    score_diff = (best_score - played_score).abs
-    variation_sequence[0].comment = "Better line (advantage: #{format_centipawns(score_diff)})"
-  end
-
-  # Build a sequence of moves for a variation
-  # @param fen [String] the starting FEN position
-  # @param uci_moves [Array<String>] array of UCI moves
-  # @param max_moves [Integer] maximum number of moves to include
-  # @return [Array<PGN::MoveText>] array of move objects
-  def build_variation_sequence(fen, uci_moves, max_moves)
-    sequence = []
-    current_fen = fen
-
-    uci_moves.take(max_moves).each do |uci_move|
-      # Skip invalid moves
-      next unless uci_move && uci_move != '--'
-
-      begin
-        # Convert UCI to SAN using the current position
-        san_move = @uci_converter.convert(current_fen, uci_move)
-        sequence << PGN::MoveText.new(san_move)
-
-        # Update the position by applying the move
-        translator = MoveTranslator.new
-        translator.load_game_from_fen(current_fen)
-        translator.translate_move(san_move)
-        current_fen = translator.board_as_fen
-      rescue StandardError
-        # If a move is invalid, stop building the variation
-        # This can happen if the variation contains moves that aren't valid for the position
-        break
-      end
-    end
-
-    sequence
-  end
-
-  # Format centipawns as a human-readable advantage string
-  # @param centipawns [Integer] the advantage in centipawns
-  # @return [String] formatted advantage (e.g., "+1.4" or "+M5" for mate in 5)
-  def format_centipawns(centipawns)
-    if centipawns > 900
-      # This is likely a mate score
-      mate_in = (1000 - centipawns).abs
-      "+M#{mate_in}"
-    else
-      pawns = centipawns / 100.0
-      format('+%.1f', pawns)
-    end
+    @annotation_shifter.add_201_to_move(game.moves[move_index - 1]) if move_index.positive?
   end
 
   # Modifies a PGN::Game object in place.
@@ -198,19 +105,7 @@ class GameEditor
   # it is moved to move M+1, as semantically $201 applies to the *next* move.
   # The PGN parser might associate it with M. This method corrects that.
   def shift_critical_annotations(game)
-    moves = game.moves
-    i = moves.size - 1
-    while i.positive?
-      current_move = moves[i]
-      prev_move = moves[i - 1]
-
-      # Only shift annotation to a real move, not MoveText.
-      if should_shift_annotation?(prev_move, current_move)
-        remove_201_from_move(prev_move)
-        add_201_to_move(current_move)
-      end
-      i -= 1
-    end
+    @annotation_shifter.shift_critical_annotations(game)
   end
 
   # Reverses shift_critical_annotations - moves $201 from move M+1 back to move M.
@@ -218,38 +113,13 @@ class GameEditor
   # add_blunder_annotations places $201 on move i-1 (before the blunder),
   # which is the correct placement for PGN files.
   def unshift_critical_annotations(game)
-    moves = game.moves
-    return if moves.empty?
-
-    # Start from the beginning and move $201 backwards
-    (1...moves.size).each do |i|
-      current_move = moves[i]
-      prev_move = moves[i - 1]
-
-      next unless current_move.respond_to?(:annotation) && current_move.annotation&.include?('$201')
-
-      # Only unshift annotation if previous move is a real move
-      next unless prev_move.respond_to?(:annotation)
-
-      remove_201_from_move(current_move)
-
-      add_201_to_move(prev_move)
-    end
+    @annotation_shifter.unshift_critical_annotations(game)
   end
 
-  def remove_201_from_move(move)
-    move.annotation.delete('$201')
-    move.annotation = nil if move.annotation.empty?
-  end
-
-  def add_201_to_move(move)
-    move.annotation ||= [] # Initialize if nil
-    move.annotation << '$201' unless move.annotation.include?('$201')
-  end
-
-  def should_shift_annotation?(prev_move, current_move)
-    prev_move.respond_to?(:annotation) &&
-      prev_move.annotation&.include?('$201') &&
-      current_move.respond_to?(:annotation)
+  # Format centipawns as a human-readable advantage string (delegated to VariationBuilder)
+  # @param centipawns [Integer] the advantage in centipawns
+  # @return [String] formatted advantage (e.g., "+1.4" or "+M5" for mate in 5)
+  def format_centipawns(centipawns)
+    @variation_builder.send(:format_centipawns, centipawns)
   end
 end
