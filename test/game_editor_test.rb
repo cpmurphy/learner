@@ -32,13 +32,16 @@ class TestGameEditor < Minitest::Test
       translator.load_game_from_fen(fen)
       uci_move = translator.translate_move(game.moves[i].notation)
 
-      # Build variation from the next 2 moves
+      # Build variation from the continuation moves AFTER the best move
+      # The variation should not include the best move itself
       translator.load_game_from_fen(fen)
-      variation = (i...(i + 2)).map do |j|
+      translator.translate_move(game.moves[i].notation) # Apply current move
+      variation = ((i + 1)...(i + 3)).map do |j|
         break unless game.positions[j] && game.moves[j]
 
         translator.translate_move(game.moves[j].notation)
       end
+      variation = [] if variation.nil? # Handle break returning nil
 
       # Mock best move evaluation - return the move that was actually played
       mock_analyzer.expect :evaluate_best_move, { score: 200, move: uci_move, variation: variation }, [fen]
@@ -85,13 +88,15 @@ class TestGameEditor < Minitest::Test
       uci_move = translator.translate_move(game.moves[i].notation)
       best_move_uci = uci_move
 
-      # Mock variation to be moves actually played
+      # Mock variation to be continuation moves AFTER the best move
       translator.load_game_from_fen(fen)
-      variation = (i...(i + 2)).map do |j|
+      translator.translate_move(game.moves[i].notation) # Apply current move
+      variation = ((i + 1)...(i + 3)).map do |j|
         break unless game.positions[j] && game.moves[j]
 
         translator.translate_move(game.moves[j].notation)
       end
+      variation = [] if variation.nil? # Handle break returning nil
 
       # Mock best move evaluation
       mock_analyzer.expect :evaluate_best_move,

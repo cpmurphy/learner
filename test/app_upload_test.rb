@@ -57,14 +57,28 @@ class AppUploadTest < Minitest::Test
       next unless game.positions[i] && game.moves[i]
 
       fen = game.positions[i].to_fen.to_s
-      # Mock best move analysis - return a good score
+
+      # Get the actual move that was played (in UCI format)
+      translator.load_game_from_fen(fen)
+      uci_move = translator.translate_move(game.moves[i].notation)
+
+      # Build variation: continuation moves after the current move
+      translator.load_game_from_fen(fen)
+      translator.translate_move(game.moves[i].notation) # Apply current move
+      variation = ((i + 1)...(i + 3)).map do |j|
+        break unless game.positions[j] && game.moves[j]
+
+        translator.translate_move(game.moves[j].notation)
+      end
+      variation = [] if variation.nil?
+
+      # Mock best move analysis - use actual move to avoid invalid positions
+      # Note: variation contains continuation moves after the best move
       mock_analyzer.expect :evaluate_best_move,
-                           { score: 200, move: 'e2e4', variation: %w[e2e4 e7e5] },
+                           { score: 200, move: uci_move, variation: variation },
                            [fen]
 
       # Mock played move analysis - return a score that doesn't trigger blunder (to keep test simple)
-      translator.load_game_from_fen(fen)
-      uci_move = translator.translate_move(game.moves[i].notation)
       mock_analyzer.expect :evaluate_move, { score: 150 }, [fen, uci_move]
     end
     mock_analyzer.expect :close, nil
