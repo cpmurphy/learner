@@ -32,7 +32,7 @@ class TestVariationBuilder < Minitest::Test
 
   def test_build_variation_sequence_with_simple_moves
     starting_fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-    uci_moves = ['e2e4', 'e7e5', 'g1f3']
+    uci_moves = %w[e2e4 e7e5 g1f3]
 
     sequence = @builder.build_variation_sequence(starting_fen, uci_moves, 3)
 
@@ -44,7 +44,7 @@ class TestVariationBuilder < Minitest::Test
 
   def test_build_variation_sequence_respects_max_moves
     starting_fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-    uci_moves = ['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1c4']
+    uci_moves = %w[e2e4 e7e5 g1f3 b8c6 f1c4]
 
     sequence = @builder.build_variation_sequence(starting_fen, uci_moves, 3)
 
@@ -53,7 +53,7 @@ class TestVariationBuilder < Minitest::Test
 
   def test_build_variation_sequence_handles_invalid_move
     starting_fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-    uci_moves = ['e2e4', 'invalid_move', 'g1f3']
+    uci_moves = %w[e2e4 invalid_move g1f3]
 
     sequence = @builder.build_variation_sequence(starting_fen, uci_moves, 3)
 
@@ -80,7 +80,7 @@ class TestVariationBuilder < Minitest::Test
     analysis_data = {
       best_move_analysis: {
         move: 'g1f3',
-        variation: ['b8c6', 'f1c4']
+        variation: %w[b8c6 f1c4]
       },
       best_score: 50,
       played_score: -100,
@@ -91,6 +91,7 @@ class TestVariationBuilder < Minitest::Test
 
     assert_equal 1, move.variations.size
     variation = move.variations[0]
+
     assert_equal 3, variation.size
     assert_equal 'Nf3', variation[0].notation
     assert_match(/Better line/, variation[0].comment)

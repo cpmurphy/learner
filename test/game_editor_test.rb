@@ -692,22 +692,28 @@ class TestGameEditor < Minitest::Test
     mock_analyzer.verify
   end
 
-  def test_process_move_for_blunders_stores_centipawn_loss_for_all_moves
+  def test_process_move_for_blunders_stores_centipawn_loss_only_for_blunders
     game = PGN::Game.new(%w[e4 e5])
     mock_analyzer = Minitest::Mock.new
     translator = MoveTranslator.new
 
-    # Mock analysis for both moves
-    (0...game.moves.size).each do |i|
-      move = game.moves[i]
-      fen = game.positions[i].to_fen.to_s
-      translator.load_game_from_fen(fen)
-      uci_move = translator.translate_move(move.notation)
+    # Mock analysis for first move (e4) - not a blunder (centipawn loss < 140)
+    move_1 = game.moves[0]
+    fen_1 = game.positions[0].to_fen.to_s
+    translator.load_game_from_fen(fen_1)
+    uci_move_1 = translator.translate_move(move_1.notation)
+    # Centipawn loss: 100 - 50 = 50 (not a blunder)
+    mock_analyzer.expect :evaluate_best_move, { score: 100, move: uci_move_1 }, [fen_1]
+    mock_analyzer.expect :evaluate_move, { score: -50 }, [fen_1, uci_move_1]
 
-      # Both moves have centipawn loss of 50 (not a blunder, but should still store)
-      mock_analyzer.expect :evaluate_best_move, { score: 100, move: uci_move }, [fen]
-      mock_analyzer.expect :evaluate_move, { score: -50 }, [fen, uci_move]
-    end
+    # Mock analysis for second move (e5) - is a blunder (centipawn loss > 140)
+    move_2 = game.moves[1]
+    fen_2 = game.positions[1].to_fen.to_s
+    translator.load_game_from_fen(fen_2)
+    uci_move_2 = translator.translate_move(move_2.notation)
+    # Centipawn loss: 200 - 50 = 150 (is a blunder)
+    mock_analyzer.expect :evaluate_best_move, { score: 200, move: uci_move_2 }, [fen_2]
+    mock_analyzer.expect :evaluate_move, { score: -50 }, [fen_2, uci_move_2]
 
     mock_analyzer.expect :close, nil
 
@@ -715,12 +721,15 @@ class TestGameEditor < Minitest::Test
       @editor.add_blunder_annotations(game)
     end
 
-    # Verify centipawn loss was stored for all moves
-    game.moves.each do |move|
-      cp_loss = @editor.extract_centipawn_loss(move)
+    # Verify centipawn loss was NOT stored for non-blunder move
+    cp_loss_1 = @editor.extract_centipawn_loss(game.moves[0])
 
-      assert_equal 50, cp_loss, 'Centipawn loss should be stored for all moves'
-    end
+    assert_nil cp_loss_1, 'Centipawn loss should NOT be stored for non-blunder moves'
+
+    # Verify centipawn loss WAS stored for blunder move
+    cp_loss_2 = @editor.extract_centipawn_loss(game.moves[1])
+
+    assert_equal 150, cp_loss_2, 'Centipawn loss should be stored for blunder moves'
 
     mock_analyzer.verify
   end

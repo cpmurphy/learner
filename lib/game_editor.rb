@@ -33,10 +33,10 @@ class GameEditor
     analysis_data = analyze_move_position(fen, move, analyzer, translator)
     return unless analysis_data
 
-    # Store centipawn loss for all moves (not just blunders)
-    store_centipawn_loss(move, analysis_data[:centipawn_loss])
-
     return unless @blunder_detector.blunder_detected?(analysis_data[:best_score], analysis_data[:played_score])
+
+    # Store centipawn loss only for blunders (moves that get $201 annotation)
+    store_centipawn_loss(move, analysis_data[:centipawn_loss])
 
     annotate_critical_moment(game, move_index)
     @variation_builder.add_best_move_variation(move, fen, analysis_data)
