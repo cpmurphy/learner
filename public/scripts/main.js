@@ -602,6 +602,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (moveResult.remove) {
                         board.setPiece(moveResult.remove, null);
                     }
+                    // Handle pawn promotion - replace the pawn with the promoted piece
+                    if (moveResult.promotion && moveResult.promotionSquare) {
+                        board.setPiece(moveResult.promotionSquare, moveResult.promotion);
+                    }
                     variationChess.move(nextSan, { sloppy: true });
                     currentFenInVariation = variationChess.fen();
                     currentVariationPly++;

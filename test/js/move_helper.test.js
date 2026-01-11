@@ -125,7 +125,20 @@ describe('MoveHelper.sanToSquares', () => {
 
     it('should convert SAN to squares for promotion (b8=Q)', () => {
         const fen = "r1bqk1nr/pPpp1ppp/8/4p3/8/8/PPP1PPPP/RNBQKBNR w KQkq - 0 1";
-        expect(MoveHelper.sanToSquares('b8=Q', fen)).toEqual({ moves: [{ from: 'b7', to: 'b8' }]});
+        expect(MoveHelper.sanToSquares('b8=Q', fen)).toEqual({
+            moves: [{ from: 'b7', to: 'b8' }],
+            promotion: 'wq',
+            promotionSquare: 'b8'
+        });
+    });
+
+    it('should convert SAN to squares for black pawn promotion (b1=Q)', () => {
+        const fen = "rnbqkbnr/ppp1pppp/8/8/8/8/PpPPPPPP/R1BQKBNR b KQkq - 0 1";
+        expect(MoveHelper.sanToSquares('b1=Q', fen)).toEqual({
+            moves: [{ from: 'b2', to: 'b1' }],
+            promotion: 'bq',
+            promotionSquare: 'b1'
+        });
     });
 
     it('should return null for illegal SAN', () => {

@@ -60,7 +60,7 @@ export class MoveHelper {
      * Converts SAN to a list of move objects and, for en passant, a square to remove.
      * @param {string} san
      * @param {string} fen
-     * @returns {{ moves: Array<{from: string, to: string}>, remove?: string } | null}
+     * @returns {{ moves: Array<{from: string, to: string}>, remove?: string, promotion?: string } | null}
      */
     static sanToSquares(san, fen) {
         if (!fen || typeof fen !== 'string') {
@@ -81,6 +81,8 @@ export class MoveHelper {
                 const fromSquare = move.from;
                 const toSquare = move.to;
                 const moves = [{ from: fromSquare, to: toSquare }];
+                const result = { moves };
+
                 // Use descriptor functions for castling
                 const isWhite = move.color === 'w';
                 if (typeof move.isKingsideCastle === 'function' && move.isKingsideCastle()) {
@@ -94,6 +96,16 @@ export class MoveHelper {
                         to: isWhite ? 'd1' : 'd8'
                     });
                 }
+
+                // Handle promotion
+                if (move.promotion) {
+                    // chess.js returns lowercase piece type (q, n, b, r)
+                    // cm-chessboard expects format like 'wq', 'bq', etc.
+                    const pieceColor = isWhite ? 'w' : 'b';
+                    result.promotion = pieceColor + move.promotion;
+                    result.promotionSquare = toSquare;
+                }
+
                 // Handle en passant
                 if (typeof move.isEnPassant === 'function' && move.isEnPassant()) {
                     // The captured pawn is on the same rank as the from-square, file of the to-square
@@ -102,9 +114,10 @@ export class MoveHelper {
                     const toFile = toSquare[0];
                     const removeRank = isWhite ? (parseInt(toSquare[1]) - 1).toString() : (parseInt(toSquare[1]) + 1).toString();
                     const removeSquare = toFile + removeRank;
-                    return { moves, remove: removeSquare };
+                    result.remove = removeSquare;
                 }
-                return { moves };
+
+                return result;
             }
             return null;
         } catch (e) {
