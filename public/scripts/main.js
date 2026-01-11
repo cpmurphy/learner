@@ -263,8 +263,13 @@ document.addEventListener("DOMContentLoaded", () => {
             if (lm.annotation && lm.annotation.length > 0) {
                 displayText += ` ${lm.annotation.join(' ')}`;
             }
-            if (lm.is_critical && lm.turn !== learningSide) {
-                displayText += ` (Opponent's blunder!)`;
+            // Show "?" or "??" for opponent moves based on centipawn loss
+            if (lm.turn !== learningSide && lm.centipawn_loss !== null && lm.centipawn_loss !== undefined) {
+                if (lm.centipawn_loss > 100) {
+                    displayText += ` ??`;
+                } else if (lm.centipawn_loss > 0) {
+                    displayText += ` ?`;
+                }
             }
             moveInfoDisplay.textContent = displayText;
         } else {

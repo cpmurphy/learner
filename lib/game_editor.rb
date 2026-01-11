@@ -31,10 +31,38 @@ class GameEditor
     analysis_data = analyze_move_position(fen, move, analyzer, translator)
     return unless analysis_data
 
+    # Store centipawn loss for all moves (not just blunders)
+    store_centipawn_loss(move, analysis_data[:centipawn_loss])
+
     return unless blunder_detected?(analysis_data[:best_score], analysis_data[:played_score])
 
     annotate_critical_moment(game, move_index)
     add_best_move_variation(move, fen, analysis_data)
+  end
+
+  def store_centipawn_loss(move, centipawn_loss)
+    # Store centipawn loss in a comment in parseable format
+    # Format: "cp_loss: 50" (PGN library will strip curly braces)
+    cp_loss_comment = "cp_loss: #{centipawn_loss}"
+
+    move.comment = if move.comment && !move.comment.empty?
+                     # Append to existing comment, separated by space
+                     "#{move.comment} #{cp_loss_comment}"
+                   else
+                     cp_loss_comment
+                   end
+  end
+
+  def extract_centipawn_loss(move)
+    # Extract centipawn loss from move comment
+    # Format: "cp_loss: 50" (PGN library strips curly braces)
+    return nil unless move.comment
+
+    # Try both formats: with braces (if manually set) and without (PGN library format)
+    match = move.comment.match(/\{?cp_loss:\s*(-?\d+)\}?/)
+    return nil unless match
+
+    match[1].to_i
   end
 
   def analyze_move_position(fen, move, analyzer, translator)
@@ -52,9 +80,14 @@ class GameEditor
     # who MADE the move, so we negate it.
     played_score = -played_move_analysis[:score]
 
+    # Centipawn loss: difference between best move and played move
+    # Both scores are from the perspective of the player who is about to move (before the move)
+    centipawn_loss = best_score - played_score
+
     {
       best_score: best_score,
       played_score: played_score,
+      centipawn_loss: centipawn_loss,
       best_move_analysis: best_move_analysis
     }
   end

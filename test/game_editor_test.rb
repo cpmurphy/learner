@@ -770,6 +770,122 @@ class TestGameEditor < Minitest::Test
     # Mate scores are typically > 900 centipawns
     assert_match(/\+M\d+/, @editor.format_centipawns(950))
   end
+
+  def test_store_centipawn_loss_stores_in_comment
+    move = PGN::MoveText.new('e4')
+    @editor.store_centipawn_loss(move, 50)
+
+    assert_match(/cp_loss:\s*50/, move.comment)
+  end
+
+  def test_store_centipawn_loss_appends_to_existing_comment
+    move = PGN::MoveText.new('e4', nil, 'Original comment')
+    @editor.store_centipawn_loss(move, 75)
+
+    assert_match(/Original comment/, move.comment)
+    assert_match(/cp_loss:\s*75/, move.comment)
+  end
+
+  def test_extract_centipawn_loss_extracts_from_comment
+    move = PGN::MoveText.new('e4', nil, 'cp_loss: 100')
+
+    assert_equal 100, @editor.extract_centipawn_loss(move)
+  end
+
+  def test_extract_centipawn_loss_handles_negative_values
+    move = PGN::MoveText.new('e4', nil, 'cp_loss: -50')
+
+    assert_equal(-50, @editor.extract_centipawn_loss(move))
+  end
+
+  def test_extract_centipawn_loss_returns_nil_when_not_present
+    move = PGN::MoveText.new('e4', nil, 'No cp_loss here')
+
+    assert_nil @editor.extract_centipawn_loss(move)
+  end
+
+  def test_extract_centipawn_loss_returns_nil_when_no_comment
+    move = PGN::MoveText.new('e4')
+
+    assert_nil @editor.extract_centipawn_loss(move)
+  end
+
+  def test_analyze_move_position_calculates_centipawn_loss
+    game = PGN::Game.new(%w[e4])
+    move = game.moves[0]
+    fen = game.positions[0].to_fen.to_s
+
+    mock_analyzer = Minitest::Mock.new
+    translator = MoveTranslator.new
+
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(move.notation)
+
+    # Best move score: 50, played move score: -50 (so played_score = 50)
+    # Centipawn loss = 50 - 50 = 0
+    mock_analyzer.expect :evaluate_best_move, { score: 50, move: uci_move }, [fen]
+    mock_analyzer.expect :evaluate_move, { score: -50 }, [fen, uci_move]
+
+    result = @editor.analyze_move_position(fen, move, mock_analyzer, translator)
+
+    assert_equal 0, result[:centipawn_loss]
+    mock_analyzer.verify
+  end
+
+  def test_analyze_move_position_calculates_centipawn_loss_for_blunder
+    game = PGN::Game.new(%w[e4])
+    move = game.moves[0]
+    fen = game.positions[0].to_fen.to_s
+
+    mock_analyzer = Minitest::Mock.new
+    translator = MoveTranslator.new
+
+    translator.load_game_from_fen(fen)
+    uci_move = translator.translate_move(move.notation)
+
+    # Best move score: 200, played move score: -100 (so played_score = 100)
+    # Centipawn loss = 200 - 100 = 100
+    mock_analyzer.expect :evaluate_best_move, { score: 200, move: uci_move }, [fen]
+    mock_analyzer.expect :evaluate_move, { score: -100 }, [fen, uci_move]
+
+    result = @editor.analyze_move_position(fen, move, mock_analyzer, translator)
+
+    assert_equal 100, result[:centipawn_loss]
+    mock_analyzer.verify
+  end
+
+  def test_process_move_for_blunders_stores_centipawn_loss_for_all_moves
+    game = PGN::Game.new(%w[e4 e5])
+    mock_analyzer = Minitest::Mock.new
+    translator = MoveTranslator.new
+
+    # Mock analysis for both moves
+    (0...game.moves.size).each do |i|
+      move = game.moves[i]
+      fen = game.positions[i].to_fen.to_s
+      translator.load_game_from_fen(fen)
+      uci_move = translator.translate_move(move.notation)
+
+      # Both moves have centipawn loss of 50 (not a blunder, but should still store)
+      mock_analyzer.expect :evaluate_best_move, { score: 100, move: uci_move }, [fen]
+      mock_analyzer.expect :evaluate_move, { score: -50 }, [fen, uci_move]
+    end
+
+    mock_analyzer.expect :close, nil
+
+    Analyzer.stub :new, mock_analyzer do
+      @editor.add_blunder_annotations(game)
+    end
+
+    # Verify centipawn loss was stored for all moves
+    game.moves.each do |move|
+      cp_loss = @editor.extract_centipawn_loss(move)
+
+      assert_equal 50, cp_loss, 'Centipawn loss should be stored for all moves'
+    end
+
+    mock_analyzer.verify
+  end
 end
 
 # --- Tests for AppHelpers ---
@@ -948,5 +1064,23 @@ class TestAppGetLastMoveInfoHelper < Minitest::Test
     # For current_position_index = 1, actual_move_index_in_game_array = 0.
     # So, game.positions[0] should be invalid, meaning game.positions is empty.
     assert_nil get_last_move_info(game_short_pos, 1), 'Index out of bounds for positions (empty positions array)'
+  end
+
+  def test_build_move_info_hash_includes_centipawn_loss
+    move = PGN::MoveText.new('e4', nil, 'cp_loss: 75')
+    game = PGN::Game.new([move])
+
+    info = build_move_info_hash(move, 0, game)
+
+    assert_equal 75, info[:centipawn_loss]
+  end
+
+  def test_build_move_info_hash_handles_missing_centipawn_loss
+    move = PGN::MoveText.new('e4', nil, 'No cp_loss')
+    game = PGN::Game.new([move])
+
+    info = build_move_info_hash(move, 0, game)
+
+    assert_nil info[:centipawn_loss]
   end
 end

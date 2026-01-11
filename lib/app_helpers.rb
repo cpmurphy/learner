@@ -67,6 +67,9 @@ module AppHelpers
     variation_data = extract_variation_data(move, is_critical_moment)
     move_metadata = calculate_move_metadata(actual_move_index)
 
+    # Extract centipawn loss from comment if present
+    centipawn_loss = extract_centipawn_loss_from_comment(move.comment)
+
     {
       number: move_metadata[:display_move_number],
       turn: move_metadata[:current_turn],
@@ -76,8 +79,21 @@ module AppHelpers
       is_critical: is_critical_moment,
       good_move_san: variation_data[:good_san],
       variation_sans: variation_data[:variation_sans],
-      fen_before_move: fen_before_this_move
+      fen_before_move: fen_before_this_move,
+      centipawn_loss: centipawn_loss
     }
+  end
+
+  def extract_centipawn_loss_from_comment(comment)
+    # Extract centipawn loss from move comment
+    # Format: "cp_loss: 50" (PGN library strips curly braces)
+    return nil unless comment
+
+    # Try both formats: with braces (if manually set) and without (PGN library format)
+    match = comment.match(/\{?cp_loss:\s*(-?\d+)\}?/)
+    return nil unless match
+
+    match[1].to_i
   end
 
   def extract_variation_data(move, is_critical_moment)
