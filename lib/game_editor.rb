@@ -115,11 +115,4 @@ class GameEditor
   def unshift_critical_annotations(game)
     @annotation_shifter.unshift_critical_annotations(game)
   end
-
-  # Format centipawns as a human-readable advantage string (delegated to VariationBuilder)
-  # @param centipawns [Integer] the advantage in centipawns
-  # @return [String] formatted advantage (e.g., "+1.4" or "+M5" for mate in 5)
-  def format_centipawns(centipawns)
-    @variation_builder.send(:format_centipawns, centipawns)
-  end
 end
