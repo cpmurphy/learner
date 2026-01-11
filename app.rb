@@ -564,9 +564,9 @@ class LearnerApp < Sinatra::Base
     return nil unless continuation_analysis && continuation_analysis[:variation]
 
     full_variation = [user_move_uci, continuation_analysis[:move]] + continuation_analysis[:variation]
-    require_relative 'lib/game_editor'
-    game_editor = GameEditor.new
-    variation_sequence = game_editor.build_variation_sequence(fen, full_variation, 8)
+    require_relative 'lib/variation_builder'
+    variation_builder = VariationBuilder.new
+    variation_sequence = variation_builder.build_variation_sequence(fen, full_variation, 8)
     variation_sequence.map(&:notation)
   end
 
