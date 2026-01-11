@@ -257,18 +257,22 @@ document.addEventListener("DOMContentLoaded", () => {
             let movePrefix = `${lm.number}${lm.turn === 'white' ? '.' : '...'}`;
             let displayText = `${movePrefix} ${lm.san}`;
 
-            if (lm.comment && lm.comment.trim() !== "") {
-                displayText += ` {${lm.comment.trim()}}`;
-            }
-            if (lm.annotation && lm.annotation.length > 0) {
-                displayText += ` ${lm.annotation.join(' ')}`;
-            }
-            // Show "?" or "??" for opponent moves based on centipawn loss
-            if (lm.turn !== learningSide && lm.centipawn_loss !== null && lm.centipawn_loss !== undefined) {
-                if (lm.centipawn_loss > 100) {
-                    displayText += ` ??`;
-                } else if (lm.centipawn_loss > 0) {
-                    displayText += ` ?`;
+            // For user's moves, show comments and annotations
+            if (lm.turn === learningSide) {
+                if (lm.comment && lm.comment.trim() !== "") {
+                    displayText += ` {${lm.comment.trim()}}`;
+                }
+                if (lm.annotation && lm.annotation.length > 0) {
+                    displayText += ` ${lm.annotation.join(' ')}`;
+                }
+            } else {
+                // For opponent's moves, show "?" or "??" based on centipawn loss
+                if (lm.centipawn_loss !== null && lm.centipawn_loss !== undefined && lm.centipawn_loss > 0) {
+                    if (lm.centipawn_loss > 100) {
+                        displayText += ` ??`;
+                    } else {
+                        displayText += ` ?`;
+                    }
                 }
             }
             moveInfoDisplay.textContent = displayText;
