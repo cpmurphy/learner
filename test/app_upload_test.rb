@@ -4,10 +4,9 @@ require_relative 'test_helper'
 require 'rack/test'
 require 'tempfile'
 require 'fileutils'
-require 'minitest/mock'
 require 'pgn'
 require_relative '../app'
-require_relative '../lib/move_translator'
+require_relative 'support/stub_analyzer'
 
 class AppUploadTest < Minitest::Test
   include Rack::Test::Methods
@@ -42,50 +41,12 @@ class AppUploadTest < Minitest::Test
     FileUtils.rm_rf(@test_dir) if @test_dir && Dir.exist?(@test_dir)
   end
 
-  # Helper method to create a mock analyzer for tests that need to avoid Stockfish
-  def with_mock_analyzer(pgn_content = @valid_pgn, &block)
+  # Helper method to stub the Analyzer for tests that need to avoid Stockfish
+  # Uses a simple StubAnalyzer that returns consistent results
+  def with_stub_analyzer(&block)
     require_relative '../lib/analyzer'
-    mock_analyzer = Minitest::Mock.new
-
-    # Create a simple game to determine how many positions to mock
-    games = PGN.parse(pgn_content.dup)
-    game = games.first
-    translator = MoveTranslator.new
-
-    # Mock analysis for each move position
-    (0...game.moves.size).each do |i|
-      next unless game.positions[i] && game.moves[i]
-
-      fen = game.positions[i].to_fen.to_s
-
-      # Get the actual move that was played (in UCI format)
-      translator.load_game_from_fen(fen)
-      uci_move = translator.translate_move(game.moves[i].notation)
-
-      # Build variation: continuation moves after the current move
-      translator.load_game_from_fen(fen)
-      translator.translate_move(game.moves[i].notation) # Apply current move
-      variation = ((i + 1)...(i + 3)).map do |j|
-        break unless game.positions[j] && game.moves[j]
-
-        translator.translate_move(game.moves[j].notation)
-      end
-      variation = [] if variation.nil?
-
-      # Mock best move analysis - use actual move to avoid invalid positions
-      # Note: variation contains continuation moves after the best move
-      mock_analyzer.expect :evaluate_best_move,
-                           { score: 200, move: uci_move, variation: variation },
-                           [fen]
-
-      # Mock played move analysis - return a score that doesn't trigger blunder (to keep test simple)
-      mock_analyzer.expect :evaluate_move, { score: 150 }, [fen, uci_move]
-    end
-    mock_analyzer.expect :close, nil
-
-    Analyzer.stub :new, mock_analyzer, &block
-
-    mock_analyzer.verify
+    stub = StubAnalyzer.new
+    Analyzer.stub :new, stub, &block
   end
 
   def test_upload_pgn_with_valid_file
@@ -152,7 +113,7 @@ class AppUploadTest < Minitest::Test
   end
 
   def test_analyze_and_save_with_json_content
-    with_mock_analyzer do
+    with_stub_analyzer do
       post '/api/analyze_and_save',
            { pgn_content: @valid_pgn, filename: 'test_game.pgn' }.to_json,
            'CONTENT_TYPE' => 'application/json'
@@ -206,7 +167,7 @@ class AppUploadTest < Minitest::Test
 
   def test_sanitize_filename_removes_unsafe_characters
     # Test the helper method indirectly through the endpoint
-    with_mock_analyzer do
+    with_stub_analyzer do
       post '/api/analyze_and_save',
            { pgn_content: @valid_pgn, filename: '../../../etc/passwd.pgn' }.to_json,
            'CONTENT_TYPE' => 'application/json'
@@ -226,7 +187,7 @@ class AppUploadTest < Minitest::Test
   def test_unique_filename_generation
     # Upload same file twice, should get different filenames
     first_filename = nil
-    with_mock_analyzer do
+    with_stub_analyzer do
       post '/api/analyze_and_save',
            { pgn_content: @valid_pgn, filename: 'test.pgn' }.to_json,
            'CONTENT_TYPE' => 'application/json'
@@ -239,7 +200,7 @@ class AppUploadTest < Minitest::Test
     sleep(1)
 
     # Second request with new mock
-    with_mock_analyzer do
+    with_stub_analyzer do
       post '/api/analyze_and_save',
            { pgn_content: @valid_pgn, filename: 'test.pgn' }.to_json,
            'CONTENT_TYPE' => 'application/json'
