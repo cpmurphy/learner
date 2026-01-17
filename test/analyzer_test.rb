@@ -8,7 +8,7 @@ class AnalyzerTest < Minitest::Test
   def setup
     @mock_engine = Minitest::Mock.new
     mock_engine_configuration
-    Stockfish::Engine.stub :new, @mock_engine do
+    StockfishEngine.stub :new, @mock_engine do
       @analyzer = Analyzer.new(@mock_engine)
     end
   end
@@ -119,7 +119,7 @@ class AnalyzerTest < Minitest::Test
       depth: 20,
       max_nodes: 2_000_000
     }
-    Stockfish::Engine.stub :new, mock_engine do
+    StockfishEngine.stub :new, mock_engine do
       analyzer = Analyzer.new('stockfish', custom_options)
 
       assert_equal 10, analyzer.instance_variable_get(:@timeout)

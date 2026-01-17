@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'stockfish'
+require_relative 'stockfish_engine'
 require 'timeout'
 
 # A class to parse Stockfish analysis output
@@ -171,7 +171,7 @@ class Analyzer
   private
 
   def initialize_engine
-    @engine = Stockfish::Engine.new(@engine_path)
+    @engine = StockfishEngine.new(@engine_path)
     configure_engine
   rescue StandardError => e
     raise EngineError, "Failed to initialize Stockfish engine: #{e.message}"

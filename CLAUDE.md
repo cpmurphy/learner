@@ -55,7 +55,7 @@ npm run coverage
 
 ### Stockfish Engine
 
-The Stockfish directory contains a git submodule for the Stockfish chess engine. This is built separately and not modified as part of this project. The engine binary is referenced by the `stockfish` gem, which uses the system `stockfish` command by default.
+The Stockfish directory contains a git submodule for the Stockfish chess engine. This is built separately and not modified as part of this project. The application uses an internal `StockfishEngine` class (lib/stockfish_engine.rb) to communicate with the Stockfish binary via UCI protocol, rather than using the `stockfish` gem. This approach provides better compatibility with Stockfish 17+ and avoids frozen string literal issues.
 
 ## Architecture
 
@@ -87,6 +87,14 @@ Key API endpoints:
 - `evaluate_move(fen, move)` - Evaluates a specific move from a position
 - `good_enough_move?(fen, user_move_uci, good_move_uci)` - Determines if a user's alternative move is acceptable (>250cp advantage OR >80% as good as the suggested move)
 - Contains `AnalysisParser` class that parses Stockfish UCI output
+
+**lib/stockfish_engine.rb** - Internal UCI engine implementation
+- Replaces the stockfish gem with a lightweight internal implementation
+- Directly communicates with Stockfish via UCI (Universal Chess Interface) protocol
+- `execute(command)` - Sends UCI commands and returns output
+- `analyze(fen, depth:)` - Analyzes a position and returns full engine output
+- `multipv(value)` - Sets the MultiPV option for multiple variations
+- Compatible with Stockfish 17+ without requiring gem patches
 
 **lib/move_translator.rb** - Converts between PGN notation and UCI format
 - Maintains internal board state and validates moves
@@ -168,6 +176,7 @@ The UI uses:
 ## Important Notes
 
 - The Stockfish directory is a git submodule and should not be modified
+- The application uses an internal StockfishEngine class (lib/stockfish_engine.rb) instead of the stockfish gem for better Stockfish 17+ compatibility
 - The application requires the `PGN_DIR` environment variable to load games
 - Sessions store the entire parsed game object, so they can be large
 - The frontend expects UCI move format for communication with Stockfish
