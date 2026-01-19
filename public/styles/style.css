@@ -86,8 +86,20 @@ h1 {
     /* Inherits height: 40px, margin, border, etc. which are fine */
 }
 
-.controls button:hover, .info select:hover {
+.controls button:not(:disabled):hover, .info select:hover {
     background-color: #e9e9e9;
+}
+
+.controls button:disabled {
+    background-color: #e3e3e3;
+    border-color: #b9b9b9;
+    color: #8a8a8a;
+    cursor: not-allowed;
+    box-shadow: inset 0 0 0 1px #c6c6c6;
+}
+
+.controls button:disabled .icon {
+    opacity: 0.6;
 }
 
 .move-info {
