@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  chess-learner:
+    build: .
+    ports:
+      - "9292:3000"
+    volumes:
+      # Mount a local directory for persistent game storage
+      - ./games:/app/games
+    environment:
+      - PGN_DIR=/app/games
+    restart: unless-stopped
+    container_name: chess-learner
+
+# To use:
+# 1. Install Docker Desktop (Windows/Mac) or Docker Engine (Linux)
+# 2. Run: docker-compose up
+# 3. Open: http://localhost:9292
+# 4. Your analyzed games are saved in ./games directory

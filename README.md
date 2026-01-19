@@ -2,6 +2,12 @@
 
 A web-based chess learning tool that helps you learn from your games by automatically identifying critical moments (blunders and mistakes) and allowing you to practice finding better moves. This tool integrates with Stockfish to analyze your games and provides an interactive interface for studying your play.
 
+## Quick Start
+
+See [QUICKSTART.md](QUICKSTART.md) for the fastest way to install and run.
+
+See [INSTALL.md](INSTALL.md) for more detailed step-by-step installation instructions for Windows, Mac, and Linux.
+
 ## What Makes This Tool Useful
 
 - **Automatic Analysis**: Upload your PGN files and the tool automatically identifies critical moments using Stockfish engine analysis
@@ -22,66 +28,23 @@ The tool is intended for beginning or intermediate players. Unlike the "game rev
 - **No Positive Feedback**: this tool won't tell you if you made a brilliant sacrifice or found a cunning tactic
 - **No Nuance**: if you slowly get ground down in a positional slugfest, this tool won't tell you where you went wrong
 
-## Prerequisites
+## Installation Options
 
-Before you begin, ensure you have the following installed:
+### Docker
 
-- **Ruby** (version 3.2.3 or higher recommended)
-- **Bundler** gem (`gem install bundler`)
-- **npm** (Node.js package manager)
-- **Stockfish** (Install via your system package manager, e.g., `apt-get install stockfish` on Debian/Ubuntu, `brew install stockfish` on macOS.)
+If you have Docker installed, this is the simplest option:
 
-## Installation
+```bash
+docker-compose up
+```
 
-1. Clone this repository:
-   ```bash
-   git clone <repository-url>
-   cd learner
-   ```
+Then open http://localhost:9292 in your browser. Your games are automatically saved in the `games` folder.
 
-2. Install Ruby dependencies:
-   ```bash
-   bundle install
-   ```
+Don't have Docker?  See the [Quickstart Guide](QUICKSTART.md).
 
-3. Install JavaScript dependencies:
-   ```bash
-   npm install
-   ```
+### Alternative: Native Installation
 
-4. Copy third-party assets (chessboard components):
-   ```bash
-   npm run copy-all
-   ```
-
-## Running Locally
-
-1. Set up a directory for your PGN files. You can use the test data directory for testing:
-   ```bash
-   # Option 1: Use the existing test data directory
-   export PGN_DIR=./test/data
-   
-   # Option 2: Create your own directory
-   mkdir -p ~/chess-games
-   export PGN_DIR=~/chess-games
-   ```
-
-2. Start the server:
-   ```bash
-   bundle exec puma config.ru
-   ```
-
-   The server will start on `http://localhost:9292` by default (or the port configured by Puma).
-
-3. Open your web browser and navigate to:
-   ```
-   http://localhost:9292
-   ```
-
-4. Upload a PGN file:
-   - Paste your PGN content into the text area, or
-   - The tool will analyze it automatically and identify critical moments
-   - Once analysis is complete, click the link to view your analyzed game
+For detailed installation instructions including native installation (without Docker), see [INSTALL.md](INSTALL.md).
 
 ## Usage
 

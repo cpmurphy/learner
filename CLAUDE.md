@@ -31,6 +31,7 @@ bundle exec ruby -Ilib:test test/game_editor_test.rb
 PGN_DIR=./test/data bundle exec puma config.ru
 
 # Lint code
+# IMPORTANT: do not consider a task done if rubocop still triggers warnings
 bundle exec rubocop
 ```
 
