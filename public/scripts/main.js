@@ -558,6 +558,20 @@ document.addEventListener("DOMContentLoaded", () => {
                     updateMoveInfoDisplay({ san: userMoveSanInVariation }, true, currentVariationPly);
                 }
                 if (nextMoveButton) nextMoveButton.disabled = false;
+            } else if (currentVariationPly === 1 && fenAtCriticalPrompt) {
+                console.log("Exiting variation mode, returning to critical moment prompt");
+
+                const positionBeforeBlunder = mainLineMoveIndexAtVariationStart - 1;
+
+                if (positionBeforeBlunder >= 0) {
+                    await fetchAndUpdateBoard('/game/set_move_index', 'POST', { move_index: positionBeforeBlunder });
+                } else {
+                    console.error("Invalid position before blunder:", positionBeforeBlunder);
+                    // Fallback: just set the board position and exit variation mode
+                    board.setPosition(fenAtCriticalPrompt, true);
+                    inVariationMode = false;
+                    if (resumeGameButton) resumeGameButton.disabled = true;
+                }
             }
             return;
         }
