@@ -92,4 +92,32 @@ class TestBlunderDetector < Minitest::Test
   def test_blunder_threshold_constant
     assert_equal 140, BlunderDetector::BLUNDER_THRESHOLD
   end
+
+  def test_blunder_not_detected_when_both_moves_completely_lost
+    # Both moves leave the position completely lost (losing by 8+ pawns)
+    # Best score: -401, played score: -893, difference: -492 (but both are completely lost)
+    # Should NOT be blunder because game is hopeless either way
+    refute @detector.blunder_detected?(-401, -893)
+  end
+
+  def test_blunder_not_detected_when_both_moves_exactly_at_lost_threshold
+    # Both scores are exactly at the completely lost threshold (-400)
+    # Should NOT be blunder
+    refute @detector.blunder_detected?(-400, -400)
+  end
+
+  def test_blunder_detected_when_only_played_move_completely_lost
+    assert @detector.blunder_detected?(-300, -441)
+  end
+
+  def test_blunder_detected_when_neither_move_completely_lost
+    # Neither move is completely lost, normal blunder detection should apply
+    # Best score: -200, played score: -350, difference: 150 > 140
+    # Should be blunder
+    assert @detector.blunder_detected?(-200, -350)
+  end
+
+  def test_completely_lost_threshold_constant
+    assert_equal(-400, BlunderDetector::COMPLETELY_LOST_THRESHOLD)
+  end
 end

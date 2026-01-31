@@ -2,6 +2,7 @@
 
 class BlunderDetector
   BLUNDER_THRESHOLD = 140 # In centipawns. A drop of 1.4 pawn value is a blunder.
+  COMPLETELY_LOST_THRESHOLD = -400 # In centipawns. Positions worse than this are completely lost.
 
   # Determines if a move is a blunder based on the evaluation drop
   # @param best_score [Integer] evaluation of the best move in centipawns
@@ -10,6 +11,11 @@ class BlunderDetector
   def blunder_detected?(best_score, played_score)
     # Now both scores are from the perspective of the player who is about to move.
     # A blunder means the evaluation drops significantly (for both White and Black).
+
+    # Don't flag blunders when the position is already completely lost.
+    # If both the best move and played move leave the player losing by 8+ pawns,
+    # the game is hopeless regardless of which move is played.
+    return false if best_score <= COMPLETELY_LOST_THRESHOLD && played_score <= COMPLETELY_LOST_THRESHOLD
 
     # A move should not be considered a blunder if it is 500 centipawns (or more) in favor
     # of the player making the move, unless the winning move is a forced mate in one, two or three moves.
