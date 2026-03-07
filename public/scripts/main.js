@@ -1,6 +1,7 @@
 import { Chessboard, COLOR } from "./3rdparty/cm-chessboard/Chessboard.js";
 import { MoveHelper } from './move_helper.js';
 import { Chess } from './3rdparty/chess.js/chess.js';
+import { variationMoveNumber, variationTurn, variationDisplayArrayIndex, variationNextArrayIndex } from './variation_helper.js';
 
 document.addEventListener("DOMContentLoaded", () => {
     const boardContainer = document.getElementById("chessboard-container");
@@ -130,20 +131,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     // The variation starts with learningSide making a move (replacing the blunder move)
                     variationStartTurn = learningSide;
 
-                    // The move number calculation:
-                    // - If lastMoveDataForVariation.turn === 'black', then after black's move it's white's turn
-                    //   White's move starts a new move number: lastMoveDataForVariation.number + 1
-                    // - If lastMoveDataForVariation.turn === 'white', then after white's move it's black's turn
-                    //   Black's move uses the same move number: lastMoveDataForVariation.number
-                    if (lastMoveDataForVariation.turn === 'black') {
-                        // Last move was black's move, next turn is white
-                        // White's move starts a new move number
-                        variationStartMoveNumber = lastMoveDataForVariation.number + 1;
-                    } else {
-                        // Last move was white's move, next turn is black
-                        // Black's move uses the same move number
-                        variationStartMoveNumber = lastMoveDataForVariation.number;
-                    }
+                    // The variation replaces the blunder move, so it starts at the same move number
+                    variationStartMoveNumber = lastMoveDataForVariation.number;
 
                     // If the user played the expected move and a variation exists, use it.
                     // Otherwise, check if we got a continuation line from the validation response.
@@ -206,9 +195,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     updateMoveInfoDisplay({ san: userMoveSan }, true, currentVariationPly);
 
                     if (resumeGameButton) resumeGameButton.disabled = false;
-                    // Check if we've reached the end: adjust for array indexing
-                    const nextArrayIndex = currentVariationPly - variationSANsStartIndex;
-                    if (nextMoveButton) nextMoveButton.disabled = (nextArrayIndex >= currentVariationSANs.length);
+                    // Check if we've reached the end
+                    if (nextMoveButton) nextMoveButton.disabled = (variationNextArrayIndex(currentVariationPly, variationSANsStartIndex) >= currentVariationSANs.length);
                     if (nextCriticalButton) nextCriticalButton.disabled = true;
                 } else {
                     // Fallback: Should not be reached if challenge was correctly initiated.
@@ -239,16 +227,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!moveInfoDisplay) return;
 
         if (isVariationMove && lastMoveData && lastMoveData.san) { // lastMoveData here is just { san: '...' }
-            // Calculate move number and turn based on the starting move number and turn
-            // variationPly is 1-based (1 = first move in variation)
-            const isWhiteMove = (variationStartTurn === 'white' && (variationPly - 1) % 2 === 0) ||
-                                (variationStartTurn === 'black' && (variationPly - 1) % 2 === 1);
-            const turnInVariation = isWhiteMove ? 'white' : 'black';
-
-            // Calculate move number: increment after each pair of moves (white+black)
-            // variationPly is 1-based, so (variationPly - 1) gives 0-based index
-            // Each pair (white+black) increments the move number by 1
-            const moveNumberInVariation = variationStartMoveNumber + Math.floor((variationPly - 1) / 2);
+            const turnInVariation = variationTurn(variationStartTurn, variationPly);
+            const moveNumberInVariation = variationMoveNumber(variationStartMoveNumber, variationStartTurn, variationPly);
 
             let movePrefix = `${moveNumberInVariation}${turnInVariation === 'white' ? '.' : '...'}`;
             moveInfoDisplay.textContent = `Variation: ${movePrefix} ${lastMoveData.san}`;
@@ -549,8 +529,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 currentVariationPly--;
                 board.setPosition(variationChess.fen(), true);
                 // currentVariationPly is now the ply for the move we're displaying (the one we just moved back to)
-                // Adjust index based on whether user's move is in the array
-                const arrayIndex = currentVariationPly - variationSANsStartIndex;
+                const arrayIndex = variationDisplayArrayIndex(currentVariationPly, variationSANsStartIndex);
                 if (arrayIndex >= 0 && arrayIndex < currentVariationSANs.length) {
                     updateMoveInfoDisplay({ san: currentVariationSANs[arrayIndex] }, true, currentVariationPly);
                 } else if (currentVariationPly === 1 && userMoveSanInVariation) {
@@ -592,10 +571,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (inVariationMode) {
             console.log("Next move clicked (Variation Mode)");
-            // Adjust index based on whether user's move is in the array
-            // If variationSANsStartIndex = 1, we sliced the array, so use currentVariationPly - 1
-            // If variationSANsStartIndex = 0, array includes user's move, so use currentVariationPly
-            const arrayIndex = currentVariationPly - variationSANsStartIndex;
+            const arrayIndex = variationNextArrayIndex(currentVariationPly, variationSANsStartIndex);
 
             // Check if we've reached the end of the variation
             if (arrayIndex >= currentVariationSANs.length) {
@@ -625,9 +601,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     currentVariationPly++;
                     // currentVariationPly is now the ply for the move we just played
                     updateMoveInfoDisplay({ san: nextSan }, true, currentVariationPly);
-                    // Check if we've reached the end: adjust for array indexing
-                    const nextArrayIndex = currentVariationPly - variationSANsStartIndex;
-                    if (nextMoveButton) nextMoveButton.disabled = (nextArrayIndex >= currentVariationSANs.length);
+                    // Check if we've reached the end
+                    if (nextMoveButton) nextMoveButton.disabled = (variationNextArrayIndex(currentVariationPly, variationSANsStartIndex) >= currentVariationSANs.length);
                 } else {
                     console.error(`Illegal move in variation: ${nextSan} from FEN: ${variationChess.fen()}`);
                     moveInfoDisplay.textContent = `Error: Illegal move '${nextSan}' in variation. Resuming main game.`;
