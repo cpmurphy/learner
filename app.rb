@@ -7,6 +7,7 @@ require 'digest'
 require_relative 'lib/game_editor'
 require_relative 'lib/app_helpers' # Require the new helpers
 require_relative 'lib/analyzer'
+require_relative 'lib/pgn_reader'
 
 class LearnerApp < Sinatra::Base
   enable :sessions
@@ -42,23 +43,6 @@ class LearnerApp < Sinatra::Base
       content_type :json
       status status_code
       data.to_json
-    end
-
-    # Ensure the PGN text ends with a valid game termination token.
-    # If missing, and a [Result "..."] tag exists, append that token to the end.
-    def ensure_pgn_has_result_termination(pgn_text)
-      return pgn_text if pgn_text.nil? || pgn_text.strip.empty?
-
-      result_tag = pgn_text[/\[Result\s+"([^"]+)"\]/i, 1]
-      return pgn_text unless result_tag
-
-      normalized_result = result_tag.strip
-      return pgn_text unless ['1-0', '0-1', '1/2-1/2', '*'].include?(normalized_result)
-
-      trimmed = pgn_text.rstrip
-      return pgn_text if trimmed.match?(%r{(1-0|0-1|1/2-1/2|\*)\s*\z})
-
-      "#{trimmed} #{normalized_result}\n"
     end
 
     # Sanitize filename to prevent path traversal and ensure safe filenames
@@ -188,8 +172,8 @@ class LearnerApp < Sinatra::Base
 
     begin
       pgn_content = File.read(abs_path)
-      pgn_content = ensure_pgn_has_result_termination(pgn_content)
-      games_in_file = PGN.parse(pgn_content)
+      reader = PGNReader.new
+      games_in_file = reader.read(pgn_content)
       game_count = games_in_file.size
 
       if games_in_file.any? && games_in_file.first.tags
@@ -273,8 +257,7 @@ class LearnerApp < Sinatra::Base
 
   def parse_pgn_file(file_path)
     pgn_content = File.read(file_path)
-    pgn_content = ensure_pgn_has_result_termination(pgn_content)
-    PGN.parse(pgn_content)
+    PGNReader.new.read(pgn_content)
   end
 
   def handle_empty_pgn_file(pgn_meta)
@@ -706,8 +689,7 @@ class LearnerApp < Sinatra::Base
       tempfile.rewind
 
       # Validate it's parseable PGN
-      pgn_content = ensure_pgn_has_result_termination(pgn_content)
-      games = PGN.parse(pgn_content.dup)
+      games = PGNReader.new.read(pgn_content.dup)
       return json_response({ error: 'No valid games found in PGN file' }, 400) if games.empty?
 
       # Return info about the uploaded file
@@ -779,8 +761,7 @@ class LearnerApp < Sinatra::Base
   end
 
   def analyze_and_save_pgn(pgn_content, original_filename, pgn_dir)
-    pgn_content = ensure_pgn_has_result_termination(pgn_content)
-    games = PGN.parse(pgn_content.dup)
+    games = PGNReader.new.read(pgn_content.dup)
     return json_response({ error: 'No valid games found in PGN' }, 400) if games.empty?
 
     game = games.first
