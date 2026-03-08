@@ -225,4 +225,23 @@ class PGNReaderTest < Minitest::Test
 
     assert result.rstrip.end_with?('0-1')
   end
+
+  def test_parses_pgns_with_emoji
+    pgn_text = <<~PGN
+      [Event "Test"]
+      [White "Player1"]
+      [Black "Player2"]
+      [Result "1-0"]
+
+      1.e4 { best by test… 👉😭👈} 1... e5 2.Nf3 Nc6 1-0
+    PGN
+
+    games = @reader.read(pgn_text.dup)
+
+    assert_equal 1, games.size
+
+    game = games.first
+
+    assert_equal 'Player1', game.tags['White']
+  end
 end

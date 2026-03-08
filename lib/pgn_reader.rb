@@ -19,8 +19,15 @@ class PGNReader
   def read(pgn_text)
     return [] if pgn_text.nil? || pgn_text.strip.empty?
 
+    pgn_text = strip_non_ascii(pgn_text)
     pgn_text = ensure_pgn_has_result_termination(pgn_text)
     PGN.parse(pgn_text)
+  end
+
+  # Remove non-ASCII characters that the PGN parser cannot handle.
+  def strip_non_ascii(pgn_text)
+    pgn_text.encode('UTF-8', invalid: :replace, undef: :replace, replace: '')
+            .gsub(/[^\x00-\x7F]/, '')
   end
 
   # Ensure the PGN text ends with a valid game termination token.
