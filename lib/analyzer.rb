@@ -7,16 +7,17 @@ require 'timeout'
 # A thin wrapper that uses the stockfish engine to analyse the position
 class Analyzer
   DEFAULT_TIMEOUT = 5 # seconds
-  DEFAULT_DEPTH = 14
+  DEFAULT_DEPTH = 18
   DEFAULT_MULTIPV = 3
   MAX_NODES = 1_000_000
 
   class EngineError < StandardError; end
   class TimeoutError < EngineError; end
 
-  def initialize(engine_path = 'stockfish', options = {})
+  def initialize(options = {})
     @parser = AnalysisParser.new
-    @engine_path = engine_path
+    @engine_override = options[:engine_override]
+    @engine_path = options.fetch(:engine_path, 'stockfish')
     @timeout = options.fetch(:timeout, DEFAULT_TIMEOUT)
     @depth = options.fetch(:depth, DEFAULT_DEPTH)
     @max_nodes = options.fetch(:max_nodes, MAX_NODES)
@@ -107,7 +108,7 @@ class Analyzer
   private
 
   def initialize_engine
-    @engine = StockfishEngine.new(@engine_path)
+    @engine = @engine_override || StockfishEngine.new(@engine_path)
     configure_engine
   rescue StandardError => e
     raise EngineError, "Failed to initialize Stockfish engine: #{e.message}"

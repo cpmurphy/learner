@@ -20,7 +20,7 @@ class GameEditorIntegrationTest < Minitest::Test
 
     fen_position = '3r4/p1k4p/1p1q2p1/2p2p2/2B5/P1Bp2P1/1P2rP1P/R2Q2K1 w - - 3 30'
 
-    analyzer = Analyzer.new
+    analyzer = Analyzer.new(depth: 14)
     begin
       # Get the best move analysis
       best_move_analysis = analyzer.evaluate_best_move(fen_position)
