@@ -17,6 +17,8 @@ class PGNReader
   # @param pgn_text [String] the PGN representation
   # @return a [PGN::Game] object comprising the game
   def read(pgn_text)
+    return [] if pgn_text.nil? || pgn_text.strip.empty?
+
     pgn_text = ensure_pgn_has_result_termination(pgn_text)
     PGN.parse(pgn_text)
   end
