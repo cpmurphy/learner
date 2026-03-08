@@ -228,7 +228,6 @@ class LearnerApp < Sinatra::Base
   post '/api/load_game' do
     scan_pgn_directory
     params = parse_json_body
-    return params if params.is_a?(Hash) && params[:error]
 
     pgn_file_id = params['pgn_file_id']
     return json_response({ error: 'Missing pgn_file_id parameter' }, 400) unless pgn_file_id
@@ -242,7 +241,7 @@ class LearnerApp < Sinatra::Base
   def parse_json_body
     JSON.parse(request.body.read)
   rescue JSON::ParserError
-    json_response({ error: 'Invalid JSON in request body' }, 400)
+    halt 400, { 'Content-Type' => 'application/json' }, { error: 'Invalid JSON in request body' }.to_json
   end
 
   def load_game_from_pgn_file(pgn_meta)
@@ -395,7 +394,6 @@ class LearnerApp < Sinatra::Base
     end
 
     params = parse_json_body
-    return params if params.is_a?(Hash) && params[:error]
 
     learning_side = params['learning_side']
     unless %w[white black].include?(learning_side)
@@ -500,7 +498,6 @@ class LearnerApp < Sinatra::Base
     return json_response({ error: 'No game loaded.' }, 404) unless game_loaded?
 
     params = parse_json_body
-    return params if params.is_a?(Hash) && params[:error]
 
     fen = params['fen']
     user_move_uci = params['user_move_uci']
@@ -558,7 +555,6 @@ class LearnerApp < Sinatra::Base
     return json_response({ error: 'No game loaded.' }, 404) unless game_loaded?
 
     params = parse_json_body
-    return params if params.is_a?(Hash) && params[:error]
 
     move_index = params['move_index']
     variation_sans = params['variation_sans']

@@ -6,6 +6,7 @@
 
 require_relative '../test_helper'
 require_relative '../../lib/game_editor'
+require_relative '../../lib/blunder_detector'
 require_relative '../../lib/analyzer'
 require_relative '../../lib/move_translator'
 require_relative '../../lib/uci_to_san_converter'
@@ -49,7 +50,7 @@ class GameEditorIntegrationTest < Minitest::Test
       # The score difference should be large enough to be a blunder
       # User stated: +2.5 to -2.0 = ~4.5 pawns = 450 centipawns
       # But we'll be more flexible and just verify it's above the threshold
-      assert_operator score_diff, :>, GameEditor::BLUNDER_THRESHOLD, "Score difference (#{score_diff} cp) should exceed blunder threshold (#{GameEditor::BLUNDER_THRESHOLD} cp). Best: #{best_score} cp, Played: #{played_score} cp"
+      assert_operator score_diff, :>, BlunderDetector::BLUNDER_THRESHOLD, "Score difference (#{score_diff} cp) should exceed blunder threshold (#{BlunderDetector::BLUNDER_THRESHOLD} cp). Best: #{best_score} cp, Played: #{played_score} cp"
 
       # Verify the best move is Qa4
       best_move_uci = best_move_analysis[:move]

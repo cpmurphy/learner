@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
-require_relative 'test_helper'
+require_relative '../test_helper'
 require 'rack/test'
 require 'tempfile'
 require 'fileutils'
 require 'pgn'
-require_relative '../app'
-require_relative '../lib/game_editor'
+require_relative '../../app'
+require_relative '../../lib/game_editor'
 
 class AppGameEndpointsTest < Minitest::Test
   include Rack::Test::Methods
@@ -47,26 +47,7 @@ class AppGameEndpointsTest < Minitest::Test
   end
 
   def test_load_game_in_session
-    # Set up a session with a loaded game
-    get '/api/pgn_files'
-
-    assert_predicate last_response, :ok?, "Failed to get PGN files: #{last_response.body}"
-
-    files = JSON.parse(last_response.body)
-    test_file = files.find { |f| f['name'] == 'test_game.pgn' }
-
-    assert test_file, "test_game.pgn not found in PGN files list: #{files.inspect}"
-
-    post '/api/load_game',
-         { pgn_file_id: test_file['id'] }.to_json,
-         'CONTENT_TYPE' => 'application/json'
-
-    unless last_response.ok?
-      puts "Response status: #{last_response.status}"
-      puts "Response body: #{last_response.body}"
-    end
-
-    assert_predicate last_response, :ok?, "Failed to load game: #{last_response.body}"
+    load_game_in_session
   end
 
   def test_add_variation_without_loaded_game
@@ -253,6 +234,23 @@ class AppGameEndpointsTest < Minitest::Test
   end
 
   private
+
+  def load_game_in_session
+    get '/api/pgn_files'
+
+    assert_predicate last_response, :ok?, "Failed to get PGN files: #{last_response.body}"
+
+    files = JSON.parse(last_response.body)
+    test_file = files.find { |f| f['name'] == 'test_game.pgn' }
+
+    assert test_file, "test_game.pgn not found in PGN files list: #{files.inspect}"
+
+    post '/api/load_game',
+         { pgn_file_id: test_file['id'] }.to_json,
+         'CONTENT_TYPE' => 'application/json'
+
+    assert_predicate last_response, :ok?, "Failed to load game: #{last_response.body}"
+  end
 
   def verify_variation_response(json)
     assert json['success']
