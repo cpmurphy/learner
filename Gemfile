@@ -17,4 +17,4 @@ group :development, :test do
   gem 'simplecov', require: false
 end
 
-gem 'rake', '~> 13.3'
+gem 'rake', '~> 13.4'
