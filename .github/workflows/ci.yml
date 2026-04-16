@@ -42,7 +42,7 @@ jobs:
       - name: Run tests
         run: |
           bundle install
-          bundle exec ruby -Itest $(ls test/*.rb | grep -v smoke)
+          bundle exec rake test
           npm install && npm run copy-all && npm run test_once
 
       - name: Keep screenshots from failed system tests
