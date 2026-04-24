@@ -1,4 +1,5 @@
 import { Chessboard, COLOR } from "./3rdparty/cm-chessboard/Chessboard.js";
+import { Arrows } from "./3rdparty/cm-chessboard/extensions/arrows/Arrows.js";
 import { MoveHelper } from './move_helper.js';
 import { Chess } from './3rdparty/chess.js/chess.js';
 import { variationMoveNumber, variationTurn, variationDisplayArrayIndex, variationNextArrayIndex } from './variation_helper.js';
@@ -120,6 +121,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (validationData.good_enough) {
                 moveInfoDisplay.textContent = `Correct! "${userMoveSan}" is a good move.`;
+                if (board && board.removeArrows) board.removeArrows();
                 const lastMoveDataForVariation = window.lastServerMoveData;
 
                 if (lastMoveDataForVariation) {
@@ -358,6 +360,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (url === '/game/set_move_index' || url === '/api/load_game' || url === '/game/go_to_start' || url === '/game/go_to_end') {
                     inVariationMode = false;
                     if (resumeGameButton) resumeGameButton.disabled = true;
+                    if (board && board.removeArrows) board.removeArrows();
                 }
 
                 const fenToDisplay = setupChallenge ? fenAtCriticalPrompt : data.fen;
@@ -371,7 +374,8 @@ document.addEventListener("DOMContentLoaded", () => {
                             moveFromMarker: undefined, // Optional: clear markers
                             moveToMarker: undefined,   // Optional: clear markers
                         },
-                        orientation: initialOrientation
+                        orientation: initialOrientation,
+                        extensions: [{ class: Arrows }]
                     };
                     board = new Chessboard(boardContainer, props);
                     console.log(`Chessboard initialized. FEN: ${fenToDisplay}, Position index: ${data.move_index}, Total positions: ${data.total_positions}, Orientation: ${learningSide}`);
@@ -660,6 +664,7 @@ document.addEventListener("DOMContentLoaded", () => {
     learnSideSelect?.addEventListener("change", (event) => {
         learningSide = event.target.value;
         console.log("Learning side changed to:", learningSide);
+        if (board && board.removeArrows) board.removeArrows();
         if (inCriticalMomentChallenge || inVariationMode) {
             console.log("Learning side changed during challenge/variation. Mode cancelled.");
             inCriticalMomentChallenge = false;
