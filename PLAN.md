@@ -1,183 +1,206 @@
-# PGN Upload and Annotation Feature - Implementation Plan
+# Chess Learner Hint Feature - Implementation Plan
 
 ## Goal
-Automate the manual SCID annotation workflow by allowing users to upload PGN files via the web UI and run Stockfish analysis directly, saving annotated PGNs to PGN_DIR.
+If learner makes three wrong guesses in a row, show a hint button.  If the
+user presses the button, show a bubble that reads "Try moving your
+<piecename>".  If <piecename> is ambiguous make it not ambiguous. For
+example it's a pawn and there is more than one, it should read "Try moving your
+<column> pawn".  If it's not a pawn just say "Try moving your <piecename> on
+<square>".  After showing the hint button, if the learner makes three more
+wrong guesses, show the best move using an arrow on the board.
 
 ## Current State Analysis
 
-**What exists:**
-- `GameEditor.add_blunder_annotations(game)` - Adds $201 annotations to blunders
-- PGN parsing via pgn2 gem
-- Stockfish analysis via `Analyzer` class
+### Where critical-moment guessing happens
 
-**What's missing:**
-- PGN file upload endpoint
-- Adding variations (better moves) to the PGN, not just $201 markers
-- PGN serialization (writing game back to PGN format)
-- Frontend upload UI
+- `public/scripts/main.js` drives all client-side gameplay. The critical-moment
+  challenge is entered inside `fetchAndUpdateBoard()` when the server returns a
+  `last_move` with `is_critical: true`, `turn === learningSide`, and a
+  `good_move_san`. At that point the file sets:
+  - `inCriticalMomentChallenge = true`
+  - `fenAtCriticalPrompt = lastMoveData.fen_before_move` (position the learner
+    must play from)
+  - `goodMoveSanForChallenge = lastMoveData.good_move_san` (the expected reply
+    in SAN)
+  - and calls `board.enableMoveInput(handleCriticalMoveAttempt, learningSide)`
+    (main.js:347-429).
 
----
+- Every user guess flows through `handleCriticalMoveAttempt()` (main.js:49-220).
+  It converts the attempted move to SAN with `MoveHelper`, derives the UCI for
+  the expected good move, and POSTs both to `/game/validate_critical_move`.
+  - Correct guess (`validationData.good_enough === true`): the function enters
+    variation mode, saves the continuation to the PGN, and disables move input.
+  - Wrong guess: the function sets
+    `moveInfoDisplay.textContent = '"<san>" is not the best move. Try again!'`,
+    resets the board to `fenAtCriticalPrompt`, and returns `false`. There is
+    **no counter** of how many wrong guesses have happened in a row — each
+    rejection is independent.
 
-## Implementation Plan
+### Backend / data already available
 
-### **Phase 1: PGN Serialization (Backend Foundation)**
-*Enable writing annotated games back to PGN format*
+- `/game/validate_critical_move` in `app.rb` (lines 497-529) only tells the
+  client whether the move is good enough and, if so, returns a variation. It
+  does not need to change for the hint feature; the client already has
+  `goodMoveSanForChallenge` and `fenAtCriticalPrompt`, which together are
+  enough to derive: the from-square, to-square, and piece type of the best
+  move (via `new Chess(fen).move(san, { sloppy: true })` — already used at
+  main.js:92-100 to compute `goodMoveUci`).
+- `AppHelpers#get_last_move_info` (lib/app_helpers.rb:44-85) is what populates
+  `good_move_san`, `fen_before_move`, and the critical-moment flags in the
+  `last_move` payload.
 
-**Step 1.1: Create PGN Writer class** (`lib/pgn_writer.rb`)
-- Write method to serialize `PGN::Game` to PGN string format
-- Handle tags (Event, Site, Date, White, Black, Result, etc.)
-- Handle moves with annotations ($201, comments)
-- Handle variations (alternative move sequences)
-- **Output:** Can convert in-memory game to PGN string
+### Board rendering / arrows
 
-**Step 1.2: Add tests for PGN Writer**
-- Test serialization of simple game
-- Test serialization with annotations
-- Test serialization with variations
-- Test round-trip: parse → modify → serialize → parse
+- The board is a `cm-chessboard` instance (main.js:376). The library ships an
+  `Arrows` extension at
+  `public/scripts/3rdparty/cm-chessboard/extensions/arrows/Arrows.js` that adds
+  `chessboard.addArrow`, `getArrows`, and `removeArrows`. It is **not**
+  currently registered — the board is constructed with only `position`,
+  `assetsUrl`, `style`, and `orientation` props. To use arrows we have to pass
+  an `extensions` array to the `Chessboard` constructor (see cm-chessboard
+  docs) and call `chessboard.removeArrows()` when clearing.
 
----
+### UI / HTML / CSS
 
-### **Phase 2: Enhanced Annotation (Core Feature)**
-*Add variations showing better moves, not just $201 markers*
+- `public/game.html` hosts the board, the `move-info-display` paragraph, and a
+  row of icon buttons inside `.controls`. There is no hint button and no
+  bubble/tooltip element. The only similar existing UI pattern is
+  `#copy-fen-feedback` (a green "Copied!" bubble positioned absolutely inside
+  `.copy-fen-container` — style.css:149-173) which we can mirror for the
+  hint-text bubble.
+- `style.css` currently has no styling for hint-related elements.
 
-**Step 2.1: Enhance GameEditor to add variations**
-- Modify `add_blunder_annotations` to also add variations
-- When a blunder is found, add the best move as a variation
-- Keep the $201 annotation for compatibility
-- **Output:** Annotated games now include suggested alternatives
+### Testing
 
-**Step 2.2: Add MoveTranslator reverse conversion** (if needed)
-- If variations need to be in SAN format, ensure UCI → SAN conversion
-- The Analyzer returns moves in UCI format (e.g., "e2e4")
-- PGN variations need SAN format (e.g., "e4")
-- **Note:** May be able to use chess.js or create simple converter
+- Vitest covers JS modules (`test/js/move_helper.test.js`,
+  `variation_helper.test.js`). There are no DOM-level tests for `main.js`
+  today, so new hint logic should live in a small, unit-testable module (like
+  `move_helper.js`) rather than being buried inline in `main.js`.
+- Minitest covers Ruby. No backend changes are required, so no new Ruby tests.
 
-**Step 2.3: Add tests for enhanced annotation**
-- Test that variations are added correctly
-- Test that both $201 and variations exist
-- Verify variation format is valid PGN
+### Summary of what's missing for the hint feature
 
----
-
-### **Phase 3: File Upload Backend**
-*Accept PGN uploads and save annotated results*
-
-**Step 3.1: Add file upload endpoint** (`POST /api/upload_pgn`)
-- Accept multipart/form-data file upload
-- Validate file is valid PGN
-- Parse PGN content
-- **Output:** Returns parsed game info or error
-
-**Step 3.2: Add annotation + save endpoint** (`POST /api/analyze_and_save`)
-- Accept uploaded PGN content
-- Run analysis and annotation (GameEditor)
-- Serialize back to PGN format (PGNWriter)
-- Save to PGN_DIR with timestamp or unique name
-- **Output:** Returns success + filename, or error
-
-**Step 3.3: Add file management**
-- Prevent filename collisions (use timestamps or sanitize names)
-- Ensure files are saved within PGN_DIR boundary (security)
-- Refresh available PGN list after upload
-- **Output:** New file appears in game list
-
----
-
-### **Phase 4: Frontend Upload UI**
-*Allow users to upload files via web interface*
-
-**Step 4.1: Add upload form to UI**
-- Add file input and upload button to index.html
-- Style to match existing UI
-- Show upload progress indicator
-- **Output:** User can select PGN file from disk
-
-**Step 4.2: Implement upload JavaScript**
-- Add fetch call to POST /api/upload_pgn
-- Handle file reading via FormData
-- Show success/error messages
-- **Output:** File is uploaded to server
-
-**Step 4.3: Add annotation trigger**
-- Add "Annotate with Stockfish" button/checkbox
-- Call POST /api/analyze_and_save
-- Show progress during analysis (can be slow)
-- Refresh PGN file list after completion
-- **Output:** User sees annotated game in file list
+1. A counter of consecutive wrong guesses for the current critical moment,
+   reset when the user advances to a new critical moment, makes a correct
+   move, loads a new game, changes `learningSide`, or navigates away from the
+   prompt.
+2. A hint button in the DOM, hidden by default.
+3. A bubble element to display the hint text next to / over the board.
+4. A function that turns (FEN, good-move SAN) into a human-readable hint
+   phrase using the disambiguation rules in the goal.
+5. Registration of the cm-chessboard `Arrows` extension and logic to draw /
+   remove the best-move arrow after 6 consecutive wrong guesses.
 
 ---
 
-### **Phase 5: Integration & Polish**
-*Wire everything together and handle edge cases*
+## Phased Implementation Plan
 
-**Step 5.1: Add progress indication**
-- Long-running Stockfish analysis needs feedback
-- Consider WebSocket or polling for status updates
-- Show "Analyzing move X of Y..."
-- **Output:** User knows analysis is in progress
+### Phase 1 — Hint-text helper (pure, testable)
 
-**Step 5.2: Error handling**
-- Handle invalid PGN files gracefully
-- Handle Stockfish errors/timeouts
-- Handle disk write errors
-- Show meaningful error messages to user
-- **Output:** Robust error handling
+Create `public/scripts/hint_helper.js` exporting a single function
+`bestMoveHint(fen, goodMoveSan)` that returns the sentence to show in the
+bubble. Internally:
 
-**Step 5.3: Optional enhancements**
-- Download annotated PGN directly
-- Configure analysis depth/threshold
-- Batch upload multiple games
-- Preview annotations before saving
+1. Parse `goodMoveSan` with `chess.js` against `fen` to get `{ from, piece,
+   color }`.
+2. Map `piece` ∈ `{p,n,b,r,q,k}` to a display name
+   (`pawn / knight / bishop / rook / queen / king`).
+3. If the piece is a pawn:
+   - Count pawns of `color` on the board (scan the FEN's piece-placement
+     field).
+   - If there is exactly one, return `"Try moving your pawn"`.
+   - Otherwise return `"Try moving your <file> pawn"` where `<file>` is
+     `from[0]` (the column, a–h).
+4. Otherwise return `"Try moving your <piecename> on <from>"` (e.g.
+   `"Try moving your knight on f3"`).
 
----
+Add `test/js/hint_helper.test.js` covering: single pawn, multiple pawns,
+knight, bishop, rook, queen, king, and both colors.
 
-## Recommended Implementation Order
+### Phase 2 — DOM additions (game.html + style.css)
 
-1. **Phase 1.1-1.2** (PGN Writer) - Foundational and testable in isolation
-2. **Phase 2.1-2.3** (Enhanced Annotation) - Builds on PGN Writer, still backend-only
-3. **Phase 3** (Backend Upload) - Can test with curl before UI exists
-4. **Phase 4** (Frontend) - Wire up the UI
-5. **Phase 5** (Polish) - Make it production-ready
+1. In `game.html`, add inside `.controls` (or immediately after the board) a
+   hidden hint button:
+   ```html
+   <button id="hint-button" class="app-button" style="display:none;">Hint</button>
+   ```
+   and a hidden hint-bubble container (modeled on `.copy-feedback`) positioned
+   near the board:
+   ```html
+   <div id="hint-bubble" class="hint-bubble" style="display:none;"></div>
+   ```
+2. In `style.css`, add a `.hint-bubble` rule (rounded, contrasting background,
+   short fade-in) and a `.app-button.hint-visible` helper if extra emphasis
+   is wanted. Keep the visual language consistent with the existing
+   `.copy-feedback` / `.upload-status.info` styles.
 
-Each phase produces a testable, working component.
+### Phase 3 — Register the Arrows extension
 
----
+In `main.js` where the `Chessboard` is constructed (lines 365-376), import
+`Arrows` and `ARROW_TYPE` from
+`./3rdparty/cm-chessboard/extensions/arrows/Arrows.js` and pass
+`extensions: [{ class: Arrows }]` in the props. Also ensure
+`chessboard.removeArrows()` is called when a challenge ends (correct move,
+`resumeGameButton`, `set_move_index`, side change, new game load).
 
-## Technical Considerations
+### Phase 4 — Wire up wrong-guess state in main.js
 
-**PGN Variation Format:**
-```pgn
-1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. Bxf7+? $201 (4. c3 {Better is c3}) Kxf7
-```
-The variation `(4. c3 ...)` shows the better move.
+1. Introduce two module-scoped counters alongside the other challenge state
+   (near main.js:25-41):
+   ```js
+   let wrongGuessCount = 0;
+   let hintShown = false;
+   ```
+2. Create a helper `resetHintState()` that zeroes both counters, hides the
+   hint button, hides the bubble, and calls `board.removeArrows()`.
+3. Call `resetHintState()` from:
+   - The start of every new critical moment (the `setupChallenge` branch of
+     `fetchAndUpdateBoard`).
+   - The successful-guess branch of `handleCriticalMoveAttempt`.
+   - `resumeGameButton` click handler.
+   - `learnSideSelect` change handler.
+   - `autoLoadGame` / any `/api/load_game` path.
+4. In the wrong-guess branch of `handleCriticalMoveAttempt` (main.js:209-213),
+   increment `wrongGuessCount`. Then:
+   - If `!hintShown && wrongGuessCount >= 3`: reveal the hint button (set
+     `display: inline-flex`).
+   - If `hintShown && wrongGuessCount >= 6`: derive `{from, to}` of the good
+     move (reuse the `goodMoveObject` computation already present at
+     main.js:92-100) and call
+     `board.addArrow(ARROW_TYPE.default, from, to)`. Guard so we only add the
+     arrow once per challenge.
 
-**File Naming:**
-- Append timestamp: `my_game_20251025_143022.pgn`
-- Or add suffix: `my_game_annotated.pgn`
-- Check if file exists before saving
+### Phase 5 — Hint button handler
 
-**Security:**
-- Validate uploaded files are text/PGN
-- Limit file size (e.g., 10MB max)
-- Sanitize filenames
-- Ensure PGN_DIR path traversal protection
+Add a `document.getElementById('hint-button').addEventListener('click', …)`
+handler that:
 
----
+1. Calls `bestMoveHint(fenAtCriticalPrompt, goodMoveSanForChallenge)` (from
+   Phase 1) to build the sentence.
+2. Writes it into `#hint-bubble` and makes the bubble visible.
+3. Sets `hintShown = true` and resets `wrongGuessCount = 0` so the next three
+   wrong guesses trigger the arrow (matches the goal wording: "after showing
+   the hint button, if the learner makes three more wrong guesses, show the
+   best move").
+4. Disables the hint button (we've already given it; the next escalation is
+   the arrow).
 
-## Status
+### Phase 6 — Manual verification
 
-- [x] Phase 1.1: PGN Writer class
-- [x] Phase 1.2: PGN Writer tests
-- [x] Phase 2.1: Enhanced annotation
-- [x] Phase 2.2: UCI to SAN conversion
-- [x] Phase 2.3: Enhanced annotation tests
-- [x] Phase 3.1: Upload endpoint
-- [x] Phase 3.2: Annotate and save endpoint
-- [x] Phase 3.3: File management
-- [x] Phase 4.1: Upload form UI
-- [x] Phase 4.2: Upload JavaScript
-- [x] Phase 4.3: Annotation trigger
-- [ ] Phase 5.1: Progress indication
-- [ ] Phase 5.2: Error handling
-- [ ] Phase 5.3: Optional enhancements
+Because `main.js` has no DOM tests, verify the full flow manually with
+`PGN_DIR=./test/data bundle exec puma config.ru`:
+
+1. Load a game with a known blunder.
+2. Jump to a critical moment; make three wrong guesses of the same type
+   (e.g., obviously bad moves) and confirm the hint button appears.
+3. Click the hint; confirm the bubble text follows the pawn / piece-on-square
+   rules for the test positions (pick one pawn blunder and one piece blunder).
+4. Make three more wrong guesses; confirm an arrow is drawn from the correct
+   square to the correct square.
+5. Play the correct move; confirm the hint button, bubble, and arrow all
+   disappear and variation mode starts normally.
+6. Re-enter a different critical moment in the same game and confirm state
+   is reset (no carryover counter).
+7. Run `bundle exec rake test`, `npm test`, and `bundle exec rubocop` — only
+   the first and second are expected to exercise new code, and rubocop must
+   stay clean per CLAUDE.md.
