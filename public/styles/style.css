@@ -146,6 +146,51 @@ h1 {
     padding: 5px 0; /* Some vertical padding */
 }
 
+.hint-bubble {
+    position: relative;
+    margin: 10px auto 0;
+    width: fit-content;
+    max-width: 400px;
+    padding: 8px 14px;
+    background-color: #fff8c5;
+    border: 1px solid #e0c96a;
+    border-radius: 8px;
+    color: #573a00;
+    font-size: 1em;
+    font-weight: 500;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+    animation: hint-bubble-fade-in 0.2s ease-in;
+}
+
+.hint-bubble::after {
+    content: '';
+    position: absolute;
+    top: -7px;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 12px;
+    height: 12px;
+    background-color: #fff8c5;
+    border-left: 1px solid #e0c96a;
+    border-top: 1px solid #e0c96a;
+}
+
+@keyframes hint-bubble-fade-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+#hint-button {
+    background-color: #fff8c5;
+    border-color: #e0c96a;
+    color: #573a00;
+    font-weight: 600;
+}
+
+#hint-button:not(:disabled):hover {
+    background-color: #ffeea8;
+}
+
 .copy-fen-container {
     position: relative; /* Establishes a positioning context for the feedback bubble */
     display: inline-block; /* To keep it in line with other buttons if needed, or adjust as part of flex layout */
