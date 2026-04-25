@@ -61,6 +61,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let userMoveSanInVariation = null; // Store the user's move for variation navigation
     let currentFenInVariation = null;
     let variationChess = null; // Chess.js instance for variation mode
+    let nextMoveInFlight = false;
 
     /**
      * Handles the user's move attempt during a critical moment challenge.
@@ -603,56 +604,61 @@ document.addEventListener("DOMContentLoaded", () => {
             alert("Please load a game first.");
             return;
         }
+        if (nextMoveInFlight) return;
+        nextMoveInFlight = true;
+        try {
+            if (inVariationMode) {
+                console.log("Next move clicked (Variation Mode)");
+                const arrayIndex = variationNextArrayIndex(currentVariationPly, variationSANsStartIndex);
 
-        if (inVariationMode) {
-            console.log("Next move clicked (Variation Mode)");
-            const arrayIndex = variationNextArrayIndex(currentVariationPly, variationSANsStartIndex);
+                // Check if we've reached the end of the variation
+                if (arrayIndex >= currentVariationSANs.length) {
+                    // End of variation
+                    moveInfoDisplay.textContent = "End of variation. Use Resume Game to return to the main line.";
+                    if (nextMoveButton) nextMoveButton.disabled = true;
+                    return;
+                }
 
-            // Check if we've reached the end of the variation
-            if (arrayIndex >= currentVariationSANs.length) {
-                // End of variation
-                moveInfoDisplay.textContent = "End of variation. Use Resume Game to return to the main line.";
-                if (nextMoveButton) nextMoveButton.disabled = true;
-                return;
-            }
-
-            // Play the next move in variationChess
-            const nextSan = currentVariationSANs[arrayIndex];
-            try {
-                const moveResult = MoveHelper.sanToSquares(nextSan, variationChess.fen());
-                if (moveResult && moveResult.moves) {
-                    for (const move of moveResult.moves) {
-                        await board.movePiece(move.from, move.to, true);
+                // Play the next move in variationChess
+                const nextSan = currentVariationSANs[arrayIndex];
+                try {
+                    const moveResult = MoveHelper.sanToSquares(nextSan, variationChess.fen());
+                    if (moveResult && moveResult.moves) {
+                        for (const move of moveResult.moves) {
+                            await board.movePiece(move.from, move.to, true);
+                        }
+                        if (moveResult.remove) {
+                            board.setPiece(moveResult.remove, null);
+                        }
+                        // Handle pawn promotion - replace the pawn with the promoted piece
+                        if (moveResult.promotion && moveResult.promotionSquare) {
+                            board.setPiece(moveResult.promotionSquare, moveResult.promotion);
+                        }
+                        variationChess.move(nextSan, { sloppy: true });
+                        currentFenInVariation = variationChess.fen();
+                        currentVariationPly++;
+                        // currentVariationPly is now the ply for the move we just played
+                        updateMoveInfoDisplay({ san: nextSan }, true, currentVariationPly);
+                        // Check if we've reached the end
+                        if (nextMoveButton) nextMoveButton.disabled = (variationNextArrayIndex(currentVariationPly, variationSANsStartIndex) >= currentVariationSANs.length);
+                    } else {
+                        console.error(`Illegal move in variation: ${nextSan} from FEN: ${variationChess.fen()}`);
+                        moveInfoDisplay.textContent = `Error: Illegal move '${nextSan}' in variation. Resuming main game.`;
+                        if (resumeGameButton) resumeGameButton.click();
                     }
-                    if (moveResult.remove) {
-                        board.setPiece(moveResult.remove, null);
-                    }
-                    // Handle pawn promotion - replace the pawn with the promoted piece
-                    if (moveResult.promotion && moveResult.promotionSquare) {
-                        board.setPiece(moveResult.promotionSquare, moveResult.promotion);
-                    }
-                    variationChess.move(nextSan, { sloppy: true });
-                    currentFenInVariation = variationChess.fen();
-                    currentVariationPly++;
-                    // currentVariationPly is now the ply for the move we just played
-                    updateMoveInfoDisplay({ san: nextSan }, true, currentVariationPly);
-                    // Check if we've reached the end
-                    if (nextMoveButton) nextMoveButton.disabled = (variationNextArrayIndex(currentVariationPly, variationSANsStartIndex) >= currentVariationSANs.length);
-                } else {
-                    console.error(`Illegal move in variation: ${nextSan} from FEN: ${variationChess.fen()}`);
-                    moveInfoDisplay.textContent = `Error: Illegal move '${nextSan}' in variation. Resuming main game.`;
+                } catch (e) {
+                    console.error(`Error playing variation move ${nextSan}:`, e);
+                    moveInfoDisplay.textContent = `Error playing variation move. Resuming main game.`;
                     if (resumeGameButton) resumeGameButton.click();
                 }
-            } catch (e) {
-                console.error(`Error playing variation move ${nextSan}:`, e);
-                moveInfoDisplay.textContent = `Error playing variation move. Resuming main game.`;
-                if (resumeGameButton) resumeGameButton.click();
+                return;
             }
-            return;
+            // Main line play
+            console.log("Next move clicked (Main Line)");
+            await fetchAndUpdateBoard('/game/next_move', 'POST');
+        } finally {
+            nextMoveInFlight = false;
         }
-        // Main line play
-        console.log("Next move clicked (Main Line)");
-        await fetchAndUpdateBoard('/game/next_move', 'POST');
     });
 
     hintButton?.addEventListener("click", () => {
