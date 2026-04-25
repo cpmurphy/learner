@@ -41,8 +41,7 @@ document.addEventListener("DOMContentLoaded", () => {
         hintShown = false;
         arrowShown = false;
         if (hintButton) {
-            hintButton.style.display = 'none';
-            hintButton.disabled = false;
+            hintButton.disabled = true;
         }
         if (hintBubble) {
             hintBubble.style.display = 'none';
@@ -236,7 +235,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 board.setPosition(fenAtCriticalPrompt, false);
 
                 if (!hintShown && wrongGuessCount >= 3 && hintButton) {
-                    hintButton.style.display = 'inline-flex';
+                    hintButton.disabled = false;
                 }
                 if (hintShown && wrongGuessCount >= 6 && !arrowShown && board.addArrow) {
                     board.addArrow(ARROW_TYPE.default, goodMoveObject.from, goodMoveObject.to);
