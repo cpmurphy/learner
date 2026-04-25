@@ -7,7 +7,7 @@ require 'timeout'
 # A thin wrapper that uses the stockfish engine to analyse the position
 class Analyzer
   DEFAULT_TIMEOUT = 5 # seconds
-  DEFAULT_DEPTH = 18
+  DEFAULT_DEPTH = 16
   DEFAULT_MULTIPV = 3
   MAX_NODES = 1_000_000
 
