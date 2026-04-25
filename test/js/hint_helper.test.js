@@ -35,19 +35,29 @@ describe('bestMoveHint', () => {
             expect(bestMoveHint(fen, 'Bc4')).toBe('Try moving your bishop on f1');
         });
 
-        it('describes a rook move with its from-square', () => {
-            const fen = '4k3/8/8/8/8/8/8/R3K3 w Q - 0 1';
+        it('describes a rook move with its from-square when both rooks remain', () => {
+            const fen = '4k3/8/8/8/8/8/8/R3K2R w KQ - 0 1';
             expect(bestMoveHint(fen, 'Ra5')).toBe('Try moving your rook on a1');
         });
 
-        it('describes a queen move with its from-square', () => {
-            const fen = '4k3/8/8/8/8/8/8/3QK3 w - - 0 1';
+        it('describes a queen move with its from-square when more than one queen exists', () => {
+            const fen = '4k3/8/8/8/8/8/8/3QKQ2 w - - 0 1';
             expect(bestMoveHint(fen, 'Qd5')).toBe('Try moving your queen on d1');
         });
 
-        it('describes a king move with its from-square', () => {
+        it('omits the from-square when only one rook of the side remains', () => {
+            const fen = '4k3/8/8/8/8/8/8/R3K3 w Q - 0 1';
+            expect(bestMoveHint(fen, 'Ra5')).toBe('Try moving your rook');
+        });
+
+        it('omits the from-square for the king (always unique)', () => {
             const fen = '4k3/8/8/8/8/8/8/4K3 w - - 0 1';
-            expect(bestMoveHint(fen, 'Ke2')).toBe('Try moving your king on e1');
+            expect(bestMoveHint(fen, 'Ke2')).toBe('Try moving your king');
+        });
+
+        it('omits the from-square when only one queen of the side remains', () => {
+            const fen = 'r4rk1/pq3pp1/1nbppn1p/1p6/2pP4/P1N1PNPP/1P1QBP2/R3R1K1 w - - 1 18';
+            expect(bestMoveHint(fen, 'Qd3')).toBe('Try moving your queen');
         });
 
         it('describes a black knight move with its from-square', () => {

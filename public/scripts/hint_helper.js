@@ -9,12 +9,12 @@ const PIECE_NAMES = {
     k: 'king'
 };
 
-function countPawns(fen, color) {
+function countPieces(fen, color, pieceType) {
     const placement = fen.split(/\s+/)[0] || '';
-    const pawnChar = color === 'w' ? 'P' : 'p';
+    const target = color === 'w' ? pieceType.toUpperCase() : pieceType.toLowerCase();
     let count = 0;
     for (const ch of placement) {
-        if (ch === pawnChar) count++;
+        if (ch === target) count++;
     }
     return count;
 }
@@ -40,14 +40,18 @@ export function bestMoveHint(fen, goodMoveSan) {
     const pieceName = PIECE_NAMES[move.piece];
     if (!pieceName) return null;
 
+    const pieceCount = countPieces(fen, move.color, move.piece);
+
     if (move.piece === 'p') {
-        const pawnCount = countPawns(fen, move.color);
-        if (pawnCount <= 1) {
+        if (pieceCount <= 1) {
             return 'Try moving your pawn';
         }
         const file = move.from[0];
         return `Try moving your ${file} pawn`;
     }
 
+    if (pieceCount <= 1) {
+        return `Try moving your ${pieceName}`;
+    }
     return `Try moving your ${pieceName} on ${move.from}`;
 }
