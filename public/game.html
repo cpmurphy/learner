@@ -19,7 +19,6 @@
     <div id="chessboard-container" style="width: 400px; max-width: 100vw; margin-top: 10px;">
         <!-- Chessboard will be rendered here by cm-chessboard -->
     </div>
-    <div id="hint-bubble" class="hint-bubble" style="display: none;"></div>
     <div class="controls">
         <button class='control-btn' id='fast-rewind-moves' title='Go to start'>
             <svg class='icon' viewBox='0 0 24 24'>
@@ -84,8 +83,11 @@
             <span id="copy-fen-feedback" class="copy-feedback"></span>
         </div>
     </div>
-    <div id="move-info-display" class="move-info">
-        <!-- Last move details will be displayed here by JavaScript -->
+    <div class="move-info-wrapper">
+        <div id="move-info-display" class="move-info">
+            <!-- Last move details will be displayed here by JavaScript -->
+        </div>
+        <div id="hint-bubble" class="hint-bubble" style="display: none;"></div>
     </div>
     <div class="info">
         <p>Select side to learn from:</p>

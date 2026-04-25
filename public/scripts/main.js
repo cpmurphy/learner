@@ -665,6 +665,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (hintBubble) {
             hintBubble.textContent = hintText;
             hintBubble.style.display = 'block';
+            const buttonRect = hintButton.getBoundingClientRect();
+            const bubbleRect = hintBubble.getBoundingClientRect();
+            const buttonCenterX = buttonRect.left + buttonRect.width / 2;
+            const arrowX = buttonCenterX - bubbleRect.left;
+            const clampedArrowX = Math.max(12, Math.min(bubbleRect.width - 12, arrowX));
+            hintBubble.style.setProperty('--arrow-x', `${clampedArrowX}px`);
         }
         hintShown = true;
         hintButton.disabled = true;
