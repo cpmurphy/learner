@@ -73,18 +73,6 @@ h1 {
     /* Icon will be centered by flex properties above */
 }
 
-#move-input {
-    width: 80px; /* Adjust width as needed, e.g., for 3-4 chars */
-    height: 40px; /* Match button height */
-    padding: 0 10px; /* Horizontal padding */
-    margin: 5px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 1em; /* Adjust font size as needed */
-    box-sizing: border-box; /* Include padding and border in the element's total width and height */
-    /* vertical-align: middle; */ /* No longer needed, flex alignment on parent handles this */
-}
-
 .icon {
   width: 24px; /* Icon size, button padding will create space around it if needed */
   height: 24px;
