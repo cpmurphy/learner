@@ -164,7 +164,7 @@ class AppGameEndpointsTest < Minitest::Test
     # Add a variation
     variation_sans = %w[d4 d5]
     post '/game/add_variation',
-         { move_index: 1, variation_sans: variation_sans, user_move_san: 'd4' }.to_json,
+         { move_index: 0, variation_sans: variation_sans, user_move_san: 'd4' }.to_json,
          'CONTENT_TYPE' => 'application/json'
 
     assert_predicate last_response, :ok?
