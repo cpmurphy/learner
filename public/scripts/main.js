@@ -1,8 +1,9 @@
 import { Chessboard, COLOR } from "./3rdparty/cm-chessboard/Chessboard.js";
-import { Arrows } from "./3rdparty/cm-chessboard/extensions/arrows/Arrows.js";
+import { Arrows, ARROW_TYPE } from "./3rdparty/cm-chessboard/extensions/arrows/Arrows.js";
 import { MoveHelper } from './move_helper.js';
 import { Chess } from './3rdparty/chess.js/chess.js';
 import { variationMoveNumber, variationTurn, variationDisplayArrayIndex, variationNextArrayIndex } from './variation_helper.js';
+import { bestMoveHint } from './hint_helper.js';
 
 document.addEventListener("DOMContentLoaded", () => {
     const boardContainer = document.getElementById("chessboard-container");
@@ -22,12 +23,33 @@ document.addEventListener("DOMContentLoaded", () => {
     const fastForwardButton = document.getElementById("fast-forward-moves");
     const flipBoardButton = document.getElementById("flip-board");
     const resumeGameButton = document.getElementById("resume-game");
+    const hintButton = document.getElementById("hint-button");
+    const hintBubble = document.getElementById("hint-bubble");
 
     let learningSide = learnSideSelect.value || 'white';
     let inCriticalMomentChallenge = false;
     let fenAtCriticalPrompt = null; // FEN before the bad move, for reverting
     let goodMoveSanForChallenge = null; // SAN of the good alternative move
     let lastKnownServerFEN = null; // Stores the last FEN received from the server for the main line
+
+    let wrongGuessCount = 0;
+    let hintShown = false;
+    let arrowShown = false;
+
+    function resetHintState() {
+        wrongGuessCount = 0;
+        hintShown = false;
+        arrowShown = false;
+        if (hintButton) {
+            hintButton.style.display = 'none';
+            hintButton.disabled = false;
+        }
+        if (hintBubble) {
+            hintBubble.style.display = 'none';
+            hintBubble.textContent = '';
+        }
+        if (board && board.removeArrows) board.removeArrows();
+    }
 
     // State for variation play
     let inVariationMode = false;
@@ -121,7 +143,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (validationData.good_enough) {
                 moveInfoDisplay.textContent = `Correct! "${userMoveSan}" is a good move.`;
-                if (board && board.removeArrows) board.removeArrows();
+                resetHintState();
                 const lastMoveDataForVariation = window.lastServerMoveData;
 
                 if (lastMoveDataForVariation) {
@@ -209,8 +231,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 inCriticalMomentChallenge = false;
                 return true; // Accept the move
             } else {
+                wrongGuessCount++;
                 moveInfoDisplay.textContent = `"${userMoveSan}" is not the best move. Try again!`;
                 board.setPosition(fenAtCriticalPrompt, false);
+
+                if (!hintShown && wrongGuessCount >= 3 && hintButton) {
+                    hintButton.style.display = 'inline-flex';
+                }
+                if (hintShown && wrongGuessCount >= 6 && !arrowShown && board.addArrow) {
+                    board.addArrow(ARROW_TYPE.default, goodMoveObject.from, goodMoveObject.to);
+                    arrowShown = true;
+                }
                 return false; // Reject the move
             }
         } catch (error) {
@@ -351,6 +382,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     inCriticalMomentChallenge = true;
                     fenAtCriticalPrompt = lastMoveData.fen_before_move;
                     goodMoveSanForChallenge = lastMoveData.good_move_san;
+                    resetHintState();
                 } else {
                     inCriticalMomentChallenge = false;
                     // board.disableMoveInput(); // Now called unconditionally above
@@ -360,7 +392,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (url === '/game/set_move_index' || url === '/api/load_game' || url === '/game/go_to_start' || url === '/game/go_to_end') {
                     inVariationMode = false;
                     if (resumeGameButton) resumeGameButton.disabled = true;
-                    if (board && board.removeArrows) board.removeArrows();
+                    resetHintState();
                 }
 
                 const fenToDisplay = setupChallenge ? fenAtCriticalPrompt : data.fen;
@@ -624,6 +656,21 @@ document.addEventListener("DOMContentLoaded", () => {
         await fetchAndUpdateBoard('/game/next_move', 'POST');
     });
 
+    hintButton?.addEventListener("click", () => {
+        if (!fenAtCriticalPrompt || !goodMoveSanForChallenge) return;
+        const hintText = bestMoveHint(fenAtCriticalPrompt, goodMoveSanForChallenge);
+        if (!hintText) {
+            console.warn("Hint could not be generated for", { fenAtCriticalPrompt, goodMoveSanForChallenge });
+            return;
+        }
+        if (hintBubble) {
+            hintBubble.textContent = hintText;
+            hintBubble.style.display = 'block';
+        }
+        hintShown = true;
+        hintButton.disabled = true;
+    });
+
     resumeGameButton?.addEventListener("click", async () => {
         if (!inVariationMode) return; // Should not happen if button is managed correctly
         console.log("Resume game clicked");
@@ -664,7 +711,7 @@ document.addEventListener("DOMContentLoaded", () => {
     learnSideSelect?.addEventListener("change", (event) => {
         learningSide = event.target.value;
         console.log("Learning side changed to:", learningSide);
-        if (board && board.removeArrows) board.removeArrows();
+        resetHintState();
         if (inCriticalMomentChallenge || inVariationMode) {
             console.log("Learning side changed during challenge/variation. Mode cancelled.");
             inCriticalMomentChallenge = false;
