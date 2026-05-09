@@ -1,0 +1,30 @@
+# flyctl launch added from .gitignore
+.aider*
+deploy_env.sh
+
+# ignore JS dependencies
+node_modules
+
+# ignore 3rd party files that get copied during build
+public/3rdparty-assets
+public/scripts/3rdparty
+
+sandbox
+
+coverage
+
+games
+
+# flyctl launch added from Stockfish/.gitignore
+# Files from build
+*.o
+*.s
+.depend
+
+# Built binary
+stockfish*
+
+# Neural network for the NNUE evaluation
+*.nnue
+
+fly.toml

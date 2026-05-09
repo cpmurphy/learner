@@ -27,13 +27,22 @@ FROM base AS build
 
 # Install build dependencies
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y build-essential git wget pkg-config && \
+    apt-get install --no-install-recommends -y build-essential git wget pkg-config nodejs npm && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 # Install gems
 COPY Gemfile Gemfile.lock ./
 RUN bundle install && \
     rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git
+
+# Copy browser dependencies into public/ so the final image can serve them as static assets.
+COPY package.json package-lock.json ./
+RUN npm ci && \
+    npm run copy-all && \
+    test -f public/3rdparty-assets/cm-chessboard/extensions/arrows/arrows.css && \
+    test -f public/scripts/3rdparty/cm-chessboard/Chessboard.js && \
+    npm cache clean --force && \
+    rm -rf node_modules
 
 # Build Stockfish
 COPY Stockfish Stockfish
@@ -51,6 +60,8 @@ FROM base
 COPY --from=build "${BUNDLE_PATH}" "${BUNDLE_PATH}"
 COPY --from=build /app/bin/stockfish /app/bin/stockfish
 COPY . /app
+COPY --from=build /app/public/3rdparty-assets /app/public/3rdparty-assets
+COPY --from=build /app/public/scripts/3rdparty /app/public/scripts/3rdparty
 RUN rm -rf /app/Stockfish
 RUN mkdir -p /app/games
 
