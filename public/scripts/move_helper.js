@@ -57,6 +57,26 @@ export class MoveHelper {
     }
 
     /**
+     * Returns true if moving from `fromSquare` to `toSquare` in the given FEN is a pawn promotion.
+     * @param {string} fen
+     * @param {string} fromSquare
+     * @param {string} toSquare
+     * @returns {boolean}
+     */
+    static isPromotionMove(fen, fromSquare, toSquare) {
+        try {
+            const chess = new Chess(fen);
+            const piece = chess.get(fromSquare);
+            const toRank = toSquare[1];
+            return piece && piece.type === 'p' &&
+                   ((piece.color === 'w' && toRank === '8') ||
+                    (piece.color === 'b' && toRank === '1'));
+        } catch {
+            return false;
+        }
+    }
+
+    /**
      * Converts SAN to a list of move objects and, for en passant, a square to remove.
      * @param {string} san
      * @param {string} fen

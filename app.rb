@@ -608,11 +608,11 @@ class LearnerApp < Sinatra::Base
     current_fen = fen_before
 
     variation_sans.each do |san_move|
-      variation_sequence << PGN::MoveText.new(san_move)
       require_relative 'lib/move_translator'
       translator = MoveTranslator.new
       translator.load_game_from_fen(current_fen)
       translator.translate_move(san_move)
+      variation_sequence << PGN::MoveText.new(san_move)
       current_fen = translator.board_as_fen
     rescue StandardError => e
       puts "Warning: Failed to process variation move #{san_move}: #{e.message}"

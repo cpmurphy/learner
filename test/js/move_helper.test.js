@@ -161,3 +161,56 @@ describe('MoveHelper.sanToSquares', () => {
         });
     });
 });
+
+// FEN where a black pawn on h2 can promote to h1
+const FEN_FOR_PROMOTION = "r7/8/1R1N4/1pp2p2/1k2q3/1P6/P1P4p/1K1R4 b - - 1 46";
+
+describe('MoveHelper.getSan (promotion)', () => {
+    it('returns null without a promotion piece (we likely need to ask what to promote to)', () => {
+        const gen = new MoveHelper(FEN_FOR_PROMOTION, 'h2', 'h1');
+        expect(gen.getSan()).toBeNull();
+    });
+
+    it('returns h1=Q when promoting to queen', () => {
+        const gen = new MoveHelper(FEN_FOR_PROMOTION, 'h2', 'h1', 'q');
+        expect(gen.getSan()).toBe('h1=Q');
+    });
+
+    it('returns h1=R when promoting to rook', () => {
+        const gen = new MoveHelper(FEN_FOR_PROMOTION, 'h2', 'h1', 'r');
+        expect(gen.getSan()).toBe('h1=R');
+    });
+
+    it('returns h1=B when promoting to bishop', () => {
+        const gen = new MoveHelper(FEN_FOR_PROMOTION, 'h2', 'h1', 'b');
+        expect(gen.getSan()).toBe('h1=B');
+    });
+
+    it('returns h1=N when promoting to knight', () => {
+        const gen = new MoveHelper(FEN_FOR_PROMOTION, 'h2', 'h1', 'n');
+        expect(gen.getSan()).toBe('h1=N');
+    });
+});
+
+describe('MoveHelper.isPromotionMove', () => {
+    it('returns true for the black pawn promotion from the bug report (h2→h1)', () => {
+        expect(MoveHelper.isPromotionMove(FEN_FOR_PROMOTION, 'h2', 'h1')).toBe(true);
+    });
+
+    it('returns false for a normal black pawn move', () => {
+        expect(MoveHelper.isPromotionMove(FEN_FOR_PROMOTION, 'h2', 'h1')); // sanity above
+        const normalFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1";
+        expect(MoveHelper.isPromotionMove(normalFen, 'e7', 'e5')).toBe(false);
+    });
+
+    it('returns false for a non-pawn piece moving to rank 1', () => {
+        // Queen moving to rank 1 — not a promotion
+        const queenFen = "4k3/8/8/8/8/8/4q3/4K3 b - - 0 1";
+        expect(MoveHelper.isPromotionMove(queenFen, 'e2', 'e1')).toBe(false);
+    });
+
+    it('returns true for a white pawn promotion (e7→e8)', () => {
+        const whiteFen = "4k3/4P3/8/8/8/8/8/4K3 w - - 0 1";
+        expect(MoveHelper.isPromotionMove(whiteFen, 'e7', 'e8')).toBe(true);
+    });
+});

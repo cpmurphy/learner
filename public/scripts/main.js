@@ -1,5 +1,6 @@
 import { Chessboard, COLOR } from "./3rdparty/cm-chessboard/Chessboard.js";
 import { Arrows, ARROW_TYPE } from "./3rdparty/cm-chessboard/extensions/arrows/Arrows.js";
+import { PromotionDialog, PROMOTION_DIALOG_RESULT_TYPE } from "./3rdparty/cm-chessboard/extensions/promotion-dialog/PromotionDialog.js";
 import { MoveHelper } from './move_helper.js';
 import { Chess } from './3rdparty/chess.js/chess.js';
 import { variationMoveNumber, variationTurn, variationDisplayArrayIndex, variationNextArrayIndex } from './variation_helper.js';
@@ -76,6 +77,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (!inCriticalMomentChallenge || !goodMoveSanForChallenge) {
             console.warn("handleCriticalMoveAttempt called inappropriately.");
+            return false;
+        }
+
+        // Detect pawn promotion: pawn moving to rank 1 or 8 without a promotion piece
+        if (!event.promotionPiece && MoveHelper.isPromotionMove(fenAtCriticalPrompt, event.squareFrom, event.squareTo)) {
+            const chessForColor = new Chess(fenAtCriticalPrompt);
+            const movingPiece = chessForColor.get(event.squareFrom);
+            board.showPromotionDialog(event.squareTo, movingPiece.color, async (result) => {
+                if (result.type === PROMOTION_DIALOG_RESULT_TYPE.canceled) {
+                    board.setPosition(fenAtCriticalPrompt, false);
+                    return;
+                }
+                // result.piece is like 'wq' or 'bq'; extract just the piece type letter
+                const promotionPiece = result.piece[1];
+                await handleCriticalMoveAttempt({
+                    type: 'moveInputFinished',
+                    squareFrom: event.squareFrom,
+                    squareTo: event.squareTo,
+                    promotionPiece: promotionPiece
+                });
+            });
             return false;
         }
 
@@ -407,7 +429,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             moveToMarker: undefined,   // Optional: clear markers
                         },
                         orientation: initialOrientation,
-                        extensions: [{ class: Arrows }]
+                        extensions: [{ class: Arrows }, { class: PromotionDialog }]
                     };
                     board = new Chessboard(boardContainer, props);
                     console.log(`Chessboard initialized. FEN: ${fenToDisplay}, Position index: ${data.move_index}, Total positions: ${data.total_positions}, Orientation: ${learningSide}`);
