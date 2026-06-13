@@ -292,23 +292,17 @@ document.addEventListener("DOMContentLoaded", () => {
             let movePrefix = `${lm.number}${lm.turn === 'white' ? '.' : '...'}`;
             let displayText = `${movePrefix} ${lm.san}`;
 
-            // For user's moves, show comments and annotations
-            if (lm.turn === learningSide) {
-                if (lm.comment && lm.comment.trim() !== "") {
-                    displayText += ` {${lm.comment.trim()}}`;
-                }
-                if (lm.annotation && lm.annotation.length > 0) {
-                    displayText += ` ${lm.annotation.join(' ')}`;
-                }
-            } else {
-                // For opponent's moves, show "?" or "??" based on centipawn loss
-                if (lm.centipawn_loss !== null && lm.centipawn_loss !== undefined && lm.centipawn_loss > 0) {
-                    if (lm.centipawn_loss > 100) {
-                        displayText += ` ??`;
-                    } else {
-                        displayText += ` ?`;
-                    }
-                }
+            // Append a human-readable quality marker ("?"/"??") based on how much
+            // the move lost, for either side. This keeps internal markers like the
+            // $201 NAG and "cp_loss:" comments out of the display.
+            if (lm.centipawn_loss !== null && lm.centipawn_loss !== undefined && lm.centipawn_loss > 0) {
+                displayText += lm.centipawn_loss > 100 ? ` ??` : ` ?`;
+            }
+
+            // For the user's own moves, surface any genuine annotation comment,
+            // but never the internal "cp_loss:" metadata.
+            if (lm.turn === learningSide && lm.comment && lm.comment.trim() !== "" && !/cp_loss:/.test(lm.comment)) {
+                displayText += ` {${lm.comment.trim()}}`;
             }
             moveInfoDisplay.textContent = displayText;
         } else {
@@ -673,6 +667,32 @@ document.addEventListener("DOMContentLoaded", () => {
                     moveInfoDisplay.textContent = `Error playing variation move. Resuming main game.`;
                     if (resumeGameButton) resumeGameButton.click();
                 }
+                return;
+            }
+            if (inCriticalMomentChallenge) {
+                // User declined to guess at the critical moment. The board is showing
+                // fenAtCriticalPrompt (the position BEFORE the blunder), while the server's
+                // index already sits on the blunder move. Reveal ONLY the played (inferior)
+                // move — lastKnownServerFEN holds the position right after it — without
+                // advancing to the opponent's reply. Exit the challenge so the next click
+                // resumes normal main-line navigation (and we never get stuck re-prompting).
+                console.log("Next move clicked (declining critical challenge)");
+                inCriticalMomentChallenge = false;
+                goodMoveSanForChallenge = null;
+                resetHintState();
+                if (board) {
+                    board.disableMoveInput();
+                    if (lastKnownServerFEN) board.setPosition(lastKnownServerFEN, true);
+                }
+                // Show the move that was actually played (the blunder), with its annotation.
+                updateMoveInfoDisplay(window.lastServerMoveData);
+                // Back on the main line at the blunder position: re-enable navigation.
+                if (nextMoveButton) nextMoveButton.disabled = false;
+                if (prevMoveButton) prevMoveButton.disabled = false;
+                if (nextCriticalButton) nextCriticalButton.disabled = false;
+                if (fastForwardButton) fastForwardButton.disabled = false;
+                if (fastRewindButton) fastRewindButton.disabled = false;
+                if (resumeGameButton) resumeGameButton.disabled = true;
                 return;
             }
             // Main line play
