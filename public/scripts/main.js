@@ -3,8 +3,19 @@ import { Arrows, ARROW_TYPE } from "./3rdparty/cm-chessboard/extensions/arrows/A
 import { PromotionDialog, PROMOTION_DIALOG_RESULT_TYPE } from "./3rdparty/cm-chessboard/extensions/promotion-dialog/PromotionDialog.js";
 import { MoveHelper } from './move_helper.js';
 import { Chess } from './3rdparty/chess.js/chess.js';
-import { variationMoveNumber, variationTurn, variationDisplayArrayIndex, variationNextArrayIndex } from './variation_helper.js';
+import { variationDisplayArrayIndex, variationNextArrayIndex } from './variation_helper.js';
 import { bestMoveHint } from './hint_helper.js';
+import { formatMoveInfoText, formatCriticalPromptText } from './move_display_helper.js';
+import { buildVariationState } from './variation_setup_helper.js';
+import { computeButtonStates, applyButtonStates } from './button_state_helper.js';
+import {
+    getGameIdFromURL,
+    shouldStartCriticalChallenge,
+    selectFenToCopy,
+    shouldEnableHint,
+    shouldShowArrow,
+    fenToDisplay
+} from './game_utils_helper.js';
 
 document.addEventListener("DOMContentLoaded", () => {
     const boardContainer = document.getElementById("chessboard-container");
@@ -26,6 +37,32 @@ document.addEventListener("DOMContentLoaded", () => {
     const resumeGameButton = document.getElementById("resume-game");
     const hintButton = document.getElementById("hint-button");
     const hintBubble = document.getElementById("hint-bubble");
+    const prevMoveButton = document.getElementById("prev-move");
+    const nextMoveButton = document.getElementById("next-move");
+
+    const navButtons = {
+        nextCritical: nextCriticalButton,
+        prevMove: prevMoveButton,
+        nextMove: nextMoveButton,
+        fastRewind: fastRewindButton,
+        fastForward: fastForwardButton,
+        resumeGame: resumeGameButton,
+        copyFen: copyFenButton,
+        flipBoard: flipBoardButton
+    };
+
+    function setNavButtonStates(mode, extra = {}) {
+        applyButtonStates(navButtons, computeButtonStates({
+            mode,
+            boardExists: !!board,
+            learningSide,
+            inVariationMode,
+            currentVariationPly,
+            variationSANs: currentVariationSANs,
+            variationSANsStartIndex,
+            ...extra
+        }));
+    }
 
     let learningSide = learnSideSelect.value || 'white';
     let inCriticalMomentChallenge = false;
@@ -180,49 +217,30 @@ document.addEventListener("DOMContentLoaded", () => {
                     // The variation replaces the blunder move, so it starts at the same move number
                     variationStartMoveNumber = lastMoveDataForVariation.number;
 
-                    // If the user played the expected move and a variation exists, use it.
-                    // Otherwise, check if we got a continuation line from the validation response.
-                    // Compare using UCI moves instead of SAN to handle check/mate annotation differences
-                    if (userMoveUci === goodMoveUci && lastMoveDataForVariation.variation_sans?.length > 0) {
-                        // User played the expected move - variation already includes it
-                        currentVariationSANs = lastMoveDataForVariation.variation_sans;
-                        variationSANsStartIndex = 0; // Array includes user's move at index 0
-                    } else if (validationData.variation_sans && validationData.variation_sans.length > 0) {
-                        // User played a good move that's not the expected move, and we got a continuation line
-                        // validationData.variation_sans includes the user's move as the first element
-                        // Since we're applying the user's move separately, we need to skip it in the variation
-                        // But for saving to PGN, we want the full variation including the user's move
-                        const fullVariationForSaving = validationData.variation_sans;
-                        // Skip the first move (user's move) since we already applied it
-                        currentVariationSANs = validationData.variation_sans.slice(1);
-                        variationSANsStartIndex = 1; // Array starts after user's move (which was at index 0)
+                    const variationState = buildVariationState({
+                        userMoveUci,
+                        goodMoveUci,
+                        userMoveSan,
+                        lastMoveData: lastMoveDataForVariation,
+                        validationData
+                    });
+                    currentVariationSANs = variationState.currentVariationSANs;
+                    variationSANsStartIndex = variationState.variationSANsStartIndex;
 
-                        // Save this variation to the PGN
-                        // move_index_of_blunder is the position index where the blunder occurs
-                        // The $201 annotation is on the move before that (move_index_of_blunder - 1)
-                        const moveIndex = lastMoveDataForVariation.move_index_of_blunder - 1;
+                    if (variationState.savePayload) {
                         try {
                             await fetch('/game/add_variation', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    move_index: moveIndex,
-                                    variation_sans: fullVariationForSaving,
-                                    user_move_san: userMoveSan
-                                })
+                                body: JSON.stringify(variationState.savePayload)
                             });
-                            // Save the game to persist the variation
                             await fetch('/game/save', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' }
                             });
                         } catch (error) {
                             console.error('Error saving variation:', error);
-                            // Continue anyway - the variation will still work in the UI
                         }
-                    } else {
-                        currentVariationSANs = [userMoveSan];
-                        variationSANsStartIndex = 0; // Array includes user's move
                     }
 
                     variationChess = new Chess(fenAtCriticalPrompt);
@@ -240,10 +258,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     // Update the display to show the user's move
                     updateMoveInfoDisplay({ san: userMoveSan }, true, currentVariationPly);
 
-                    if (resumeGameButton) resumeGameButton.disabled = false;
-                    // Check if we've reached the end
-                    if (nextMoveButton) nextMoveButton.disabled = (variationNextArrayIndex(currentVariationPly, variationSANsStartIndex) >= currentVariationSANs.length);
-                    if (nextCriticalButton) nextCriticalButton.disabled = true;
+                    setNavButtonStates('postCorrectGuess');
                 } else {
                     // Fallback: Should not be reached if challenge was correctly initiated.
                     moveInfoDisplay.textContent = `Correct! "${userMoveSan}" is a better move. Main game continues.`;
@@ -257,10 +272,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 moveInfoDisplay.textContent = `"${userMoveSan}" is not the best move. Try again!`;
                 board.setPosition(fenAtCriticalPrompt, false);
 
-                if (!hintShown && wrongGuessCount >= 3 && hintButton) {
+                if (shouldEnableHint(wrongGuessCount, hintShown) && hintButton) {
                     hintButton.disabled = false;
                 }
-                if (hintShown && wrongGuessCount >= 6 && !arrowShown && board.addArrow) {
+                if (shouldShowArrow(wrongGuessCount, hintShown, arrowShown) && board.addArrow) {
                     board.addArrow(ARROW_TYPE.default, goodMoveObject.from, goodMoveObject.to);
                     arrowShown = true;
                 }
@@ -280,34 +295,12 @@ document.addEventListener("DOMContentLoaded", () => {
      */
     function updateMoveInfoDisplay(lastMoveData, isVariationMove = false, variationPly = 0) {
         if (!moveInfoDisplay) return;
-
-        if (isVariationMove && lastMoveData && lastMoveData.san) { // lastMoveData here is just { san: '...' }
-            const turnInVariation = variationTurn(variationStartTurn, variationPly);
-            const moveNumberInVariation = variationMoveNumber(variationStartMoveNumber, variationStartTurn, variationPly);
-
-            let movePrefix = `${moveNumberInVariation}${turnInVariation === 'white' ? '.' : '...'}`;
-            moveInfoDisplay.textContent = `Variation: ${movePrefix} ${lastMoveData.san}`;
-        } else if (lastMoveData) {
-            const lm = lastMoveData;
-            let movePrefix = `${lm.number}${lm.turn === 'white' ? '.' : '...'}`;
-            let displayText = `${movePrefix} ${lm.san}`;
-
-            // Append a human-readable quality marker ("?"/"??") based on how much
-            // the move lost, for either side. This keeps internal markers like the
-            // $201 NAG and "cp_loss:" comments out of the display.
-            if (lm.centipawn_loss !== null && lm.centipawn_loss !== undefined && lm.centipawn_loss > 0) {
-                displayText += lm.centipawn_loss > 100 ? ` ??` : ` ?`;
-            }
-
-            // For the user's own moves, surface any genuine annotation comment,
-            // but never the internal "cp_loss:" metadata.
-            if (lm.turn === learningSide && lm.comment && lm.comment.trim() !== "" && !/cp_loss:/.test(lm.comment)) {
-                displayText += ` {${lm.comment.trim()}}`;
-            }
-            moveInfoDisplay.textContent = displayText;
-        } else {
-            moveInfoDisplay.textContent = "Game start.";
-        }
+        moveInfoDisplay.textContent = formatMoveInfoText(lastMoveData, learningSide, {
+            isVariationMove,
+            variationPly,
+            variationStartMoveNumber,
+            variationStartTurn
+        });
     }
 
     /**
@@ -346,15 +339,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     alert(`Error loading game: ${errorMsg}`);
                 }
                 // Disable all navigation buttons on error
-                if (nextCriticalButton) nextCriticalButton.disabled = true;
-                if (prevMoveButton) prevMoveButton.disabled = true;
-                if (nextMoveButton) nextMoveButton.disabled = true;
-                if (copyFenButton) copyFenButton.disabled = true;
-                if (fastRewindButton) fastRewindButton.disabled = true;
-                if (fastForwardButton) fastForwardButton.disabled = true;
-                if (flipBoardButton) flipBoardButton.disabled = true;
-                if (resumeGameButton) resumeGameButton.disabled = true;
-                inVariationMode = false; // Exit variation mode on error
+                setNavButtonStates('error');
+                inVariationMode = false;
                 return null;
             }
 
@@ -384,7 +370,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (data.fen || (data.last_move && data.last_move.fen_before_move) || (url === '/api/load_game' && data.fen)) { // Ensure there's a FEN to display or it's a load_game response with FEN
                 const lastMoveData = data.last_move;
-                let setupChallenge = false;
+                const setupChallenge = shouldStartCriticalChallenge(lastMoveData, learningSide);
 
                 // Always disable move input before deciding to enable it for a new challenge,
                 // or if no challenge is being set up. This prevents "moveInput already enabled" errors.
@@ -392,16 +378,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     board.disableMoveInput();
                 }
 
-                // Check conditions for starting a critical moment challenge
-                if (lastMoveData && lastMoveData.is_critical && lastMoveData.turn === learningSide && lastMoveData.good_move_san && lastMoveData.fen_before_move) {
-                    setupChallenge = true;
+                if (setupChallenge) {
                     inCriticalMomentChallenge = true;
                     fenAtCriticalPrompt = lastMoveData.fen_before_move;
                     goodMoveSanForChallenge = lastMoveData.good_move_san;
                     resetHintState();
                 } else {
                     inCriticalMomentChallenge = false;
-                    // board.disableMoveInput(); // Now called unconditionally above
                 }
 
                 // If we successfully set move index (e.g. resuming game), exit variation mode.
@@ -411,12 +394,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     resetHintState();
                 }
 
-                const fenToDisplay = setupChallenge ? fenAtCriticalPrompt : data.fen;
+                const displayFen = fenToDisplay(setupChallenge, fenAtCriticalPrompt, data.fen);
 
                 if (!board) { // First time board initialization
                     const initialOrientation = learningSide === 'white' ? COLOR.white : COLOR.black;
                     const props = {
-                        position: fenToDisplay,
+                        position: displayFen,
                         assetsUrl: assetsUrl,
                         style: {
                             moveFromMarker: undefined, // Optional: clear markers
@@ -426,58 +409,32 @@ document.addEventListener("DOMContentLoaded", () => {
                         extensions: [{ class: Arrows }, { class: PromotionDialog }]
                     };
                     board = new Chessboard(boardContainer, props);
-                    console.log(`Chessboard initialized. FEN: ${fenToDisplay}, Position index: ${data.move_index}, Total positions: ${data.total_positions}, Orientation: ${learningSide}`);
-                    // After initializing board on game load, check if "Next Critical" should be enabled
-                    if (url === '/api/load_game' && nextCriticalButton) {
-                        if (data.has_initial_critical_moment_for_white && learningSide === 'white') {
-                            nextCriticalButton.disabled = false;
-                        } else {
-                            nextCriticalButton.disabled = true;
-                        }
-                    }
-                    // Enable prev/next buttons now that a game is loaded
-                    if (prevMoveButton) prevMoveButton.disabled = false;
-                    if (nextMoveButton) nextMoveButton.disabled = false;
-                    if (copyFenButton) copyFenButton.disabled = false;
-                    if (fastRewindButton) fastRewindButton.disabled = !inVariationMode;
-                    if (fastForwardButton) fastForwardButton.disabled = !inVariationMode;
-                    if (flipBoardButton) flipBoardButton.disabled = false; // Flip board always available if board exists
-                    if (resumeGameButton) resumeGameButton.disabled = !inVariationMode;
+                    console.log(`Chessboard initialized. FEN: ${displayFen}, Position index: ${data.move_index}, Total positions: ${data.total_positions}, Orientation: ${learningSide}`);
+                    setNavButtonStates('initialLoad', {
+                        url,
+                        hasInitialCriticalForWhite: data.has_initial_critical_moment_for_white
+                    });
 
                 } else { // Board already exists, just updating position
-                    board.setPosition(fenToDisplay, true); // true for animation
-                    console.log(`Board updated. FEN: ${fenToDisplay}, Position index: ${data.move_index}`);
+                    board.setPosition(displayFen, true); // true for animation
+                    console.log(`Board updated. FEN: ${displayFen}, Position index: ${data.move_index}`);
                 }
 
-                // Button states based on mode
                 if (inVariationMode) {
-                    if (nextCriticalButton) nextCriticalButton.disabled = true;
-                    if (nextMoveButton) nextMoveButton.disabled = (currentVariationPly >= currentVariationSANs.length -1);
-                    if (fastRewindButton) fastRewindButton.disabled = true;
-                    if (fastForwardButton) fastForwardButton.disabled = true;
-                    if (resumeGameButton) resumeGameButton.disabled = false;
-                } else { // Main line play
-                    if (nextCriticalButton && board) {
-                         // Enable if not explicitly told no more criticals for this side
-                        const noMoreCriticals = url === '/game/next_critical_moment' && data.message && data.message.startsWith("No further critical moments found");
-                        if (url === '/api/load_game') { // Special handling for initial load
-                             nextCriticalButton.disabled = !(data.has_initial_critical_moment_for_white && learningSide === 'white');
-                        } else {
-                            nextCriticalButton.disabled = noMoreCriticals;
-                        }
-                    }
-                    if (nextMoveButton) nextMoveButton.disabled = (data.move_index >= data.total_positions - 1);
-                    if (fastRewindButton) fastRewindButton.disabled = (data.move_index === 0);
-                    if (fastForwardButton) fastForwardButton.disabled = (data.move_index >= data.total_positions - 1);
-                    if (resumeGameButton) resumeGameButton.disabled = true;
+                    setNavButtonStates('variation');
+                } else {
+                    setNavButtonStates('main', {
+                        moveIndex: data.move_index,
+                        totalPositions: data.total_positions,
+                        url,
+                        serverMessage: data.message || '',
+                        hasInitialCriticalForWhite: data.has_initial_critical_moment_for_white
+                    });
                 }
-                if (copyFenButton) copyFenButton.disabled = !board; // Enabled if board exists
-                if (flipBoardButton) flipBoardButton.disabled = !board;
 
 
                 if (setupChallenge) {
-                    const movePrefix = `${lastMoveData.number}${lastMoveData.turn === 'white' ? '.' : '...'}`;
-                    moveInfoDisplay.textContent = `${movePrefix}${lastMoveData.san} played. Try a better move for ${learningSide}.`;
+                    moveInfoDisplay.textContent = formatCriticalPromptText(lastMoveData, learningSide);
                     board.enableMoveInput(handleCriticalMoveAttempt, learningSide);
                 } else if (!inVariationMode) { // Don't update with main line move if we just entered variation
                     updateMoveInfoDisplay(lastMoveData);
@@ -494,15 +451,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     moveInfoDisplay.textContent = data.error || "An unspecified error occurred.";
                  }
                  if (playerNamesDisplay) playerNamesDisplay.textContent = "";
-                 // Disable all navigation buttons on error
-                 if (nextCriticalButton) nextCriticalButton.disabled = true;
-                 if (prevMoveButton) prevMoveButton.disabled = true;
-                 if (nextMoveButton) nextMoveButton.disabled = true;
-                 if (copyFenButton) copyFenButton.disabled = true;
-                 if (fastRewindButton) fastRewindButton.disabled = true;
-                 if (fastForwardButton) fastForwardButton.disabled = true;
-                 if (flipBoardButton) flipBoardButton.disabled = true;
-                 if (resumeGameButton) resumeGameButton.disabled = true;
+                 setNavButtonStates('error');
                  inVariationMode = false;
             }
             return data;
@@ -511,32 +460,17 @@ document.addEventListener("DOMContentLoaded", () => {
             alert(`Could not connect to the server or an error occurred. Please check the console for details. Error: ${error.message}`);
             if (moveInfoDisplay) moveInfoDisplay.textContent = "Network error or server unavailable.";
             if (playerNamesDisplay) playerNamesDisplay.textContent = "";
-            if (nextCriticalButton) nextCriticalButton.disabled = true;
-            if (prevMoveButton) prevMoveButton.disabled = true;
-            if (nextMoveButton) nextMoveButton.disabled = true;
-            if (copyFenButton) copyFenButton.disabled = true;
-            if (fastRewindButton) fastRewindButton.disabled = true;
-            if (fastForwardButton) fastForwardButton.disabled = true;
-            if (flipBoardButton) flipBoardButton.disabled = true;
-            if (resumeGameButton) resumeGameButton.disabled = true;
+            setNavButtonStates('error');
             inVariationMode = false;
             return null;
         }
     }
 
     /**
-     * Get the game ID from the URL query parameter
-     */
-    function getGameIdFromURL() {
-        const params = new URLSearchParams(window.location.search);
-        return params.get('id');
-    }
-
-    /**
      * Load the game automatically from the URL parameter
      */
     async function autoLoadGame() {
-        const gameId = getGameIdFromURL();
+        const gameId = getGameIdFromURL(window.location.search);
 
         if (!gameId) {
             if (moveInfoDisplay) {
@@ -555,17 +489,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Initial setup
-    if (nextCriticalButton) nextCriticalButton.disabled = true; // Initially disabled
-    const prevMoveButton = document.getElementById("prev-move");
-    const nextMoveButton = document.getElementById("next-move");
-
-    if (prevMoveButton) prevMoveButton.disabled = true;
-    if (nextMoveButton) nextMoveButton.disabled = true;
-    if (copyFenButton) copyFenButton.disabled = true;
-    if (fastRewindButton) fastRewindButton.disabled = true;
-    if (fastForwardButton) fastForwardButton.disabled = true;
-    if (flipBoardButton) flipBoardButton.disabled = true;
-    if (resumeGameButton) resumeGameButton.disabled = true;
+    setNavButtonStates('error');
 
     // Auto-load the game from URL parameter
     autoLoadGame();
@@ -686,13 +610,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
                 // Show the move that was actually played (the blunder), with its annotation.
                 updateMoveInfoDisplay(window.lastServerMoveData);
-                // Back on the main line at the blunder position: re-enable navigation.
-                if (nextMoveButton) nextMoveButton.disabled = false;
-                if (prevMoveButton) prevMoveButton.disabled = false;
-                if (nextCriticalButton) nextCriticalButton.disabled = false;
-                if (fastForwardButton) fastForwardButton.disabled = false;
-                if (fastRewindButton) fastRewindButton.disabled = false;
-                if (resumeGameButton) resumeGameButton.disabled = true;
+                setNavButtonStates('declineCritical');
                 return;
             }
             // Main line play
@@ -839,28 +757,14 @@ document.addEventListener("DOMContentLoaded", () => {
             alert("Board is not initialized. Load a game first.");
             return;
         }
-        let fenToCopy = null;
-
-        if (inCriticalMomentChallenge && fenAtCriticalPrompt) {
-            // User is being prompted for a move at a critical moment.
-            // fenAtCriticalPrompt is the FEN of the board state shown.
-            fenToCopy = fenAtCriticalPrompt;
-            console.log("Copying FEN from critical moment prompt (server-derived):", fenToCopy);
-        } else if (inVariationMode && currentFenInVariation) {
-            // User is navigating a client-side variation.
-            // currentFenInVariation is derived from board.getPosition().
-            fenToCopy = currentFenInVariation;
-            console.log("Copying FEN from client-side variation:", fenToCopy);
-        } else if (lastKnownServerFEN) {
-            // Normal main line play, use the last FEN received from the server.
-            fenToCopy = lastKnownServerFEN;
-            console.log("Copying last known server FEN for main line:", fenToCopy);
-        } else {
-            // Fallback if none of the above conditions met (should be rare if game is loaded).
-            // This might happen if a game is loaded but no FEN was received yet, or state is unusual.
-            fenToCopy = board.getPosition(); // Get current FEN from cm-chessboard
-            console.warn("Copying FEN using board.getPosition() as fallback:", fenToCopy);
-        }
+        const fenToCopy = selectFenToCopy({
+            inCriticalMomentChallenge,
+            fenAtCriticalPrompt,
+            inVariationMode,
+            currentFenInVariation,
+            lastKnownServerFEN,
+            boardFen: board.getPosition()
+        });
 
         if (fenToCopy) {
             try {
