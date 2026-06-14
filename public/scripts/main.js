@@ -4,9 +4,9 @@ import { PromotionDialog, PROMOTION_DIALOG_RESULT_TYPE } from "./3rdparty/cm-che
 import { MoveHelper } from './move_helper.js';
 import { Chess } from './3rdparty/chess.js/chess.js';
 import { MoveInfoDisplay } from './move_display_helper.js';
-import { NavigationControls } from './button_state_helper.js';
+import { NavigationControls } from './navigation_controls.js';
 import { CriticalChallenge, getGameIdFromURL } from './game_utils_helper.js';
-import { HintState } from './hint_state_helper.js';
+import { HintState } from './hint_state.js';
 import { VariationSession } from './variation_session.js';
 
 document.addEventListener("DOMContentLoaded", () => {

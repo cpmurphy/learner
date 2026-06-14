@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { HintState } from '../../public/scripts/hint_state_helper.js';
+import { HintState } from '../../public/scripts/hint_state.js';
 
 describe('HintState', () => {
     it('enables the hint after three wrong guesses', () => {

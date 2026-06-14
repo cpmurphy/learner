@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { NavigationControls } from '../../public/scripts/button_state_helper.js';
+import { NavigationControls } from '../../public/scripts/navigation_controls.js';
 
 const buttonNames = [
     'nextCritical',
