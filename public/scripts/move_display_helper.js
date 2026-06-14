@@ -1,6 +1,48 @@
 import { variationMoveNumber, variationTurn } from './variation_helper.js';
 
 /**
+ * Owns the move-info display element and its formatting context.
+ */
+export class MoveInfoDisplay {
+    constructor(element, getLearningSide) {
+        this.element = element;
+        this.getLearningSide = getLearningSide;
+        this.variation = null;
+    }
+
+    setVariation(variation) {
+        this.variation = variation;
+    }
+
+    showMain(lastMoveData) {
+        this.setText(formatMoveInfoText(lastMoveData, this.getLearningSide()));
+    }
+
+    showVariation(san, variationPly = null) {
+        if (!this.variation) return;
+        const ply = variationPly ?? this.variation.currentPly;
+        this.setText(formatVariationMoveText(
+            san,
+            this.variation.startMoveNumber,
+            this.variation.startTurn,
+            ply
+        ));
+    }
+
+    showCriticalPrompt(lastMoveData) {
+        this.setText(formatCriticalPromptText(lastMoveData, this.getLearningSide()));
+    }
+
+    showMessage(message) {
+        this.setText(message);
+    }
+
+    setText(text) {
+        if (this.element) this.element.textContent = text;
+    }
+}
+
+/**
  * Format the move-info text for a main-line move.
  * @param {object} lastMoveData - Server last_move object with number, turn, san, etc.
  * @param {string} learningSide - 'white' or 'black'
@@ -52,10 +94,6 @@ export function formatCriticalPromptText(lastMoveData, learningSide) {
  * @param {object|null} lastMoveData - Move data or null for game start
  * @param {string} learningSide - 'white' or 'black'
  * @param {object} options
- * @param {boolean} [options.isVariationMove=false]
- * @param {number} [options.variationPly=0]
- * @param {number} [options.variationStartMoveNumber]
- * @param {string} [options.variationStartTurn]
  * @returns {string}
  */
 export function formatMoveInfoText(lastMoveData, learningSide, options = {}) {

@@ -1,19 +1,17 @@
 /**
- * Build variation state after a correct critical-moment guess.
- *
- * @param {object} params
- * @param {string} params.userMoveUci - UCI of the user's move
- * @param {string} params.goodMoveUci - UCI of the expected good move
- * @param {string} params.userMoveSan - SAN of the user's move
- * @param {object} params.lastMoveData - Cached server last_move with variation_sans and move_index_of_blunder
- * @param {object} params.validationData - Server validation response
- * @returns {{ currentVariationSANs: string[], variationSANsStartIndex: number, savePayload: object|null }}
+ * Build the SAN list and optional save payload for a correct critical-moment guess.
  */
-export function buildVariationState({ userMoveUci, goodMoveUci, userMoveSan, lastMoveData, validationData }) {
+export function buildVariationState(moveAttempt, source) {
+    const userMoveUci = moveAttempt.userMoveUci;
+    const goodMoveUci = moveAttempt.goodMoveUci;
+    const userMoveSan = moveAttempt.userMoveSan;
+    const lastMoveData = source.lastMoveData;
+    const validationData = source.validationData || {};
+
     if (userMoveUci === goodMoveUci && lastMoveData.variation_sans?.length > 0) {
         return {
-            currentVariationSANs: lastMoveData.variation_sans,
-            variationSANsStartIndex: 0,
+            sans: lastMoveData.variation_sans,
+            startIndex: 0,
             savePayload: null
         };
     }
@@ -22,8 +20,8 @@ export function buildVariationState({ userMoveUci, goodMoveUci, userMoveSan, las
         const fullVariationForSaving = validationData.variation_sans;
         const moveIndex = lastMoveData.move_index_of_blunder - 1;
         return {
-            currentVariationSANs: validationData.variation_sans.slice(1),
-            variationSANsStartIndex: 1,
+            sans: validationData.variation_sans.slice(1),
+            startIndex: 1,
             savePayload: {
                 move_index: moveIndex,
                 variation_sans: fullVariationForSaving,
@@ -33,8 +31,8 @@ export function buildVariationState({ userMoveUci, goodMoveUci, userMoveSan, las
     }
 
     return {
-        currentVariationSANs: [userMoveSan],
-        variationSANsStartIndex: 0,
+        sans: [userMoveSan],
+        startIndex: 0,
         savePayload: null
     };
 }

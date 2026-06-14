@@ -1,44 +1,40 @@
 import { variationNextArrayIndex } from './variation_helper.js';
 
+const ALL_BUTTONS = [
+    'nextCritical',
+    'prevMove',
+    'nextMove',
+    'fastRewind',
+    'fastForward',
+    'resumeGame',
+    'copyFen',
+    'flipBoard'
+];
+
 /**
- * Compute disabled state for navigation buttons.
- * Returns true for disabled, false for enabled (matches HTML disabled attribute).
- *
- * @param {object} params
- * @param {'main'|'variation'|'declineCritical'|'initialLoad'|'error'} params.mode
- * @param {boolean} [params.boardExists=false]
- * @param {number} [params.moveIndex=0]
- * @param {number} [params.totalPositions=1]
- * @param {number} [params.currentVariationPly=0]
- * @param {string[]} [params.variationSANs=[]]
- * @param {number} [params.variationSANsStartIndex=0]
- * @param {string} [params.learningSide='white']
- * @param {string} [params.url='']
- * @param {string} [params.serverMessage='']
- * @param {boolean} [params.hasInitialCriticalForWhite=false]
- * @param {boolean} [params.inVariationMode=false]
- * @returns {object} Map of button names to disabled boolean
+ * Owns navigation button state for the game UI.
  */
-export function computeButtonStates({
-    mode,
-    boardExists = false,
-    moveIndex = 0,
-    totalPositions = 1,
-    currentVariationPly = 0,
-    variationSANs = [],
-    variationSANsStartIndex = 0,
-    learningSide = 'white',
-    url = '',
-    serverMessage = '',
-    hasInitialCriticalForWhite = false,
-    inVariationMode = false
-}) {
-    if (mode === 'error') {
-        return allDisabled();
+export class NavigationControls {
+    constructor(buttons = {}) {
+        this.buttons = buttons;
+        this.boardExists = false;
+        this.learningSide = 'white';
     }
 
-    if (mode === 'declineCritical') {
-        return {
+    setBoardExists(boardExists) {
+        this.boardExists = !!boardExists;
+    }
+
+    setLearningSide(learningSide) {
+        this.learningSide = learningSide || 'white';
+    }
+
+    setError() {
+        this.apply(allDisabled());
+    }
+
+    setDeclineCritical() {
+        this.apply({
             nextCritical: false,
             prevMove: false,
             nextMove: false,
@@ -47,13 +43,14 @@ export function computeButtonStates({
             resumeGame: true,
             copyFen: false,
             flipBoard: false
-        };
+        });
     }
 
-    if (mode === 'initialLoad') {
-        const nextCriticalDisabled = !(hasInitialCriticalForWhite && learningSide === 'white');
-        return {
-            nextCritical: nextCriticalDisabled,
+    setInitialLoad(options = {}) {
+        const hasInitialCriticalForWhite = !!options.hasInitialCriticalForWhite;
+        const inVariationMode = !!options.inVariationMode;
+        this.apply({
+            nextCritical: !(hasInitialCriticalForWhite && this.learningSide === 'white'),
             prevMove: false,
             nextMove: false,
             fastRewind: !inVariationMode,
@@ -61,83 +58,81 @@ export function computeButtonStates({
             resumeGame: !inVariationMode,
             copyFen: false,
             flipBoard: false
-        };
+        });
     }
 
-    if (mode === 'variation') {
-        const nextMoveDisabled = currentVariationPly >= variationSANs.length - 1;
-        return {
+    setVariation(variation) {
+        const view = variationView(variation);
+        this.apply({
             nextCritical: true,
             prevMove: undefined,
-            nextMove: nextMoveDisabled,
+            nextMove: view.currentPly >= view.sans.length - 1,
             fastRewind: true,
             fastForward: true,
             resumeGame: false,
-            copyFen: !boardExists,
-            flipBoard: !boardExists
-        };
+            copyFen: !this.boardExists,
+            flipBoard: !this.boardExists
+        });
     }
 
-    if (mode === 'postCorrectGuess') {
-        const nextMoveDisabled = variationNextArrayIndex(currentVariationPly, variationSANsStartIndex) >= variationSANs.length;
-        return {
+    setPostCorrectGuess(variation) {
+        const view = variationView(variation);
+        this.apply({
             nextCritical: true,
             prevMove: undefined,
-            nextMove: nextMoveDisabled,
+            nextMove: variationNextArrayIndex(view.currentPly, view.startIndex) >= view.sans.length,
             fastRewind: undefined,
             fastForward: undefined,
             resumeGame: false,
             copyFen: undefined,
             flipBoard: undefined
-        };
+        });
     }
 
-    // mode === 'main'
-    const noMoreCriticals = url === '/game/next_critical_moment' &&
-        serverMessage.startsWith('No further critical moments found');
-    let nextCriticalDisabled;
-    if (url === '/api/load_game') {
-        nextCriticalDisabled = !(hasInitialCriticalForWhite && learningSide === 'white');
-    } else {
-        nextCriticalDisabled = noMoreCriticals;
+    setMain(position = {}, response = {}) {
+        const moveIndex = position.moveIndex || 0;
+        const totalPositions = position.totalPositions || 1;
+        this.apply({
+            nextCritical: this.nextCriticalDisabled(response),
+            prevMove: undefined,
+            nextMove: moveIndex >= totalPositions - 1,
+            fastRewind: moveIndex === 0,
+            fastForward: moveIndex >= totalPositions - 1,
+            resumeGame: true,
+            copyFen: !this.boardExists,
+            flipBoard: !this.boardExists
+        });
     }
 
-    return {
-        nextCritical: nextCriticalDisabled,
-        prevMove: undefined,
-        nextMove: moveIndex >= totalPositions - 1,
-        fastRewind: moveIndex === 0,
-        fastForward: moveIndex >= totalPositions - 1,
-        resumeGame: true,
-        copyFen: !boardExists,
-        flipBoard: !boardExists
-    };
+    apply(states) {
+        for (const name of ALL_BUTTONS) {
+            const disabled = states[name];
+            if (disabled === undefined) continue;
+            const element = this.buttons[name];
+            if (element) element.disabled = disabled;
+        }
+    }
+
+    nextCriticalDisabled(response = {}) {
+        if (response.url === '/api/load_game') {
+            return !(response.hasInitialCriticalForWhite && this.learningSide === 'white');
+        }
+        return response.url === '/game/next_critical_moment' &&
+            (response.serverMessage || '').startsWith('No further critical moments found');
+    }
 }
 
 function allDisabled() {
-    return {
-        nextCritical: true,
-        prevMove: true,
-        nextMove: true,
-        fastRewind: true,
-        fastForward: true,
-        resumeGame: true,
-        copyFen: true,
-        flipBoard: true
-    };
+    return ALL_BUTTONS.reduce((states, name) => {
+        states[name] = true;
+        return states;
+    }, {});
 }
 
-/**
- * Apply computed button states to DOM button elements.
- * Skips buttons where state is undefined (unchanged).
- *
- * @param {object} buttons - Map of button name to DOM element (may be null)
- * @param {object} states - Map of button name to disabled boolean
- */
-export function applyButtonStates(buttons, states) {
-    for (const [name, disabled] of Object.entries(states)) {
-        if (disabled === undefined) continue;
-        const element = buttons[name];
-        if (element) element.disabled = disabled;
-    }
+function variationView(variation = {}) {
+    return {
+        currentPly: variation.currentPly ?? 0,
+        sans: variation.sans ?? [],
+        startIndex: variation.startIndex ?? 0
+    };
 }

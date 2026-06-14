@@ -1,5 +1,5 @@
 /**
- * Small pure utilities extracted from main.js game UI logic.
+ * Focused game-level state helpers used by the browser UI.
  */
 
 /**
@@ -13,78 +13,59 @@ export function getGameIdFromURL(search) {
 }
 
 /**
- * Determine whether a critical moment challenge should start.
- * @param {object|null} lastMoveData
- * @param {string} learningSide - 'white' or 'black'
- * @returns {boolean}
+ * Owns the current critical-moment prompt state.
  */
-export function shouldStartCriticalChallenge(lastMoveData, learningSide) {
-    return !!(lastMoveData &&
-        lastMoveData.is_critical &&
-        lastMoveData.turn === learningSide &&
-        lastMoveData.good_move_san &&
-        lastMoveData.fen_before_move);
-}
-
-/**
- * Select which FEN to copy based on current UI mode.
- * @param {object} params
- * @param {boolean} params.inCriticalMomentChallenge
- * @param {string|null} params.fenAtCriticalPrompt
- * @param {boolean} params.inVariationMode
- * @param {string|null} params.currentFenInVariation
- * @param {string|null} params.lastKnownServerFEN
- * @param {string|null} [params.boardFen] - Fallback from board.getPosition()
- * @returns {string|null}
- */
-export function selectFenToCopy({
-    inCriticalMomentChallenge,
-    fenAtCriticalPrompt,
-    inVariationMode,
-    currentFenInVariation,
-    lastKnownServerFEN,
-    boardFen = null
-}) {
-    if (inCriticalMomentChallenge && fenAtCriticalPrompt) {
-        return fenAtCriticalPrompt;
+export class CriticalChallenge {
+    constructor() {
+        this.stop();
     }
-    if (inVariationMode && currentFenInVariation) {
-        return currentFenInVariation;
+
+    get active() {
+        return this.inProgress;
     }
-    if (lastKnownServerFEN) {
-        return lastKnownServerFEN;
+
+    get fenAtPrompt() {
+        return this.fen;
     }
-    return boardFen;
-}
 
-/**
- * Whether the hint button should be enabled after wrong guesses.
- * @param {number} wrongGuessCount
- * @param {boolean} hintShown
- * @returns {boolean}
- */
-export function shouldEnableHint(wrongGuessCount, hintShown) {
-    return !hintShown && wrongGuessCount >= 3;
-}
+    get goodMoveSan() {
+        return this.goodSan;
+    }
 
-/**
- * Whether the best-move arrow should be shown after wrong guesses.
- * @param {number} wrongGuessCount
- * @param {boolean} hintShown
- * @param {boolean} arrowShown
- * @returns {boolean}
- */
-export function shouldShowArrow(wrongGuessCount, hintShown, arrowShown) {
-    return hintShown && wrongGuessCount >= 6 && !arrowShown;
-}
+    shouldStart(lastMoveData, learningSide) {
+        return !!(lastMoveData &&
+            lastMoveData.is_critical &&
+            lastMoveData.turn === learningSide &&
+            lastMoveData.good_move_san &&
+            lastMoveData.fen_before_move);
+    }
 
-/**
- * FEN to display on the board after a server response.
- * @param {boolean} setupChallenge
- * @param {string|null} fenAtCriticalPrompt
- * @param {string|null} serverFen
- * @returns {string|null}
- */
-export function fenToDisplay(setupChallenge, fenAtCriticalPrompt, serverFen) {
-    return setupChallenge ? fenAtCriticalPrompt : serverFen;
+    start(lastMoveData) {
+        this.inProgress = true;
+        this.fen = lastMoveData.fen_before_move;
+        this.goodSan = lastMoveData.good_move_san;
+    }
+
+    stop() {
+        this.inProgress = false;
+        this.fen = null;
+        this.goodSan = null;
+    }
+
+    prepare(lastMoveData, learningSide) {
+        if (!this.shouldStart(lastMoveData, learningSide)) {
+            this.stop();
+            return false;
+        }
+        this.start(lastMoveData);
+        return true;
+    }
+
+    displayFen(serverFen) {
+        return this.active ? this.fen : serverFen;
+    }
+
+    fenToCopy() {
+        return this.active ? this.fen : null;
+    }
 }
