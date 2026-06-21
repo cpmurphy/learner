@@ -233,6 +233,80 @@ class AppGameEndpointsTest < Minitest::Test
     assert json['success']
   end
 
+  # The test game has 7 plies (1.e4 e5 2.Nf3 Nc6 3.Bc4 Nf6 4.d4) => 8 positions.
+  TOTAL_POSITIONS = 8
+
+  def test_next_move_response_includes_total_positions
+    load_game_in_session
+
+    post '/game/next_move'
+
+    assert_predicate last_response, :ok?
+    json = JSON.parse(last_response.body)
+
+    assert_equal 1, json['move_index']
+    assert_equal TOTAL_POSITIONS, json['total_positions'],
+                 'next_move must return total_positions so the UI can compute button states'
+  end
+
+  def test_prev_move_response_includes_total_positions
+    load_game_in_session
+
+    post '/game/next_move'
+    post '/game/prev_move'
+
+    assert_predicate last_response, :ok?
+    json = JSON.parse(last_response.body)
+
+    assert_equal 0, json['move_index']
+    assert_equal TOTAL_POSITIONS, json['total_positions'],
+                 'prev_move must return total_positions so the UI can compute button states'
+  end
+
+  def test_next_move_at_last_position_includes_total_positions
+    load_game_in_session
+
+    post '/game/go_to_end'
+    post '/game/next_move' # already at the last move
+
+    assert_predicate last_response, :ok?
+    json = JSON.parse(last_response.body)
+
+    assert_equal TOTAL_POSITIONS, json['total_positions'],
+                 'next_move at the last move must still return total_positions'
+  end
+
+  def test_prev_move_at_first_position_includes_total_positions
+    load_game_in_session
+
+    post '/game/prev_move' # already at the first move
+
+    assert_predicate last_response, :ok?
+    json = JSON.parse(last_response.body)
+
+    assert_equal TOTAL_POSITIONS, json['total_positions'],
+                 'prev_move at the first move must still return total_positions'
+  end
+
+  # Regression: fast-forward, fast-rewind, next-move should leave the UI able to
+  # tell it is at move 1 of many (not at the end). That requires every endpoint in
+  # the sequence to report total_positions.
+  def test_forward_rewind_next_sequence_reports_position_correctly
+    load_game_in_session
+
+    post '/game/go_to_end'
+    post '/game/go_to_start'
+    post '/game/next_move'
+
+    assert_predicate last_response, :ok?
+    json = JSON.parse(last_response.body)
+
+    assert_equal 1, json['move_index']
+    assert_equal TOTAL_POSITIONS, json['total_positions']
+    refute_equal json['move_index'], json['total_positions'] - 1,
+                 'After one forward move we are not at the end'
+  end
+
   private
 
   def load_game_in_session
