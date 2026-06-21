@@ -353,12 +353,14 @@ class LearnerApp < Sinatra::Base
     if session[:current_move_index] < session[:game].positions.size - 1
       session[:current_move_index] += 1
       last_move = get_last_move_info(session[:game], session[:current_move_index])
-      json_response({ fen: current_board_fen, move_index: session[:current_move_index], last_move: last_move })
+      json_response({ fen: current_board_fen, move_index: session[:current_move_index],
+                      total_positions: session[:game].positions.size, last_move: last_move })
     else
       last_move = get_last_move_info(session[:game], session[:current_move_index])
       json_response({
                       fen: current_board_fen,
                       move_index: session[:current_move_index],
+                      total_positions: session[:game].positions.size,
                       message: 'Already at the last move.',
                       last_move: last_move
                     })
@@ -375,12 +377,14 @@ class LearnerApp < Sinatra::Base
     if session[:current_move_index].positive?
       session[:current_move_index] -= 1
       last_move = get_last_move_info(session[:game], session[:current_move_index])
-      json_response({ fen: current_board_fen, move_index: session[:current_move_index], last_move: last_move })
+      json_response({ fen: current_board_fen, move_index: session[:current_move_index],
+                      total_positions: session[:game].positions.size, last_move: last_move })
     else
       last_move = get_last_move_info(session[:game], session[:current_move_index]) # Will be nil for index 0
       json_response({
                       fen: current_board_fen,
                       move_index: session[:current_move_index],
+                      total_positions: session[:game].positions.size,
                       message: 'Already at the first move.',
                       last_move: last_move
                     })
