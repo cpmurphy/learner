@@ -29,8 +29,7 @@ GEM
     parser (3.3.12.0)
       ast (~> 2.4.1)
       racc
-    pgn2 (0.4.0)
-      whittle
+    pgn2 (1.5.0)
     pp (0.6.3)
       prettyprint
     prettyprint (0.2.0)
@@ -93,7 +92,6 @@ GEM
     unicode-display_width (3.2.0)
       unicode-emoji (~> 4.1)
     unicode-emoji (4.2.0)
-    whittle (0.0.8)
 
 PLATFORMS
   ruby
