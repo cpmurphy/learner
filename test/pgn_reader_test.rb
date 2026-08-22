@@ -179,7 +179,7 @@ class PGNReaderTest < Minitest::Test
       1.e4 e5
     PGN
 
-    assert_raises(Whittle::ParseError) { @reader.read(pgn_text.dup) }
+    assert_raises(Racc::ParseError) { @reader.read(pgn_text.dup) }
   end
 
   def test_read_game_with_invalid_result_tag_raises_parse_error
@@ -189,7 +189,7 @@ class PGNReaderTest < Minitest::Test
       1.e4 e5
     PGN
 
-    assert_raises(Whittle::ParseError) { @reader.read(pgn_text.dup) }
+    assert_raises(Racc::ParseError) { @reader.read(pgn_text.dup) }
   end
 
   def test_ensure_pgn_has_result_termination_returns_nil_for_nil

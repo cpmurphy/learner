@@ -47,7 +47,8 @@ class VariationBuilder
       begin
         # Convert UCI to SAN using the current position
         san_move = @uci_converter.convert(current_fen, uci_move)
-        sequence << PGN::MoveText.new(san_move)
+        pgn_move = PGN::MoveText.new(san_move)
+        sequence << PGN::MoveText.new(san_move) unless pgn_move.notation.nil?
 
         # Update the position by applying the move
         translator = MoveTranslator.new
