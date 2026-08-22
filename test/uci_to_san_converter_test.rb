@@ -16,6 +16,12 @@ class UciToSanConverterTest < Minitest::Test
     assert_equal 'e4', san
   end
 
+  def test_convert_invalid_move
+    san = @converter.convert(@starting_fen, 'invalid_move_lala')
+
+    assert_nil san
+  end
+
   def test_convert_knight_move
     # g1-f3 should be "Nf3"
     san = @converter.convert(@starting_fen, 'g1f3')

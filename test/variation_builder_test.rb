@@ -58,8 +58,7 @@ class TestVariationBuilder < Minitest::Test
     sequence = @builder.build_variation_sequence(starting_fen, uci_moves, 3)
 
     # Should stop at the invalid move
-    assert_equal 1, sequence.size
-    assert_equal 'e4', sequence[0].notation
+    assert_equal(['e4'], sequence.map(&:notation))
   end
 
   def test_build_variation_sequence_skips_null_moves

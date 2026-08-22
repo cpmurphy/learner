@@ -30,7 +30,7 @@ class UciToSanConverter
     return uci_move if uci_move == '--' # Null move
 
     context = parse_move_context(fen, uci_move)
-    return uci_move unless context[:piece] # Invalid move
+    return nil unless context[:piece] # Invalid move
 
     castling_move = detect_castling(context)
     return castling_move if castling_move
