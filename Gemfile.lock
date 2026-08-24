@@ -29,7 +29,7 @@ GEM
     parser (3.3.12.0)
       ast (~> 2.4.1)
       racc
-    pgn2 (2.0.1)
+    pgn2 (2.0.3)
       rb_sys (~> 0.9.39)
     pp (0.6.3)
       prettyprint
@@ -54,7 +54,7 @@ GEM
     rainbow (3.1.1)
     rake (13.4.2)
     rake-compiler-dock (1.12.0)
-    rb_sys (0.9.128)
+    rb_sys (0.9.130)
       rake-compiler-dock (= 1.12.0)
     rdoc (7.2.0)
       erb
