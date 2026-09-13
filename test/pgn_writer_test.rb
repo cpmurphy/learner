@@ -234,7 +234,7 @@ class PGNWriterTest < Minitest::Test
     assert_operator movetext_lines.size, :>, 1, 'Expected multiple lines due to wrapping'
   end
 
-  # rubocop:disable Minitest/MultipleAssertions
+  # rubocop:disable-next Minitest/MultipleAssertions
   def test_write_standard_tag_order
     game = PGN::Game.new(
       %w[e4 e5],
@@ -266,5 +266,4 @@ class PGNWriterTest < Minitest::Test
     # Extra tag comes after
     assert_match(/\[WhiteElo/, lines[7])
   end
-  # rubocop:enable Minitest/MultipleAssertions
 end

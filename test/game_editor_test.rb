@@ -11,7 +11,7 @@ class TestGameEditor < Minitest::Test
     @editor = GameEditor.new
   end
 
-  # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+  # rubocop:disable-next Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
   def test_game_evaluation
     games = PGN.parse(File.read('test/data/quill-2025-08-06.pgn'))
     game = games[0]
@@ -63,9 +63,8 @@ class TestGameEditor < Minitest::Test
     assert_predicate blunders.size, :positive?, 'Should find at least one blunder in the game'
     mock_analyzer.verify
   end
-  # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
-  # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+  # rubocop:disable-next Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
   def test_add_blunder_annotations_adds_variations
     # Create a simple game where we know there's a blunder
     # 1.e4 e5 2.Qh5?? - This is a blunder, better is 2.Nf3
@@ -143,7 +142,6 @@ class TestGameEditor < Minitest::Test
 
     mock_analyzer.verify
   end
-  # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
   def test_move_with_500_centipawns_advantage_not_blunder_when_best_move_not_mate
     # A move that is 500+ centipawns in favor should NOT be considered a blunder
