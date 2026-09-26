@@ -79,6 +79,14 @@ class AppGameEndpointsTest < Minitest::Test
     assert validation_response['good_enough']
     assert_equal 8, validation_response['variation_sans'].length
 
+    post '/game/validate_critical_move', { fen:	"r1b2k1r/ppppqBpp/2n5/6N1/3P4/1Q6/P4PPP/b1B2RK1 w - - 3 13",
+                                            good_move_uci:	"b3d1",
+                                            user_move_uci:	"c1f4" }.to_json,
+                  'CONTENT_TYPE' => 'application/json'
+    assert_predicate last_response, :ok?, "Failed validate bad guess: #{last_response.body}"
+    validation_response = JSON.parse(last_response.body)
+    assert ! validation_response['good_enough']
+
     post '/game/go_to_end'
     assert_predicate last_response, :ok?, "Failed navigate to end: #{last_response.body}"
     game_state = JSON.parse(last_response.body)
