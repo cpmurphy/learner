@@ -12,13 +12,12 @@ class AppUploadTest < Minitest::Test
   include Rack::Test::Methods
 
   def app
-    LearnerApp
+    @app ||= LearnerApp.new(pgn_dir: @test_dir)
   end
 
   def setup
     # Create a temporary directory for testing
     @test_dir = Dir.mktmpdir('pgn_upload_test')
-    ENV['PGN_DIR'] = @test_dir
 
     # Create a valid PGN for testing
     @valid_pgn = <<~PGN
@@ -182,6 +181,23 @@ class AppUploadTest < Minitest::Test
       # File should be in PGN_DIR
       assert json['path'].start_with?(@test_dir), 'File should be in PGN_DIR'
     end
+  end
+
+  def test_pgn_directories_are_isolated_between_app_instances
+    other_dir = Dir.mktmpdir('pgn_upload_other')
+    File.write(File.join(@test_dir, 'mine.pgn'), @valid_pgn)
+    File.write(File.join(other_dir, 'other.pgn'), @valid_pgn)
+
+    names = [@test_dir, other_dir].map do |dir|
+      Thread.new do
+        response = Rack::MockRequest.new(LearnerApp.new(pgn_dir: dir)).get('/api/pgn_files')
+        JSON.parse(response.body).map { |file| file['name'] }
+      end
+    end.map(&:value)
+
+    assert_equal [%w[mine.pgn], %w[other.pgn]], names
+  ensure
+    FileUtils.rm_rf(other_dir) if other_dir && Dir.exist?(other_dir)
   end
 
   def test_unique_filename_generation

@@ -6,16 +6,15 @@ require 'fileutils'
 require 'pgn'
 require_relative '../../app'
 
-class AppGameEndpointsTest < Minitest::Test
+class GameNavigationTest < Minitest::Test
   include Rack::Test::Methods
 
   def app
-    LearnerApp
+    @app ||= LearnerApp.new(pgn_dir: @test_dir)
   end
 
   def setup
     @test_dir = 'test/data'
-    ENV['PGN_DIR'] = @test_dir
 
     @threadwell_pgn_file = File.join(@test_dir, 'threadwell-2025-05-26-01.pgn')
     @threadwell_pgn_content = File.read(@threadwell_pgn_file)

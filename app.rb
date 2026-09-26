@@ -61,9 +61,8 @@ class LearnerApp < Sinatra::Base
       "#{name}_#{timestamp}#{ext}"
     end
 
-    # Check if file is within PGN_DIR boundary
+    # Check if file is within this app's PGN directory boundary
     def within_pgn_dir?(file_path)
-      pgn_dir = ENV.fetch('PGN_DIR', nil)
       return false if pgn_dir.nil? || pgn_dir.empty?
 
       abs_file_path = File.expand_path(file_path)
@@ -80,16 +79,25 @@ class LearnerApp < Sinatra::Base
   end
   # --- End Helpers ---
 
-  def initialize
-    super
+  # Each instance keeps its own PGN directory so concurrent tests can point at
+  # different directories. When pgn_dir is omitted, the server still follows ENV['PGN_DIR'].
+  def initialize(app = nil, pgn_dir: nil, **kwargs)
+    @pgn_dir = pgn_dir
+    super(app, **kwargs)
     @available_pgns = [] # Holds {id: string, name: string, path: string} for discovered PGN files
     scan_pgn_directory
   end
 
-  # Scan PGN_DIR and populate @available_pgns
+  def pgn_dir
+    return @pgn_dir unless @pgn_dir.nil?
+
+    ENV.fetch('PGN_DIR', nil)
+  end
+
+  # Scan this instance's PGN directory and populate @available_pgns
   def scan_pgn_directory
     @available_pgns = []
-    pgn_dir_path = ENV.fetch('PGN_DIR', nil)
+    pgn_dir_path = pgn_dir
 
     return unless pgn_directory_valid?(pgn_dir_path)
 
@@ -664,8 +672,7 @@ class LearnerApp < Sinatra::Base
 
   # API endpoint to upload a PGN file
   post '/api/upload_pgn' do
-    # Check if PGN_DIR is configured
-    pgn_dir = ENV.fetch('PGN_DIR', nil)
+    # Check if this instance has a usable PGN directory
     if pgn_dir.nil? || pgn_dir.empty? || !Dir.exist?(pgn_dir)
       return json_response({ error: 'PGN_DIR not configured or directory does not exist' }, 500)
     end
@@ -708,7 +715,6 @@ class LearnerApp < Sinatra::Base
   post '/api/analyze_and_save' do
     require_relative 'lib/pgn_writer'
 
-    pgn_dir = ENV.fetch('PGN_DIR', nil)
     if pgn_dir.nil? || pgn_dir.empty? || !Dir.exist?(pgn_dir)
       return json_response({ error: 'PGN_DIR not configured or directory does not exist' }, 500)
     end

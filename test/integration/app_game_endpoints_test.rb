@@ -12,13 +12,12 @@ class AppGameEndpointsTest < Minitest::Test
   include Rack::Test::Methods
 
   def app
-    LearnerApp
+    @app ||= LearnerApp.new(pgn_dir: @test_dir)
   end
 
   def setup
     # Create a temporary directory for testing
     @test_dir = Dir.mktmpdir('pgn_game_test')
-    ENV['PGN_DIR'] = @test_dir
 
     # Create a valid PGN file for testing
     @test_pgn_content = <<~PGN
