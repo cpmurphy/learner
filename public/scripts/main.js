@@ -409,7 +409,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // - Move info display
         // - Button state management
         // - Error handling
-        await fetchAndUpdateBoard('/api/load_game', 'POST', { pgn_file_id: gameId, game_index: 0 });
+        await fetchAndUpdateBoard('/api/load_game', 'POST', { pgn_file_id: gameId });
     }
 
     // Initial setup
