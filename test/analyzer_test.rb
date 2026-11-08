@@ -5,6 +5,8 @@ require 'minitest/mock'
 require_relative '../lib/analyzer'
 
 class AnalyzerTest < Minitest::Test
+  START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+
   def setup
     @mock_engine = Minitest::Mock.new
     mock_engine_configuration
@@ -16,7 +18,7 @@ class AnalyzerTest < Minitest::Test
   def test_best_moves_returns_moves_with_scores_and_notations
     @mock_engine.expect :multipv, nil, [3]
     mock_analysis_result(standard_analysis)
-    result = @analyzer.best_moves('mock_fen')
+    result = @analyzer.best_moves(START_FEN)
 
     assert_equal 3, result.length
     result.each do |move|
@@ -30,7 +32,7 @@ class AnalyzerTest < Minitest::Test
   def test_evaluate_best_move_returns_move_with_score_and_notation
     @mock_engine.expect :multipv, nil, [1]
     mock_analysis_result(standard_analysis)
-    result = @analyzer.evaluate_best_move('mock_fen')
+    result = @analyzer.evaluate_best_move(START_FEN)
 
     assert_includes result.keys, :score
     assert_includes result.keys, :move
@@ -40,9 +42,9 @@ class AnalyzerTest < Minitest::Test
 
   def test_evaluate_move_returns_move_with_score_and_notation
     @mock_engine.expect :multipv, nil, [1]
-    @mock_engine.expect :execute, nil, ['position fen mock_fen moves h6h3']
+    @mock_engine.expect :execute, nil, ["position fen #{START_FEN} moves h6h3"]
     @mock_engine.expect :execute, standard_analysis, ["go depth #{Analyzer::DEFAULT_DEPTH} nodes #{Analyzer::MAX_NODES}"]
-    result = @analyzer.evaluate_move('mock_fen', 'h6h3')
+    result = @analyzer.evaluate_move(START_FEN, 'h6h3')
 
     assert_includes result.keys, :score
     assert_includes result.keys, :move
@@ -53,7 +55,7 @@ class AnalyzerTest < Minitest::Test
   def test_best_moves_handles_score_with_mate_in_n
     @mock_engine.expect :multipv, nil, [3]
     mock_analysis_result(mate_in_n_analysis)
-    result = @analyzer.best_moves('mock_fen')
+    result = @analyzer.best_moves(START_FEN)
 
     assert_equal 3, result.length
     result.each do |move|
@@ -68,7 +70,7 @@ class AnalyzerTest < Minitest::Test
     already_mate_analysis = "info string NNUE evaluation using nn-b1a57edbea57.nnue\ninfo depth 0 score mate 0\nbestmove (none)\n"
     @mock_engine.expect :multipv, nil, [3]
     mock_analysis_result(already_mate_analysis)
-    result = @analyzer.best_moves('mock_fen')
+    result = @analyzer.best_moves(START_FEN)
 
     assert_equal 1, result.length
     result.each do |move|
@@ -82,7 +84,7 @@ class AnalyzerTest < Minitest::Test
     draw_analysis = "info string NNUE evaluation using nn-b1a57edbea57.nnue\ninfo depth 0 score cp 0\nbestmove (none)\n"
     @mock_engine.expect :multipv, nil, [3]
     mock_analysis_result(draw_analysis)
-    result = @analyzer.best_moves('mock_fen')
+    result = @analyzer.best_moves(START_FEN)
 
     assert_equal 1, result.length
     result.each do |move|
@@ -90,15 +92,24 @@ class AnalyzerTest < Minitest::Test
     end
   end
 
+  def test_rejects_injected_fen_without_touching_engine
+    injected = "#{START_FEN}\nsetoption name Threads value 1024"
+
+    assert_raises(Analyzer::InvalidInputError) { @analyzer.best_moves(injected) }
+    assert_raises(Analyzer::InvalidInputError) { @analyzer.evaluate_move(injected, 'e2e4') }
+    assert_raises(Analyzer::InvalidInputError) { @analyzer.evaluate_move(START_FEN, "e2e4\nquit") }
+    @mock_engine.verify
+  end
+
   def test_engine_error_handling
     @mock_engine.expect :multipv, nil, [3]
     @mock_engine.expect :analyze, nil do |fen, kw|
-      fen == 'mock_fen' && kw[:depth].is_a?(Integer)
+      fen == START_FEN && kw[:depth].is_a?(Integer)
     end
     @mock_engine.expect :execute, nil, ['quit']
 
     error = assert_raises(Analyzer::EngineError) do
-      @analyzer.best_moves('mock_fen')
+      @analyzer.best_moves(START_FEN)
     end
 
     assert_match(/Engine error/, error.message)
@@ -142,7 +153,7 @@ class AnalyzerTest < Minitest::Test
 
   def mock_analysis_result(analysis_string)
     @mock_engine.expect :analyze, analysis_string do |fen, kw|
-      fen == 'mock_fen' &&
+      fen == START_FEN &&
         kw[:depth].is_a?(Integer)
     end
   end

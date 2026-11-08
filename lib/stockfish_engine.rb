@@ -126,6 +126,9 @@ class StockfishEngine
   end
 
   def send_command(command)
+    # A UCI command is exactly one line; a line break would inject extra commands.
+    raise ArgumentError, 'UCI command must not contain line breaks' if command.match?(/[\r\n]/)
+
     @stdin.puts(command)
   end
 

@@ -2,6 +2,7 @@
 
 require_relative 'stockfish_engine'
 require_relative 'analysis_parser'
+require_relative 'uci_input_validator'
 require 'timeout'
 
 # A thin wrapper that uses the stockfish engine to analyse the position
@@ -13,6 +14,7 @@ class Analyzer
 
   class EngineError < StandardError; end
   class TimeoutError < EngineError; end
+  InvalidInputError = UciInputValidator::InvalidInputError
 
   def initialize(options = {})
     @parser = AnalysisParser.new
@@ -25,6 +27,7 @@ class Analyzer
   end
 
   def best_moves(fen, multipv = DEFAULT_MULTIPV)
+    UciInputValidator.validate_fen!(fen)
     ensure_engine_running
     @engine.multipv(multipv)
 
@@ -35,11 +38,15 @@ class Analyzer
     @parser.parse(analysis)
   rescue TimeoutError
     raise TimeoutError, "Analysis timed out after #{@timeout} seconds"
+  rescue InvalidInputError
+    raise
   rescue StandardError => e
     handle_engine_error(e)
   end
 
   def evaluate_move(fen, move)
+    UciInputValidator.validate_fen!(fen)
+    UciInputValidator.validate_uci_move!(move) if move
     ensure_engine_running
     move_str = move ? "moves #{move}" : ''
     @engine.execute("position fen #{fen} #{move_str}")
@@ -51,6 +58,8 @@ class Analyzer
     @parser.parse(analysis)[0]
   rescue TimeoutError
     raise TimeoutError, "Move evaluation timed out after #{@timeout} seconds"
+  rescue InvalidInputError
+    raise
   rescue StandardError => e
     handle_engine_error(e)
   end
