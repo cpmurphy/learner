@@ -26,27 +26,32 @@ Metrics/ClassLength:
     - 'lib/move_translator.rb'
     - 'lib/uci_to_san_converter.rb'
     - 'test/**/*'
+    - 'stockfish-pool/test/**/*'
     - 'app.rb'
 
 Metrics/ModuleLength:
   Max: 120
   Exclude:
     - 'test/**/*'
+    - 'stockfish-pool/test/**/*'
 
 Metrics/MethodLength:
   Max: 26
   Exclude:
     - 'test/**/*'
+    - 'stockfish-pool/test/**/*'
 
 Metrics/AbcSize:
   Max: 25
   Exclude:
     - 'test/**/*'
+    - 'stockfish-pool/test/**/*'
 
 Metrics/BlockLength:
   Max: 30
   Exclude:
     - 'test/**/*'
+    - 'stockfish-pool/test/**/*'
     - 'config/routes.rb'
     - 'app.rb'
 
@@ -54,6 +59,7 @@ Layout/LineLength:
   Max: 120
   Exclude:
     - 'test/**/*'
+    - 'stockfish-pool/test/**/*'
 
 # Common sense adjustments
 Naming/VariableNumber:

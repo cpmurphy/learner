@@ -52,3 +52,23 @@ jobs:
           name: screenshots
           path: ${{ github.workspace }}/tmp/screenshots
           if-no-files-found: ignore
+
+  stockfish-pool:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: stockfish-pool
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: .ruby-version
+          bundler-cache: true
+          working-directory: stockfish-pool
+
+      - name: Run tests
+        run: bundle exec rake test
