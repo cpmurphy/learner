@@ -519,6 +519,12 @@ class LearnerApp < Sinatra::Base
       return json_response({ error: 'Missing fen, user_move_uci, or good_move_uci' }, 400)
     end
 
+    unless UciInputValidator.valid_fen?(fen) &&
+           UciInputValidator.valid_uci_move?(user_move_uci) &&
+           UciInputValidator.valid_uci_move?(good_move_uci)
+      return json_response({ error: 'Invalid fen or move format' }, 400)
+    end
+
     validate_and_get_continuation(fen, user_move_uci, good_move_uci)
   end
 

@@ -58,6 +58,12 @@ class StockfishEngineTest < Minitest::Test
     assert_includes result, 'bestmove', 'Should return analysis with bestmove'
   end
 
+  def test_rejects_commands_with_line_breaks
+    assert_raises(ArgumentError) { @engine.execute("isready\nsetoption name Threads value 1024") }
+    assert_raises(ArgumentError) { @engine.analyze("8/8/8/8/8/8/8/8 w - - 0 1\rquit", depth: 1) }
+    assert_predicate @engine, :running?
+  end
+
   def test_close_shuts_down_engine
     @engine.close
 
