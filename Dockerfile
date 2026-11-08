@@ -4,7 +4,7 @@
 # docker run -d -p 3000:3000 --name chess-learner chess-learner
 
 # Make sure RUBY_VERSION matches the Ruby version in .ruby-version
-ARG RUBY_VERSION=3.4.1
+ARG RUBY_VERSION=3.4.12
 FROM docker.io/library/ruby:$RUBY_VERSION-slim AS base
 
 WORKDIR /app
