@@ -72,7 +72,7 @@ Style/ClassAndModuleChildren:
   Enabled: false  # Allows both compact and nested styles
 
 Naming/MethodParameterName:
-  AllowedNames: ['id', 'ip', 'to', 'x', 'y']
+  AllowedNames: ['id', 'ip', 'to', 'x', 'y', 'pv'] # pv: principal variation (UCI term)
 
 Minitest/MultipleAssertions:
   Max: 5

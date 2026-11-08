@@ -14,7 +14,9 @@ class GameEditor
   end
 
   def add_blunder_annotations(game)
-    analyzer = Analyzer.new
+    # Whole-game analysis is background work: on the engine service it uses
+    # the batch lane, which never takes the workers reserved for interactive use.
+    analyzer = Analyzer.new(lane: :batch)
     translator = MoveTranslator.new
     begin
       (0...game.moves.size).each do |i|

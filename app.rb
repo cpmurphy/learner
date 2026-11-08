@@ -4,6 +4,8 @@ require 'sinatra/base'
 require 'pgn'
 require 'json'
 require 'digest'
+require 'openssl'
+require 'securerandom'
 require_relative 'lib/game_editor'
 require_relative 'lib/app_helpers' # Require the new helpers
 require_relative 'lib/analyzer'
@@ -12,6 +14,10 @@ require_relative 'lib/pgn_reader'
 class LearnerApp < Sinatra::Base
   enable :sessions
   set :session_store, Rack::Session::Pool
+
+  # Key for hashing client IPs into engine-service quota subjects. Set it to keep
+  # subjects stable across restarts; a random per-process key works otherwise.
+  ENGINE_SUBJECT_SECRET = ENV.fetch('ENGINE_SUBJECT_SECRET') { SecureRandom.hex(32) }.freeze
 
   # --- Configuration ---
   configure do
@@ -37,6 +43,12 @@ class LearnerApp < Sinatra::Base
       return nil unless game_loaded? && session[:game].positions[session[:current_move_index]]
 
       session[:game].positions[session[:current_move_index]].to_fen.to_s
+    end
+
+    # The engine service's per-visitor quota key: an HMAC of the client IP, so
+    # the service never sees addresses.
+    def engine_subject
+      OpenSSL::HMAC.hexdigest('SHA256', ENGINE_SUBJECT_SECRET, request.ip.to_s)[0, 32]
     end
 
     def json_response(data, status_code = 200)
@@ -529,7 +541,7 @@ class LearnerApp < Sinatra::Base
   end
 
   def validate_and_get_continuation(fen, user_move_uci, good_move_uci)
-    analyzer = Analyzer.new
+    analyzer = Analyzer.new(subject: engine_subject)
     begin
       is_good_enough = analyzer.good_enough_move?(fen, user_move_uci, good_move_uci)
       response = { good_enough: is_good_enough }
@@ -540,6 +552,9 @@ class LearnerApp < Sinatra::Base
       end
 
       json_response(response)
+    rescue Analyzer::BusyError => e
+      headers 'Retry-After' => e.retry_after.to_s if e.retry_after
+      json_response({ error: 'The analysis engine is busy. Please try again shortly.' }, 429)
     rescue Analyzer::EngineError => e
       json_response({ error: "Analysis engine error: #{e.message}" }, 500)
     ensure

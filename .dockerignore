@@ -23,6 +23,8 @@ games
 
 # Built binary
 stockfish*
+# ...but not the engine service directory, whose client gem the app bundles
+!stockfish-pool
 
 # Neural network for the NNUE evaluation
 *.nnue

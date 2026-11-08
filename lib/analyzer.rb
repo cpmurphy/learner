@@ -1,67 +1,65 @@
 # frozen_string_literal: true
 
-require_relative 'stockfish_engine'
-require_relative 'analysis_parser'
 require_relative 'uci_input_validator'
 require 'timeout'
 
-# A thin wrapper that uses the stockfish engine to analyse the position
+# Analyses positions with Stockfish, either in this process (LocalBackend) or
+# through a stockfish-pool service (RemoteBackend) when ENGINE_URL is set.
+# The public API is the same either way.
 class Analyzer
-  DEFAULT_TIMEOUT = 5 # seconds
+  DEFAULT_TIMEOUT = 5 # seconds, local engine only
   DEFAULT_DEPTH = 16
   DEFAULT_MULTIPV = 3
   MAX_NODES = 1_000_000
+  DEFAULT_REMOTE_READ_TIMEOUT = 40 # seconds; covers queue wait plus search
 
   class EngineError < StandardError; end
   class TimeoutError < EngineError; end
+
+  # The engine service is at capacity or the caller is over its quota.
+  class BusyError < EngineError
+    attr_reader :retry_after
+
+    def initialize(message = nil, retry_after: nil)
+      super(message)
+      @retry_after = retry_after
+    end
+  end
+
   InvalidInputError = UciInputValidator::InvalidInputError
 
+  # Options:
+  #   :engine_url      stockfish-pool URL (default ENV['ENGINE_URL']); unset means a local engine
+  #   :engine_token    bearer token for the service (default ENV['ENGINE_TOKEN'])
+  #   :lane            :interactive (default) or :batch, for the service
+  #   :subject         per-caller quota key for the service, e.g. a hashed client IP
+  #   :engine_path     local Stockfish binary
+  #   :engine_override a local engine object (tests); forces the local backend
+  #   :backend         a ready-made backend (tests)
+  #   :timeout, :depth, :max_nodes
   def initialize(options = {})
-    @parser = AnalysisParser.new
-    @engine_override = options[:engine_override]
-    @engine_path = options.fetch(:engine_path, 'stockfish')
+    @options = options
     @timeout = options.fetch(:timeout, DEFAULT_TIMEOUT)
     @depth = options.fetch(:depth, DEFAULT_DEPTH)
     @max_nodes = options.fetch(:max_nodes, MAX_NODES)
-    initialize_engine
+    initialize_backend
+  end
+
+  def remote?
+    @backend.is_a?(RemoteBackend)
   end
 
   def best_moves(fen, multipv = DEFAULT_MULTIPV)
     UciInputValidator.validate_fen!(fen)
-    ensure_engine_running
-    @engine.multipv(multipv)
-
-    analysis = with_timeout do
-      @engine.analyze(fen, depth: @depth)
-    end
-
-    @parser.parse(analysis)
-  rescue TimeoutError
-    raise TimeoutError, "Analysis timed out after #{@timeout} seconds"
-  rescue InvalidInputError
-    raise
-  rescue StandardError => e
-    handle_engine_error(e)
+    with_backend('Analysis') { |backend| backend.best_moves(fen, multipv: multipv, depth: @depth) }
   end
 
   def evaluate_move(fen, move)
     UciInputValidator.validate_fen!(fen)
     UciInputValidator.validate_uci_move!(move) if move
-    ensure_engine_running
-    move_str = move ? "moves #{move}" : ''
-    @engine.execute("position fen #{fen} #{move_str}")
-
-    analysis = with_timeout do
-      @engine.execute("go depth #{@depth} nodes #{@max_nodes}")
-    end
-
-    @parser.parse(analysis)[0]
-  rescue TimeoutError
-    raise TimeoutError, "Move evaluation timed out after #{@timeout} seconds"
-  rescue InvalidInputError
-    raise
-  rescue StandardError => e
-    handle_engine_error(e)
+    with_backend('Move evaluation') do |backend|
+      backend.evaluate_move(fen, move, depth: @depth, nodes: @max_nodes)
+    end[0]
   end
 
   def evaluate_best_move(fen)
@@ -105,38 +103,52 @@ class Analyzer
   end
 
   def close
-    @engine&.execute('quit')
-  rescue Errno::EPIPE
-    # The stockfish engine may raise an EPIPE error if
-    # the connection is closed and the engine is not running.
-    # This is a workaround to ignore that error.
+    @backend&.close
   ensure
-    @engine = nil
+    @backend = nil
   end
 
   private
 
-  def initialize_engine
-    @engine = @engine_override || StockfishEngine.new(@engine_path)
-    configure_engine
+  def with_backend(action)
+    initialize_backend unless @backend
+    yield @backend
+  rescue Timeout::Error
+    close # the engine may still be searching; never reuse it
+    raise TimeoutError, "#{action} timed out after #{@timeout} seconds"
+  rescue InvalidInputError, EngineError
+    raise
+  rescue StandardError => e
+    handle_engine_error(e)
+  end
+
+  def initialize_backend
+    @backend = build_backend
   rescue StandardError => e
     raise EngineError, "Failed to initialize Stockfish engine: #{e.message}"
   end
 
-  def configure_engine
-    @engine.execute("setoption name MultiPV value #{DEFAULT_MULTIPV}")
-    @engine.execute('setoption name Hash value 128')
-    @engine.execute('setoption name Threads value 1')
+  def build_backend
+    return @options[:backend] if @options[:backend]
+
+    url = @options.fetch(:engine_url) { ENV.fetch('ENGINE_URL', nil) }.to_s.strip
+    return local_backend if @options[:engine_override] || url.empty?
+
+    remote_backend(url)
   end
 
-  def ensure_engine_running
-    return if @engine
-
-    initialize_engine
+  def local_backend
+    LocalBackend.new(engine: @options[:engine_override], engine_path: @options.fetch(:engine_path, 'stockfish'),
+                     timeout: @timeout)
   end
 
-  def with_timeout(&block)
-    Timeout.timeout(@timeout, &block)
+  def remote_backend(url)
+    token = @options.fetch(:engine_token) { ENV.fetch('ENGINE_TOKEN', nil) }
+    raise ArgumentError, 'ENGINE_TOKEN must be set when ENGINE_URL is' if token.to_s.empty?
+
+    read_timeout = Integer(ENV.fetch('ENGINE_READ_TIMEOUT', DEFAULT_REMOTE_READ_TIMEOUT))
+    client = StockfishPool::Client.new(url: url, token: token, read_timeout: read_timeout)
+    RemoteBackend.new(client: client, lane: @options.fetch(:lane, :interactive), subject: @options[:subject])
   end
 
   def handle_engine_error(error)
@@ -144,3 +156,6 @@ class Analyzer
     raise EngineError, "Engine error: #{error.message}"
   end
 end
+
+require_relative 'analyzer/local_backend'
+require_relative 'analyzer/remote_backend'
