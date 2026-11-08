@@ -1,0 +1,15 @@
+# frozen_string_literal: true
+
+source 'https://rubygems.org'
+
+gem 'json'
+gem 'puma', '>= 6.0'
+gem 'sinatra', '>= 4.0'
+
+group :development, :test do
+  gem 'minitest'
+  gem 'rack-test'
+  gem 'rake'
+  gem 'rubocop', require: false
+  gem 'rubocop-minitest', require: false
+end
