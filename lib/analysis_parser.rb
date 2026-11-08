@@ -10,6 +10,12 @@ class AnalysisParser
   IMMEDIATE_MATE_PATTERN = /info depth 0 score mate 0/
   IMMEDIATE_DRAW_PATTERN = /info depth 0 score cp 0/
 
+  # Maps "mate in n" onto the centipawn scale: mate in 1 is 999, mated in 1 is -999.
+  def self.mate_score(mate_in)
+    base = mate_in.negative? ? -1000 : 1000
+    base - mate_in
+  end
+
   # Extract the top moves and their corresponding ponder moves
   #
   # rubocop:disable Layout/LineLength
@@ -59,8 +65,7 @@ class AnalysisParser
   end
 
   def calculate_mate_score(mate_score)
-    base = mate_score.negative? ? -1000 : 1000
-    base - mate_score
+    self.class.mate_score(mate_score)
   end
 
   def add_variation(move_data, variation_string)

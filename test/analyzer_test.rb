@@ -119,7 +119,7 @@ class AnalyzerTest < Minitest::Test
     @mock_engine.expect :execute, nil, ['quit']
     @analyzer.close
 
-    assert_nil @analyzer.instance_variable_get(:@engine)
+    assert_nil @analyzer.instance_variable_get(:@backend)
   end
 
   def test_custom_configuration

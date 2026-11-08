@@ -6,6 +6,8 @@ gem 'json' # Standard JSON library, Sinatra often includes it
 gem 'pgn2'
 gem 'puma', '>= 5.0'    # A recommended server for Sinatra
 gem 'sinatra', '>= 3.2' # Using a recent stable version
+# Client for the engine service in stockfish-pool/ (used when ENGINE_URL is set)
+gem 'stockfish_pool_client', path: 'stockfish-pool/client'
 
 group :development, :test do
   gem 'debug', '>= 1.0.0'

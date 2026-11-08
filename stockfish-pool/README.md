@@ -20,7 +20,9 @@ other applications, built to be safe to put behind a public site:
   restarted with exponential backoff.
 
 This directory is self-contained (its own Gemfile, tests and lint config) so it
-can later move to its own repository.
+can later move to its own repository. `client/` holds the Ruby client gem
+(see [client/README.md](client/README.md)); its contract tests run against this
+server as part of `rake test`.
 
 ## API
 

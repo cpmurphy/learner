@@ -54,6 +54,10 @@ npm run test_once
 npm run coverage
 ```
 
+### Engine service (stockfish-pool/)
+
+`stockfish-pool/` is a self-contained HTTP/JSON service (own Gemfile, tests and `.rubocop.yml`) that runs a fixed, sandboxable pool of Stockfish engines. `stockfish-pool/client/` is its client gem, which the app uses as a path gem. Run its tests with `cd stockfish-pool && bundle exec rake test`. CI lints it with the root config (`bin/rubocop` forces it), so test exclusions for `stockfish-pool/test` live in the root `.rubocop.yml` too.
+
 ### Stockfish Engine
 
 The Stockfish directory contains a git submodule for the Stockfish chess engine. This is built separately and not modified as part of this project. The application uses an internal `StockfishEngine` class (lib/stockfish_engine.rb) to communicate with the Stockfish binary via UCI protocol, rather than using the `stockfish` gem. This approach provides better compatibility with Stockfish 17+ and avoids frozen string literal issues.
@@ -84,6 +88,8 @@ Key API endpoints:
 - When a blunder is detected, creates a variation with the best move in SAN format and adds a comment explaining the advantage
 
 **lib/analyzer.rb** - Stockfish engine wrapper
+- Uses a pluggable backend: `LocalBackend` (lib/analyzer/local_backend.rb) runs Stockfish in-process; `RemoteBackend` (lib/analyzer/remote_backend.rb) calls the `stockfish-pool` service when `ENGINE_URL` (plus `ENGINE_TOKEN`) is set. Both return the same result hashes
+- Options `lane:` (`:interactive`/`:batch`) and `subject:` (hashed client IP) only matter for the remote backend; `Analyzer::BusyError` (with `retry_after`) means the service is at capacity
 - `best_moves(fen, multipv)` - Returns the top N moves for a position
 - `evaluate_move(fen, move)` - Evaluates a specific move from a position
 - `good_enough_move?(fen, user_move_uci, good_move_uci)` - Determines if a user's alternative move is acceptable (>250cp advantage OR >80% as good as the suggested move)
