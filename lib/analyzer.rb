@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative 'uci_input_validator'
+require_relative 'env_setting'
 require 'timeout'
 
 # Analyses positions with Stockfish, either in this process (LocalBackend) or
@@ -157,7 +158,7 @@ class Analyzer
 
   def remote_read_timeout(lane)
     default = REMOTE_READ_TIMEOUTS.fetch(lane) { raise ArgumentError, "Unknown lane: #{lane.inspect}" }
-    Integer(ENV.fetch("ENGINE_READ_TIMEOUT_#{lane.to_s.upcase}", default))
+    EnvSetting.integer("ENGINE_READ_TIMEOUT_#{lane.to_s.upcase}", default)
   end
 
   def handle_engine_error(error)

@@ -30,7 +30,8 @@ class RemoteInstallTest < Minitest::Test
 
   def base_env
     { 'HOME' => @home, 'FAKE_PODMAN_STATE' => @state, 'PODMAN' => File.join(FAKES, 'fake_podman'),
-      'SYSTEMCTL' => File.join(FAKES, 'fake_systemctl'), 'HEALTH_ATTEMPTS' => '1', 'SKIP_HOST_CHECK' => '1',
+      'SYSTEMCTL' => File.join(FAKES, 'fake_systemctl'), 'JOURNALCTL' => File.join(FAKES, 'fake_journalctl'),
+      'HEALTH_ATTEMPTS' => '1', 'SKIP_HOST_CHECK' => '1',
       'STOCKFISH_ARCH' => 'x86-64-sse41-popcnt', 'XDG_RUNTIME_DIR' => @state }
   end
 
@@ -109,13 +110,20 @@ class RemoteInstallTest < Minitest::Test
     output, status = run_install(release: 'r2')
 
     refute_predicate status, :success?
-    assert_match(/did not become healthy.*--rollback/m, output)
+    assert_match(/did not become healthy.*fake journal: app crashed at boot.*--rollback/m, output)
     assert_equal 'r1-chess-learner:app', image('localhost/chess-learner:good')
     FileUtils.rm(File.join(@state, 'unhealthy-chess-learner'))
     output, = run_install('--rollback')
 
     assert_match(/Rolled back to the :good release/, output)
     assert_equal 'r1-chess-learner:app', image('localhost/chess-learner:app')
+  end
+
+  def test_failed_start_shows_the_units_journal
+    FileUtils.touch(File.join(@state, 'unhealthy-chess-learner'))
+    run_install
+
+    assert_includes calls, 'journalctl -u chess-learner.service -n 40 --no-pager'
   end
 
   def test_rollback_from_a_healthy_release_goes_to_previous

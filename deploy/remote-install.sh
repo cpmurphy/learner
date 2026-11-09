@@ -29,6 +29,7 @@ images=(localhost/chess-learner:app localhost/stockfish-pool:latest)
 # Commands, overridable so the script can be exercised without a server.
 podman_cmd=${PODMAN:-podman}
 systemctl_cmd=${SYSTEMCTL:-systemctl --user}
+journal_cmd=${JOURNALCTL:-journalctl --user}
 health_attempts=${HEALTH_ATTEMPTS:-60}
 
 config_dir=$HOME/.config/chess-learner
@@ -68,8 +69,10 @@ restart_and_wait() {
     if wait_healthy "$container"; then
       echo "$container: healthy"
     else
-      echo "$container did not become healthy. Recent log:" >&2
-      $podman_cmd logs --tail 30 "$container" >&2 || true
+      # The units run containers with --rm, so one that crashed at startup is
+      # already gone; the systemd journal keeps its output.
+      echo "$container did not become healthy. Recent journal for $container.service:" >&2
+      $journal_cmd -u "$container.service" -n 40 --no-pager >&2 || $podman_cmd logs --tail 40 "$container" >&2 || true
       echo "To go back to the previous release: deploy/remote-install.sh --rollback" >&2
       exit 1
     fi
