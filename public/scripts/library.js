@@ -1,15 +1,22 @@
 // library.js - Handles game library display and upload
 
 import { initializeUpload } from './upload.js';
+import { fetchSessionInfo, ownerControls, renderAccountControl } from './session_info.js';
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     loadGameLibrary();
 
-    // Initialize upload functionality with callback to refresh library
-    initializeUpload(() => {
-        console.log("Upload completed, refreshing game library");
-        loadGameLibrary();
-    });
+    // Uploading adds to the shared library, so only the owner sees it.
+    const controls = ownerControls(await fetchSessionInfo());
+    renderAccountControl(document.getElementById('account-control'), controls.account);
+    if (controls.showUpload) {
+        document.getElementById('upload-section').hidden = false;
+        // Initialize upload functionality with callback to refresh library
+        initializeUpload(() => {
+            console.log("Upload completed, refreshing game library");
+            loadGameLibrary();
+        });
+    }
 });
 
 /**

@@ -4,17 +4,41 @@ require 'sinatra/base'
 require 'pgn'
 require 'json'
 require 'digest'
-require 'ipaddr'
 require 'openssl'
 require 'securerandom'
 require_relative 'lib/game_editor'
 require_relative 'lib/app_helpers' # Require the new helpers
 require_relative 'lib/analyzer'
 require_relative 'lib/pgn_reader'
+require_relative 'lib/annotation_cache'
+require_relative 'lib/bounded_session_pool'
+require_relative 'lib/client_network'
+require_relative 'lib/owner_password'
+require_relative 'lib/rate_limits'
 
 class LearnerApp < Sinatra::Base
-  enable :sessions
-  set :session_store, Rack::Session::Pool
+  # Sessions live in memory, bounded in count and idle time (see BoundedSessionPool).
+  # SameSite=Lax keeps the cookie off cross-site POSTs.
+  set :sessions, same_site: :lax, httponly: true, expire_after: BoundedSessionPool::DEFAULT_IDLE_TTL,
+                 secure: ENV.fetch('APP_ENV', nil) == 'production' && ENV['COOKIE_SECURE'] != 'false',
+                 max_sessions: Integer(ENV.fetch('MAX_SESSIONS', BoundedSessionPool::DEFAULT_MAX_SESSIONS))
+  set :session_store, BoundedSessionPool
+  set :session_secret, ENV['SESSION_SECRET'] if ENV['SESSION_SECRET']
+
+  # Proxies allowed to report the client address (see ClientNetwork).
+  TRUSTED_PROXIES = ClientNetwork.parse_proxies(ENV.fetch('TRUSTED_PROXIES', nil)).freeze
+  ClientNetwork.install(TRUSTED_PROXIES)
+
+  # Per-client rate limits; RATE_LIMITS=off disables them (the test suite does).
+  RateLimits.configure
+  Rack::Attack.enabled = ENV['RATE_LIMITS'] != 'off'
+  use Rack::Attack
+
+  # Writing to the library (saving games, uploading) is for the owner only.
+  # With OWNER_PASSWORD_HASH set, the owner logs in at /login. Without it,
+  # development and test keep the old single-user behaviour (everyone is the
+  # owner) and production allows no writes at all.
+  OWNER_ROUTES = ['/game/save', '/api/upload_pgn', '/api/analyze_and_save'].freeze
 
   # Key for hashing client IPs into engine-service quota subjects. Set it to keep
   # subjects stable across restarts; a random per-process key works otherwise.
@@ -22,6 +46,8 @@ class LearnerApp < Sinatra::Base
 
   # --- Configuration ---
   configure do
+    owner_password_hash = ENV.fetch('OWNER_PASSWORD_HASH', nil)
+    set :owner_password_hash, owner_password_hash && OwnerPassword.validate!(owner_password_hash)
     set :public_folder, File.join(File.dirname(__FILE__), 'public')
     set :bind, '0.0.0.0'
   end
@@ -47,17 +73,19 @@ class LearnerApp < Sinatra::Base
     end
 
     # The engine service's per-visitor quota key: an HMAC of the client's
-    # network, so the service never sees addresses. IPv6 clients are keyed by
-    # their /64, since a single client can rotate freely within it.
+    # network (ClientNetwork.key), so the service never sees addresses.
     def engine_subject
-      OpenSSL::HMAC.hexdigest('SHA256', ENGINE_SUBJECT_SECRET, client_network(request.ip))[0, 32]
+      OpenSSL::HMAC.hexdigest('SHA256', ENGINE_SUBJECT_SECRET, ClientNetwork.key(request.ip))[0, 32]
     end
 
-    def client_network(ip)
-      address = IPAddr.new(ip.to_s).native # IPv4-mapped IPv6 becomes plain IPv4
-      address.ipv6? ? "#{address.mask(64)}/64" : address.to_s
-    rescue IPAddr::Error
-      ip.to_s
+    def owner_login_enabled?
+      !settings.owner_password_hash.nil?
+    end
+
+    def owner?
+      return session[:owner] == true if owner_login_enabled?
+
+      settings.environment != :production
     end
 
     def engine_busy_response(error)
@@ -109,6 +137,9 @@ class LearnerApp < Sinatra::Base
   # different directories. When pgn_dir is omitted, the server still follows ENV['PGN_DIR'].
   def initialize(app = nil, pgn_dir: nil, **kwargs)
     @pgn_dir = pgn_dir
+    # Whole-game analysis results for library files. Requests run on shallow
+    # copies of this instance, so all visitors share one cache.
+    @annotation_cache = AnnotationCache.new
     super(app, **kwargs)
     @available_pgns = [] # Holds {id: string, name: string, path: string} for discovered PGN files
     scan_pgn_directory
@@ -230,6 +261,37 @@ class LearnerApp < Sinatra::Base
 
   # --- Routes ---
 
+  before do
+    warn_about_untrusted_proxy
+    halt json_response({ error: 'Only the site owner can do that.' }, 403) if OWNER_ROUTES.include?(request.path) &&
+                                                                              !owner?
+  end
+
+  # Tells the frontend which controls to show.
+  get '/api/session' do
+    json_response({ owner: owner?, login_enabled: owner_login_enabled? })
+  end
+
+  get '/login' do
+    redirect '/login.html'
+  end
+
+  post '/login' do
+    unless owner_login_enabled? && OwnerPassword.verify(params['password'], settings.owner_password_hash)
+      redirect '/login.html?error=1', 303
+    end
+
+    env['rack.session.options'][:renew] = true # new session id: no session fixation
+    session[:owner] = true
+    redirect '/', 303
+  end
+
+  post '/logout' do
+    session.delete(:owner)
+    env['rack.session.options'][:renew] = true
+    redirect '/', 303
+  end
+
   # Serve index.html for the root path
   get '/' do
     send_file File.join(settings.public_folder, 'index.html')
@@ -279,15 +341,28 @@ class LearnerApp < Sinatra::Base
   end
 
   def load_game_from_pgn_file(pgn_meta)
-    games_in_file = parse_pgn_file(pgn_meta[:path])
-    return handle_empty_pgn_file(pgn_meta) if games_in_file.empty?
+    game = load_annotated_game(pgn_meta[:path])
+    return handle_empty_pgn_file(pgn_meta) unless game
 
-    initialize_game_session(games_in_file.first, pgn_meta[:path])
+    initialize_game_session(game, pgn_meta[:path])
     build_load_game_response(pgn_meta)
   rescue Analyzer::BusyError => e
     engine_busy_response(e) # transient; the visitor's current game stays loaded
   rescue StandardError => e
     handle_pgn_load_error(pgn_meta, e)
+  end
+
+  # The file's first game with critical moments in place, from the shared cache
+  # when possible: analysing an unannotated file is expensive, and every visitor
+  # would otherwise repeat it. Each caller gets its own copy.
+  def load_annotated_game(file_path)
+    @annotation_cache.fetch_copy(AnnotationCache.key_for(file_path)) do
+      game = parse_pgn_file(file_path).first
+      return nil unless game # not cached
+
+      process_critical_moments_for_game(game)
+      game
+    end
   end
 
   def parse_pgn_file(file_path)
@@ -300,10 +375,9 @@ class LearnerApp < Sinatra::Base
     json_response({ error: "No games found in PGN file: #{pgn_meta[:name]}" }, 400)
   end
 
-  # Analyses the game before touching the session, so a failure (for example
-  # a busy engine) leaves the previously loaded game in place.
+  # Called only with a fully prepared game, so a failure earlier (for example a
+  # busy engine) leaves the previously loaded game in place.
   def initialize_game_session(game, file_path)
-    process_critical_moments_for_game(game)
     session[:game] = game
     session[:pgn_file_path] = file_path
     session[:current_move_index] = 0
@@ -330,6 +404,29 @@ class LearnerApp < Sinatra::Base
     else
       game_editor.add_blunder_annotations(game, subject: engine_subject)
     end
+  end
+
+  # A proxy that is not in TRUSTED_PROXIES is forwarding client addresses: every
+  # visitor then looks like the proxy and shares its rate limits and quota.
+  # Logged once per proxy address (at most a few), to help with deployment.
+  def warn_about_untrusted_proxy
+    return unless env['HTTP_X_FORWARDED_FOR']
+
+    remote = env['REMOTE_ADDR'].to_s
+    return if ClientNetwork.trusted?(remote, TRUSTED_PROXIES)
+
+    self.class.warn_once("Request from #{remote} carries X-Forwarded-For, but #{remote} is not in " \
+                         'TRUSTED_PROXIES; clients behind it will share one rate limit and quota.')
+  end
+
+  WARNED = { mutex: Mutex.new, messages: [] }.freeze
+  def self.warn_once(message)
+    WARNED[:mutex].synchronize do
+      return if WARNED[:messages].include?(message) || WARNED[:messages].size >= 10
+
+      WARNED[:messages] << message
+    end
+    warn "WARNING: #{message}"
   end
 
   def build_load_game_response(pgn_meta)

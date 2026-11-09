@@ -8,6 +8,11 @@ import { NavigationControls } from './navigation_controls.js';
 import { CriticalChallenge, getGameIdFromURL } from './game_utils_helper.js';
 import { HintState } from './hint_state.js';
 import { VariationSession } from './variation_session.js';
+import { fetchSessionInfo } from './session_info.js';
+
+// Saving a variation into the library file is for the site owner only;
+// everyone else keeps it in their own session.
+const sessionInfo = fetchSessionInfo();
 
 document.addEventListener("DOMContentLoaded", () => {
     const boardContainer = document.getElementById("chessboard-container");
@@ -191,10 +196,12 @@ document.addEventListener("DOMContentLoaded", () => {
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify(variationPlan.savePayload)
                             });
-                            await fetch('/game/save', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' }
-                            });
+                            if ((await sessionInfo).owner) {
+                                await fetch('/game/save', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' }
+                                });
+                            }
                         } catch (error) {
                             console.error('Error saving variation:', error);
                         }

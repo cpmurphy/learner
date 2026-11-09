@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Owner login - Chess Learner</title>
+    <link rel="stylesheet" href="styles/style.css">
+</head>
+<body>
+    <h1>Chess Learner</h1>
+
+    <div class="login-section">
+        <h2>Owner login</h2>
+        <p id="login-error" class="error-message" hidden>That password is not right. Please try again.</p>
+        <form method="post" action="/login" class="login-form">
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
+            <button type="submit" class="app-button">Log in</button>
+        </form>
+        <p><a href="/">Back to the game library</a></p>
+    </div>
+
+    <script type="module" src="scripts/login.js"></script>
+</body>
+</html>

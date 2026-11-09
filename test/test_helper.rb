@@ -2,6 +2,9 @@
 
 # Set test environment before loading anything else
 ENV['RACK_ENV'] = 'test'
+# Rate limits are global; the suite makes many requests from one address. Tests
+# that exercise the limits turn them back on explicitly.
+ENV['RATE_LIMITS'] ||= 'off'
 
 require 'simplecov'
 SimpleCov.start do

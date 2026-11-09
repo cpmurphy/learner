@@ -214,6 +214,38 @@ h1 {
     transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
 }
 
+/* The hidden attribute must win over component display rules */
+[hidden] {
+    display: none !important;
+}
+
+/* Owner login link / logout button (top right of the library page) */
+.account-control {
+    max-width: 800px;
+    margin: 0 auto;
+    text-align: right;
+}
+
+.account-control form {
+    display: inline;
+}
+
+.login-section {
+    background-color: #fff;
+    padding: 15px;
+    margin: 20px auto;
+    max-width: 400px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
 /* Upload Section Styles */
 .upload-section {
     background-color: #fff;
