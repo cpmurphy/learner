@@ -153,7 +153,9 @@ class Analyzer
 
     lane = @options.fetch(:lane, :interactive)
     client = StockfishPool::Client.new(url: url, token: token, read_timeout: remote_read_timeout(lane))
-    RemoteBackend.new(client: client, lane: lane, subject: @options[:subject])
+    RemoteBackend.new(client: client, lane: lane, subject: @options[:subject],
+                      batch_busy_wait_s: EnvSetting.integer('ENGINE_BATCH_BUSY_WAIT_S',
+                                                            RemoteBackend::DEFAULT_BATCH_BUSY_WAIT_S))
   end
 
   def remote_read_timeout(lane)

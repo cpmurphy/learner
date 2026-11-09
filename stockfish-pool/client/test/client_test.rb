@@ -77,7 +77,7 @@ class ClientTest < Minitest::Test
 
   def test_quota_exceeded
     url = start_server({ 'SUBJECT_BURST_SEC' => '1' })
-    @service.instance_variable_get(:@quota).charge('client-1', 5)
+    @service.quota(:interactive).charge('client-1', 5)
 
     assert_raises(StockfishPool::Client::QuotaExceeded) { client(url).analyze(fen: START_FEN, subject: 'client-1') }
   end

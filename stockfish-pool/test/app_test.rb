@@ -65,7 +65,7 @@ class AppTest < Minitest::Test
   def test_subject_quota_returns_429_with_retry_after
     @overrides = { 'SUBJECT_BURST_SEC' => '1', 'SUBJECT_ENGINE_SEC_PER_MIN' => '1' }
     app
-    @service.instance_variable_get(:@quota).charge('client-1', 5)
+    @service.quota(:interactive).charge('client-1', 5)
     body = analyze({ fen: START_FEN, subject: 'client-1' })
 
     assert_equal 429, last_response.status
