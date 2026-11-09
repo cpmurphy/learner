@@ -11,7 +11,11 @@ class Analyzer
   DEFAULT_DEPTH = 16
   DEFAULT_MULTIPV = 3
   MAX_NODES = 1_000_000
-  DEFAULT_REMOTE_READ_TIMEOUT = 40 # seconds; covers queue wait plus search
+  # Seconds to wait for the engine service, per lane. Each covers the service's
+  # default queue wait plus the search ceiling and stop/kill grace (interactive:
+  # 5 + 2 + 1.25 s; batch: 30 + 0.4 + 1.25 s) with headroom, so a hung service
+  # fails an interactive request quickly. Override with ENGINE_READ_TIMEOUT_<LANE>.
+  REMOTE_READ_TIMEOUTS = { interactive: 15, batch: 45 }.freeze
 
   class EngineError < StandardError; end
   class TimeoutError < EngineError; end
@@ -146,9 +150,14 @@ class Analyzer
     token = @options.fetch(:engine_token) { ENV.fetch('ENGINE_TOKEN', nil) }
     raise ArgumentError, 'ENGINE_TOKEN must be set when ENGINE_URL is' if token.to_s.empty?
 
-    read_timeout = Integer(ENV.fetch('ENGINE_READ_TIMEOUT', DEFAULT_REMOTE_READ_TIMEOUT))
-    client = StockfishPool::Client.new(url: url, token: token, read_timeout: read_timeout)
-    RemoteBackend.new(client: client, lane: @options.fetch(:lane, :interactive), subject: @options[:subject])
+    lane = @options.fetch(:lane, :interactive)
+    client = StockfishPool::Client.new(url: url, token: token, read_timeout: remote_read_timeout(lane))
+    RemoteBackend.new(client: client, lane: lane, subject: @options[:subject])
+  end
+
+  def remote_read_timeout(lane)
+    default = REMOTE_READ_TIMEOUTS.fetch(lane) { raise ArgumentError, "Unknown lane: #{lane.inspect}" }
+    Integer(ENV.fetch("ENGINE_READ_TIMEOUT_#{lane.to_s.upcase}", default))
   end
 
   def handle_engine_error(error)

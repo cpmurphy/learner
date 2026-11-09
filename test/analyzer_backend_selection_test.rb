@@ -65,4 +65,33 @@ class AnalyzerBackendSelectionTest < Minitest::Test
     assert_includes engine.commands, 'quit'
     assert_nil analyzer.instance_variable_get(:@backend)
   end
+
+  def read_timeout(analyzer)
+    analyzer.instance_variable_get(:@backend).instance_variable_get(:@client).instance_variable_get(:@read_timeout)
+  end
+
+  def test_remote_read_timeout_depends_on_lane
+    interactive = Analyzer.new(engine_url: 'http://stockfish-pool:4000', engine_token: TOKEN)
+    batch = Analyzer.new(engine_url: 'http://stockfish-pool:4000', engine_token: TOKEN, lane: :batch)
+
+    assert_equal 15, read_timeout(interactive)
+    assert_equal 45, read_timeout(batch)
+  end
+
+  def test_remote_read_timeout_can_be_overridden_per_lane
+    ENV['ENGINE_READ_TIMEOUT_INTERACTIVE'] = '7'
+    analyzer = Analyzer.new(engine_url: 'http://stockfish-pool:4000', engine_token: TOKEN)
+
+    assert_equal 7, read_timeout(analyzer)
+  ensure
+    ENV.delete('ENGINE_READ_TIMEOUT_INTERACTIVE')
+  end
+
+  def test_unknown_lane_is_rejected
+    error = assert_raises(Analyzer::EngineError) do
+      Analyzer.new(engine_url: 'http://stockfish-pool:4000', engine_token: TOKEN, lane: :urgent)
+    end
+
+    assert_match(/Unknown lane/, error.message)
+  end
 end

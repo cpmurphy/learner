@@ -4,6 +4,7 @@ require 'sinatra/base'
 require 'pgn'
 require 'json'
 require 'digest'
+require 'ipaddr'
 require 'openssl'
 require 'securerandom'
 require_relative 'lib/game_editor'
@@ -45,10 +46,23 @@ class LearnerApp < Sinatra::Base
       session[:game].positions[session[:current_move_index]].to_fen.to_s
     end
 
-    # The engine service's per-visitor quota key: an HMAC of the client IP, so
-    # the service never sees addresses.
+    # The engine service's per-visitor quota key: an HMAC of the client's
+    # network, so the service never sees addresses. IPv6 clients are keyed by
+    # their /64, since a single client can rotate freely within it.
     def engine_subject
-      OpenSSL::HMAC.hexdigest('SHA256', ENGINE_SUBJECT_SECRET, request.ip.to_s)[0, 32]
+      OpenSSL::HMAC.hexdigest('SHA256', ENGINE_SUBJECT_SECRET, client_network(request.ip))[0, 32]
+    end
+
+    def client_network(ip)
+      address = IPAddr.new(ip.to_s).native # IPv4-mapped IPv6 becomes plain IPv4
+      address.ipv6? ? "#{address.mask(64)}/64" : address.to_s
+    rescue IPAddr::Error
+      ip.to_s
+    end
+
+    def engine_busy_response(error)
+      headers 'Retry-After' => error.retry_after.to_s if error.retry_after
+      json_response({ error: 'The analysis engine is busy. Please try again shortly.' }, 429)
     end
 
     def json_response(data, status_code = 200)
@@ -270,6 +284,8 @@ class LearnerApp < Sinatra::Base
 
     initialize_game_session(games_in_file.first, pgn_meta[:path])
     build_load_game_response(pgn_meta)
+  rescue Analyzer::BusyError => e
+    engine_busy_response(e) # transient; the visitor's current game stays loaded
   rescue StandardError => e
     handle_pgn_load_error(pgn_meta, e)
   end
@@ -284,10 +300,12 @@ class LearnerApp < Sinatra::Base
     json_response({ error: "No games found in PGN file: #{pgn_meta[:name]}" }, 400)
   end
 
+  # Analyses the game before touching the session, so a failure (for example
+  # a busy engine) leaves the previously loaded game in place.
   def initialize_game_session(game, file_path)
+    process_critical_moments_for_game(game)
     session[:game] = game
     session[:pgn_file_path] = file_path
-    process_critical_moments_for_game
     session[:current_move_index] = 0
   end
 
@@ -303,14 +321,14 @@ class LearnerApp < Sinatra::Base
     json_response({ error: "Could not parse PGN file: #{pgn_meta[:name]}. Details: #{error.message}" }, 500)
   end
 
-  def process_critical_moments_for_game
-    has_critical_moments = session[:game].moves.any? { |m| m.annotation&.include?('$201') }
+  def process_critical_moments_for_game(game)
+    has_critical_moments = game.moves.any? { |m| m.annotation&.include?('$201') }
     game_editor = GameEditor.new
 
     if has_critical_moments
-      game_editor.shift_critical_annotations(session[:game])
+      game_editor.shift_critical_annotations(game)
     else
-      game_editor.add_blunder_annotations(session[:game])
+      game_editor.add_blunder_annotations(game, subject: engine_subject)
     end
   end
 
@@ -553,8 +571,7 @@ class LearnerApp < Sinatra::Base
 
       json_response(response)
     rescue Analyzer::BusyError => e
-      headers 'Retry-After' => e.retry_after.to_s if e.retry_after
-      json_response({ error: 'The analysis engine is busy. Please try again shortly.' }, 429)
+      engine_busy_response(e)
     rescue Analyzer::EngineError => e
       json_response({ error: "Analysis engine error: #{e.message}" }, 500)
     ensure
@@ -807,6 +824,8 @@ class LearnerApp < Sinatra::Base
                     game_count: 1,
                     message: 'Game annotated and saved successfully'
                   })
+  rescue Analyzer::BusyError => e
+    engine_busy_response(e)
   rescue StandardError => e
     puts "ERROR: Failed to analyze and save PGN: #{e.message}"
     puts e.backtrace.join("\n")
@@ -815,7 +834,7 @@ class LearnerApp < Sinatra::Base
 
   def annotate_game_with_blunders(game)
     game_editor = GameEditor.new
-    game_editor.add_blunder_annotations(game)
+    game_editor.add_blunder_annotations(game, subject: engine_subject)
     require_relative 'lib/pgn_writer'
     writer = PGNWriter.new
     writer.write(game)
