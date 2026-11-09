@@ -58,6 +58,46 @@ class AppAnalysisTest < Minitest::Test
     Digest::MD5.hexdigest(File.expand_path(File.join(@dir, LIBRARY_FILE)))
   end
 
+  # Finds one blunder: 2. Nf3 (g1f3) loses 300 centipawns against 2. Nc3.
+  class OneBlunderAnalyzer
+    def evaluate_best_move(_fen)
+      { score: 0, move: 'b1c3', variation: [] }
+    end
+
+    def evaluate_move(_fen, move)
+      { score: move == 'g1f3' ? 300 : 0 }
+    end
+
+    def close; end
+  end
+
+  def analyze_with_one_blunder(pgn = GAME)
+    Analyzer.stub :new, OneBlunderAnalyzer.new do
+      post '/api/analyze', { pgn_content: pgn }.to_json, 'CONTENT_TYPE' => 'application/json'
+    end
+    last_response
+  end
+
+  def test_a_visitor_is_offered_a_better_move_at_a_blunder
+    assert_equal 200, analyze_with_one_blunder.status, last_response.body
+    get '/api/analysis'
+
+    assert body['has_initial_critical_moment_for_white']
+    check_better_move_offered_after_knight_move
+  end
+
+  def test_the_owner_is_offered_a_better_move_in_an_unannotated_library_game
+    @app_class = LearnerApp # development: everyone is the owner
+    File.write(File.join(@dir, 'fresh.pgn'), GAME)
+    Analyzer.stub :new, OneBlunderAnalyzer.new do
+      post '/api/load_game', { pgn_file_id: Digest::MD5.hexdigest(File.join(@dir, 'fresh.pgn')) }.to_json,
+           'CONTENT_TYPE' => 'application/json'
+    end
+
+    assert_equal 200, last_response.status, last_response.body
+    check_better_move_offered_after_knight_move
+  end
+
   def test_visitors_cannot_list_or_open_library_games
     get '/api/pgn_files'
 
@@ -178,5 +218,19 @@ class AppAnalysisTest < Minitest::Test
   ensure
     Rack::Attack.enabled = false
     Rack::Attack.reset!
+  end
+
+  private
+
+  # What the game page needs to offer "Try a better move" after 2. Nf3.
+  def check_better_move_offered_after_knight_move
+    post '/game/next_critical_moment', { learning_side: 'white' }.to_json, 'CONTENT_TYPE' => 'application/json'
+
+    assert_equal 3, body['move_index'], last_response.body
+    last_move = body['last_move']
+
+    assert_equal %w[Nf3 white], last_move.values_at('san', 'turn')
+    assert last_move['is_critical'], 'the blunder itself must be the critical move'
+    assert_equal 'Nc3', last_move['good_move_san']
   end
 end

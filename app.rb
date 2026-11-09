@@ -431,11 +431,12 @@ class LearnerApp < Sinatra::Base
     has_critical_moments = game.moves.any? { |m| m.annotation&.include?('$201') }
     game_editor = GameEditor.new
 
-    if has_critical_moments
-      game_editor.shift_critical_annotations(game)
-    else
-      game_editor.add_blunder_annotations(game, subject: engine_subject)
-    end
+    # add_blunder_annotations marks the move before each blunder, the layout
+    # PGN files use (see /game/save); in memory the mark belongs on the blunder
+    # itself, next to its better-move variation, which is what the game page
+    # looks for to offer "Try a better move". Either way, shift.
+    game_editor.add_blunder_annotations(game, subject: engine_subject) unless has_critical_moments
+    game_editor.shift_critical_annotations(game)
   end
 
   # A proxy that is not in TRUSTED_PROXIES is forwarding client addresses: every
