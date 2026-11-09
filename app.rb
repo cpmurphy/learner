@@ -13,6 +13,7 @@ require_relative 'lib/pgn_reader'
 require_relative 'lib/annotation_cache'
 require_relative 'lib/bounded_session_pool'
 require_relative 'lib/client_network'
+require_relative 'lib/env_setting'
 require_relative 'lib/owner_password'
 require_relative 'lib/rate_limits'
 
@@ -21,12 +22,12 @@ class LearnerApp < Sinatra::Base
   # SameSite=Lax keeps the cookie off cross-site POSTs.
   set :sessions, same_site: :lax, httponly: true, expire_after: BoundedSessionPool::DEFAULT_IDLE_TTL,
                  secure: ENV.fetch('APP_ENV', nil) == 'production' && ENV['COOKIE_SECURE'] != 'false',
-                 max_sessions: Integer(ENV.fetch('MAX_SESSIONS', BoundedSessionPool::DEFAULT_MAX_SESSIONS))
+                 max_sessions: EnvSetting.integer('MAX_SESSIONS', BoundedSessionPool::DEFAULT_MAX_SESSIONS)
   set :session_store, BoundedSessionPool
-  set :session_secret, ENV['SESSION_SECRET'] if ENV['SESSION_SECRET']
+  set :session_secret, EnvSetting.get('SESSION_SECRET') if EnvSetting.get('SESSION_SECRET')
 
   # Proxies allowed to report the client address (see ClientNetwork).
-  TRUSTED_PROXIES = ClientNetwork.parse_proxies(ENV.fetch('TRUSTED_PROXIES', nil)).freeze
+  TRUSTED_PROXIES = ClientNetwork.parse_proxies(EnvSetting.get('TRUSTED_PROXIES')).freeze
   ClientNetwork.install(TRUSTED_PROXIES)
 
   # Per-client rate limits; RATE_LIMITS=off disables them (the test suite does).
@@ -43,11 +44,11 @@ class LearnerApp < Sinatra::Base
 
   # Key for hashing client IPs into engine-service quota subjects. Set it to keep
   # subjects stable across restarts; a random per-process key works otherwise.
-  ENGINE_SUBJECT_SECRET = ENV.fetch('ENGINE_SUBJECT_SECRET') { SecureRandom.hex(32) }.freeze
+  ENGINE_SUBJECT_SECRET = (EnvSetting.get('ENGINE_SUBJECT_SECRET') || SecureRandom.hex(32)).freeze
 
   # --- Configuration ---
   configure do
-    owner_password_hash = ENV.fetch('OWNER_PASSWORD_HASH', nil)
+    owner_password_hash = EnvSetting.get('OWNER_PASSWORD_HASH') # blank (`OWNER_PASSWORD_HASH=`) means no login
     set :owner_password_hash, owner_password_hash && OwnerPassword.validate!(owner_password_hash)
     set :owner_access_open, ENV['OWNER_ACCESS'] == 'open'
     if settings.owner_access_open && production? && owner_password_hash.nil?

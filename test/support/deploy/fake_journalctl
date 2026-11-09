@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Fake `journalctl --user` for test/remote_install_test.rb.
+echo "journalctl $*" >> "${FAKE_PODMAN_STATE:?}/calls"
+echo "fake journal: app crashed at boot"
