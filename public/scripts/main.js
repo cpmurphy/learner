@@ -14,6 +14,11 @@ import { fetchSessionInfo } from './session_info.js';
 // everyone else keeps it in their own session.
 const sessionInfo = fetchSessionInfo();
 
+// /game?id=analysis shows the game this visitor pasted for analysis, which
+// lives only in their session.
+const ANALYSIS_ID = 'analysis';
+const analyzingOwnGame = getGameIdFromURL(window.location.search) === ANALYSIS_ID;
+
 document.addEventListener("DOMContentLoaded", () => {
     const boardContainer = document.getElementById("chessboard-container");
     if (!boardContainer) {
@@ -196,7 +201,8 @@ document.addEventListener("DOMContentLoaded", () => {
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify(variationPlan.savePayload)
                             });
-                            if ((await sessionInfo).owner) {
+                            // A visitor's own analysis belongs to no library file.
+                            if ((await sessionInfo).owner && !analyzingOwnGame) {
                                 await fetch('/game/save', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' }
@@ -248,12 +254,14 @@ document.addEventListener("DOMContentLoaded", () => {
      * @param {string} url - The API endpoint to fetch from.
      * @param {string} method - HTTP method (GET, POST, etc.).
      * @param {object|null} body - The request body for POST requests.
+     * @param {string} route - Which response this is, when +url+ answers like another
+     *   endpoint (the visitor's own analysis loads like a library game).
      */
     // Cache last server move data that might contain variation info
     // This is a bit of a hack; ideally, this context would be managed more cleanly.
     window.lastServerMoveData = null;
 
-    async function fetchAndUpdateBoard(url, method = 'GET', body = null) {
+    async function fetchAndUpdateBoard(url, method = 'GET', body = null, route = url) {
         try {
             const options = { method };
             if (body) {
@@ -270,12 +278,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (playerNamesDisplay) playerNamesDisplay.textContent = "";
 
                 if (errorMsg.includes("No game loaded")) {
-                     if (url === '/game/current_fen' && !board) {
+                     if (route === '/game/current_fen' && !board) {
                         moveInfo.showMessage("Please select a PGN file and load a game.");
                      }
                 } else if (errorMsg.includes("PGN_DIR environment variable not set") || errorMsg.includes("PGN directory not found")) {
                     alert("Server PGN directory not configured. Please check server logs.");
-                } else if (url === '/api/load_game') {
+                } else if (route === '/api/load_game') {
                     alert(`Error loading game: ${errorMsg}`);
                 }
                 // Disable all navigation buttons on error
@@ -294,7 +302,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 lastKnownServerFEN = data.fen;
             }
 
-            if (data.message && (url === '/api/load_game' || url === '/game/next_move' || url === '/game/prev_move' || url === '/game/next_critical_moment' || url === '/game/set_move_index')) {
+            if (data.message && (route === '/api/load_game' || route === '/game/next_move' || route === '/game/prev_move' || route === '/game/next_critical_moment' || route === '/game/set_move_index')) {
                 console.log(`Server message: ${data.message}`);
             }
 
@@ -308,7 +316,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
 
-            if (data.fen || (data.last_move && data.last_move.fen_before_move) || (url === '/api/load_game' && data.fen)) { // Ensure there's a FEN to display or it's a load_game response with FEN
+            if (data.fen || (data.last_move && data.last_move.fen_before_move) || (route === '/api/load_game' && data.fen)) { // Ensure there's a FEN to display or it's a load_game response with FEN
                 const lastMoveData = data.last_move;
                 const setupChallenge = challenge.prepare(lastMoveData, learningSide);
 
@@ -323,7 +331,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
 
                 // If we successfully set move index (e.g. resuming game), exit variation mode.
-                if (url === '/game/set_move_index' || url === '/api/load_game' || url === '/game/go_to_start' || url === '/game/go_to_end') {
+                if (route === '/game/set_move_index' || route === '/api/load_game' || route === '/game/go_to_start' || route === '/game/go_to_end') {
                     variation.reset();
                     if (resumeGameButton) resumeGameButton.disabled = true;
                     resetHintState();
@@ -346,7 +354,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     board = new Chessboard(boardContainer, props);
                     console.log(`Chessboard initialized. FEN: ${displayFen}, Position index: ${data.move_index}, Total positions: ${data.total_positions}, Orientation: ${learningSide}`);
                     setNavButtonStates('initialLoad', {
-                        url,
+                        url: route,
                         hasInitialCriticalForWhite: data.has_initial_critical_moment_for_white
                     });
 
@@ -361,7 +369,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     setNavButtonStates('main', {
                         moveIndex: data.move_index,
                         totalPositions: data.total_positions,
-                        url,
+                        url: route,
                         serverMessage: data.message || '',
                         hasInitialCriticalForWhite: data.has_initial_critical_moment_for_white
                     });
@@ -406,7 +414,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const gameId = getGameIdFromURL(window.location.search);
 
         if (!gameId) {
-            moveInfo.showMessage("No game specified. Please select a game from the library.");
+            moveInfo.showMessage("No game specified. Go back to choose or analyze a game.");
             return;
         }
 
@@ -416,7 +424,11 @@ document.addEventListener("DOMContentLoaded", () => {
         // - Move info display
         // - Button state management
         // - Error handling
-        await fetchAndUpdateBoard('/api/load_game', 'POST', { pgn_file_id: gameId });
+        if (gameId === ANALYSIS_ID) {
+            await fetchAndUpdateBoard('/api/analysis', 'GET', null, '/api/load_game');
+        } else {
+            await fetchAndUpdateBoard('/api/load_game', 'POST', { pgn_file_id: gameId });
+        }
     }
 
     // Initial setup

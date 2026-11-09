@@ -19,12 +19,13 @@ class AppBootEnvTest < Minitest::Test
   end
 
   def test_blank_settings_boot_with_writes_disabled
-    blank = %w[OWNER_PASSWORD_HASH SESSION_SECRET ENGINE_SUBJECT_SECRET MAX_SESSIONS TRUSTED_PROXIES]
+    blank = %w[OWNER_PASSWORD_HASH SESSION_SECRET ENGINE_SUBJECT_SECRET MAX_SESSIONS TRUSTED_PROXIES
+               MAX_CONCURRENT_ANALYSES]
             .to_h { |key| [key, ''] }
     output, status = boot(blank)
 
     assert_predicate status, :success?, output
-    assert_includes output, '{"owner":false,"login_enabled":false}'
+    assert_includes output, '{"owner":false,"login_enabled":false,"analysis":false}'
   end
 
   def test_a_malformed_password_hash_still_fails_loudly

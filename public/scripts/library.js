@@ -4,18 +4,19 @@ import { initializeUpload } from './upload.js';
 import { fetchSessionInfo, ownerControls, renderAccountControl } from './session_info.js';
 
 document.addEventListener("DOMContentLoaded", async () => {
-    loadGameLibrary();
-
-    // Uploading adds to the shared library, so only the owner sees it.
-    const controls = ownerControls(await fetchSessionInfo());
+    const info = await fetchSessionInfo();
+    const controls = ownerControls(info);
     renderAccountControl(document.getElementById('account-control'), controls.account);
-    if (controls.showUpload) {
-        document.getElementById('upload-section').hidden = false;
-        // Initialize upload functionality with callback to refresh library
-        initializeUpload(() => {
-            console.log("Upload completed, refreshing game library");
-            loadGameLibrary();
-        });
+    document.getElementById('analysis-resume').hidden = !info.analysis;
+
+    // Anyone may analyze a game; only the owner's analyses are saved, into the
+    // library, which only the owner sees.
+    initializeUpload(() => loadGameLibrary(), { saveToLibrary: controls.saveToLibrary });
+    if (controls.showLibrary) {
+        document.getElementById('upload-instructions').textContent =
+            'Paste a game in PGN format and click the button to analyze it. The analyzed game is saved to your library.';
+        document.getElementById('game-library').hidden = false;
+        loadGameLibrary();
     }
 });
 
@@ -30,7 +31,7 @@ async function loadGameLibrary() {
     // Show loading state
     loadingMessage.style.display = 'block';
     errorMessage.style.display = 'none';
-    gameList.innerHTML = '';
+    gameList.replaceChildren();
 
     try {
         const response = await fetch('/api/pgn_files');
@@ -43,24 +44,15 @@ async function loadGameLibrary() {
         loadingMessage.style.display = 'none';
 
         if (!Array.isArray(data) || data.length === 0) {
-            gameList.innerHTML = '<li class="info-message">No games found. Upload a PGN file to get started!</li>';
+            const empty = document.createElement('li');
+            empty.className = 'info-message';
+            empty.textContent = 'No games found. Analyze a game to get started!';
+            gameList.append(empty);
             return;
         }
 
-        // Display games as a list
-        gameList.innerHTML = data.map(game => {
-            // Extract game info from PGN headers
-            const displayName = formatGameNameFromHeaders(game);
-
-            return `
-                <li>
-                    <a href="/game?id=${encodeURIComponent(game.id)}">
-                        <span class="game-name">${displayName}</span>
-                        <span class="game-meta">→</span>
-                    </a>
-                </li>
-            `;
-        }).join('');
+        // Display games as a list. Names come from PGN tags: text only, never HTML.
+        gameList.append(...data.map(gameListItem));
 
     } catch (error) {
         console.error('Failed to load game library:', error);
@@ -68,6 +60,26 @@ async function loadGameLibrary() {
         errorMessage.textContent = `Error loading games: ${error.message}`;
         errorMessage.style.display = 'block';
     }
+}
+
+/**
+ * A list item linking to a library game.
+ * @param {Object} game - The game object from /api/pgn_files
+ * @returns {HTMLLIElement}
+ */
+function gameListItem(game) {
+    const link = document.createElement('a');
+    link.href = `/game?id=${encodeURIComponent(game.id)}`;
+    const name = document.createElement('span');
+    name.className = 'game-name';
+    name.textContent = formatGameNameFromHeaders(game);
+    const meta = document.createElement('span');
+    meta.className = 'game-meta';
+    meta.textContent = '→';
+    link.append(name, meta);
+    const item = document.createElement('li');
+    item.append(link);
+    return item;
 }
 
 /**

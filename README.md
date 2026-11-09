@@ -55,8 +55,8 @@ For detailed installation instructions including native installation (without Do
 3. Click "Analyze Game" - the tool will:
    - Analyze the game with Stockfish
    - Identify critical moments (blunders/mistakes)
-   - Save the annotated PGN file
-   - Provide a link to view the completed analysis
+   - For the owner (and in a local install, where everyone is the owner): save the annotated PGN to the library and link to it
+   - For anyone else: open the analyzed game straight away. It is kept only in that visitor's session and is never saved
 
 ### Playing Through a Game
 
@@ -78,28 +78,30 @@ Given all the mistakes that can be made it takes a long time to fix all of them.
 By default the tool behaves as a single-user local app: whoever opens it can upload games and save to the library. For a public site, set `APP_ENV=production` and configure the settings below.
 
 **What's in place:**
-- **Owner-only writes.** Visitors can browse the library, play through games and try moves; variations they find stay in their own session. Saving to library files and uploading new games need the owner login (`/login`).
+- **A private library.** The library in `PGN_DIR` is the owner's alone: listing it, opening its games, saving to it and adding games all need the owner login (`/login`).
+- **Anonymous analysis, never stored.** Any visitor can paste a game to analyze. The result lives only in that visitor's in-memory session. It isn't written to disk, shared with other visitors, cached between sessions or logged, and it's gone when the session expires (2 hours idle) or the app restarts. Pasted games must be legal games from the standard starting position, at most 150 moves and 64 KB, and only a few analyses run at once (`MAX_CONCURRENT_ANALYSES`); others get `429`.
 - **Rate limits per client:** an IPv6 client counts as one client across its /64.
   - page and API requests: 600 per 5 minutes
   - move checks: 30 a minute and 300 an hour
   - game loads: 20 a minute
   - login attempts: 5 a minute and 20 an hour
-  - uploads: 10 an hour
+  - analyses and uploads: 10 an hour
   - Over a limit, a request gets `429` with `Retry-After`.
 - **Bounded sessions.** Sessions are held in memory, capped in number and expired when idle, so floods of new visitors can't exhaust memory.
-- **Shared analysis cache.** Loading a library file that has no critical-moment annotations runs Stockfish once; later visitors reuse the result.
+- **Analysis cache.** Opening a library file that has no critical-moment annotations runs Stockfish once; reopening it reuses the result. Visitors' own analyses are never cached.
 - **Engine service.** With `ENGINE_URL` set, analysis runs in the separate, sandboxed `stockfish-pool` service, with its own per-visitor quota and global CPU budget (see `stockfish-pool/README.md`).
 
 | Variable | Purpose |
 |---|---|
-| `OWNER_PASSWORD_HASH` | Enables the owner login. Generate the value with `bin/owner-password`. In production, leaving it unset means nobody can write to the library. |
+| `OWNER_PASSWORD_HASH` | Enables the owner login. Generate the value with `bin/owner-password`. In production, leaving it unset means nobody can see or write to the library (visitors can still analyze their own games). |
 | `TRUSTED_PROXIES` | Comma-separated addresses or CIDR ranges allowed to report the client address via `X-Forwarded-For` (default: loopback only). Set it to your reverse proxy's address as the app sees it. If it's wrong, the app logs a warning and every visitor shares one rate limit. |
 | `SESSION_SECRET` | Optional; keeps session cookies valid across restarts (sessions themselves are in memory and still reset). |
 | `MAX_SESSIONS` | Most sessions kept in memory (default 500; least recently used are dropped). |
+| `MAX_CONCURRENT_ANALYSES` | Visitors' whole-game analyses that may run at once (default 2). Each holds a web server thread until it finishes, so keep it below Puma's thread count. |
 | `COOKIE_SECURE` | Session cookies are `Secure` in production; set to `false` only when serving plain HTTP. |
 | `ENGINE_URL`, `ENGINE_TOKEN`, `ENGINE_SUBJECT_SECRET` | Use the `stockfish-pool` engine service (see `CLAUDE.md`). |
 | `ENGINE_BATCH_BUSY_WAIT_S` | How long whole-game analysis waits out a busy engine service before giving up (default 90 seconds); hint checks never wait. |
-| `OWNER_ACCESS` | `open` lets everyone write when `OWNER_PASSWORD_HASH` is unset (the single-user default of the standalone container image). Never set it on a public site. |
+| `OWNER_ACCESS` | `open` makes everyone the owner (sees and writes the library) when `OWNER_PASSWORD_HASH` is unset (the single-user default of the standalone container image). Never set it on a public site. |
 | `RATE_LIMITS` | `off` disables rate limiting (the test suite does this). |
 
 Always serve it over HTTPS behind a reverse proxy (for example Caddy), with the app's port reachable only from the proxy.
