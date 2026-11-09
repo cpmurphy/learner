@@ -36,8 +36,9 @@ class LearnerApp < Sinatra::Base
 
   # Writing to the library (saving games, uploading) is for the owner only.
   # With OWNER_PASSWORD_HASH set, the owner logs in at /login. Without it,
-  # development and test keep the old single-user behaviour (everyone is the
-  # owner) and production allows no writes at all.
+  # everyone is the owner (the old single-user behaviour) in development and
+  # test, or anywhere OWNER_ACCESS=open (the standalone container image);
+  # otherwise production allows no writes at all.
   OWNER_ROUTES = ['/game/save', '/api/upload_pgn', '/api/analyze_and_save'].freeze
 
   # Key for hashing client IPs into engine-service quota subjects. Set it to keep
@@ -48,6 +49,11 @@ class LearnerApp < Sinatra::Base
   configure do
     owner_password_hash = ENV.fetch('OWNER_PASSWORD_HASH', nil)
     set :owner_password_hash, owner_password_hash && OwnerPassword.validate!(owner_password_hash)
+    set :owner_access_open, ENV['OWNER_ACCESS'] == 'open'
+    if settings.owner_access_open && production? && owner_password_hash.nil?
+      warn 'WARNING: OWNER_ACCESS=open: every visitor can upload and save. Use this only for a private, ' \
+           'single-user install; set OWNER_PASSWORD_HASH for a public site.'
+    end
     set :public_folder, File.join(File.dirname(__FILE__), 'public')
     set :bind, '0.0.0.0'
   end
@@ -85,7 +91,7 @@ class LearnerApp < Sinatra::Base
     def owner?
       return session[:owner] == true if owner_login_enabled?
 
-      settings.environment != :production
+      settings.owner_access_open || settings.environment != :production
     end
 
     def engine_busy_response(error)

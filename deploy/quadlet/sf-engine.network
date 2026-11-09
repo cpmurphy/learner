@@ -1,0 +1,6 @@
+# Network shared only by chess-learner and stockfish-pool. Internal: nothing
+# on it can reach the internet, so a compromised engine has nowhere to call out.
+[Network]
+NetworkName=sf-engine
+Internal=true
+Subnet=10.89.20.0/24

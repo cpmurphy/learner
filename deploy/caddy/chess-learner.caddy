@@ -1,0 +1,29 @@
+# Site block for the chess-learner app; add it to your Caddyfile and change
+# the hostname. Caddy obtains and renews the TLS certificate itself.
+#
+# Caddy replaces any X-Forwarded-For / X-Forwarded-Proto a client sends with
+# the real values, which is what the app's TRUSTED_PROXIES relies on.
+#
+# Slow-client limits belong in the global options block (they apply to every
+# site), for example:
+#
+#   {
+#       servers {
+#           timeouts {
+#               read_header 10s
+#               read_body   30s
+#               idle        2m
+#           }
+#       }
+#   }
+
+chess.example.com {
+	encode zstd gzip
+
+	# PGN uploads are small; nothing else sends a body worth more than this.
+	request_body {
+		max_size 1MB
+	}
+
+	reverse_proxy 127.0.0.1:9292
+}

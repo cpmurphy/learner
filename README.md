@@ -98,9 +98,12 @@ By default the tool behaves as a single-user local app: whoever opens it can upl
 | `MAX_SESSIONS` | Most sessions kept in memory (default 500; least recently used are dropped). |
 | `COOKIE_SECURE` | Session cookies are `Secure` in production; set to `false` only when serving plain HTTP. |
 | `ENGINE_URL`, `ENGINE_TOKEN`, `ENGINE_SUBJECT_SECRET` | Use the `stockfish-pool` engine service (see `CLAUDE.md`). |
+| `OWNER_ACCESS` | `open` lets everyone write when `OWNER_PASSWORD_HASH` is unset (the single-user default of the standalone container image). Never set it on a public site. |
 | `RATE_LIMITS` | `off` disables rate limiting (the test suite does this). |
 
 Always serve it over HTTPS behind a reverse proxy (for example Caddy), with the app's port reachable only from the proxy.
+
+**[deploy/README.md](deploy/README.md)** is a step-by-step guide for running it this way with rootless Podman (Quadlet units) and Caddy, with the engine in its own sandboxed container.
 
 ## Development
 

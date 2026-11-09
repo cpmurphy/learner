@@ -20,6 +20,8 @@ class AppOwnerTest < Minitest::Test
 
   WITH_LOGIN = app_class(owner_password_hash: HASH)
   PRODUCTION_WITHOUT_LOGIN = app_class(owner_password_hash: nil, environment: :production)
+  PRODUCTION_OPEN = app_class(owner_password_hash: nil, environment: :production, owner_access_open: true)
+  PRODUCTION_OPEN_WITH_LOGIN = app_class(owner_password_hash: HASH, environment: :production, owner_access_open: true)
   WITH_LOGIN_AND_PROTECTION = app_class(owner_password_hash: HASH, protection: true)
 
   def setup
@@ -93,6 +95,18 @@ class AppOwnerTest < Minitest::Test
     post '/game/save'
 
     assert_equal 403, last_response.status
+  end
+
+  def test_open_owner_access_keeps_single_user_mode_in_production
+    @app_class = PRODUCTION_OPEN
+
+    assert_equal({ 'owner' => true, 'login_enabled' => false }, session_info)
+  end
+
+  def test_a_password_overrides_open_owner_access
+    @app_class = PRODUCTION_OPEN_WITH_LOGIN
+
+    assert_equal({ 'owner' => false, 'login_enabled' => true }, session_info)
   end
 
   def test_development_without_a_password_keeps_single_user_mode

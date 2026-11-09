@@ -1,0 +1,38 @@
+[Unit]
+Description=chess-learner web app
+Wants=stockfish-pool.service
+After=stockfish-pool.service
+
+[Container]
+Image=localhost/chess-learner:app
+ContainerName=chess-learner
+# Fixed address: proxied requests arrive from it (see sf-web.network).
+Network=sf-web.network:ip=10.89.10.2
+Network=sf-engine.network
+# Reachable only from this host, i.e. from Caddy.
+PublishPort=127.0.0.1:9292:3000
+# The library. Maps your host user onto the image's appuser (uid 1000), so
+# files the app writes belong to you on the host.
+Volume=%h/chess-learner/games:/app/games:Z
+UserNS=keep-id:uid=1000,gid=1000
+EnvironmentFile=%h/.config/chess-learner/chess-learner.env
+Environment=APP_ENV=production ENGINE_URL=http://stockfish-pool:4000 HOME=/tmp
+ReadOnly=true
+Tmpfs=/tmp:rw,size=64m,mode=1777
+DropCapability=ALL
+NoNewPrivileges=true
+PodmanArgs=--memory=768m --memory-swap=768m --pids-limit=128
+HealthCmd=/app/bin/healthcheck
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+HealthStartPeriod=20s
+HealthOnFailure=kill
+
+[Service]
+Restart=always
+RestartSec=5
+TimeoutStartSec=120
+
+[Install]
+WantedBy=default.target

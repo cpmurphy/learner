@@ -1,0 +1,31 @@
+[Unit]
+Description=stockfish-pool engine service (sandboxed Stockfish)
+
+[Container]
+Image=localhost/stockfish-pool:latest
+ContainerName=stockfish-pool
+# Internal network only, and no published ports.
+Network=sf-engine.network
+EnvironmentFile=%h/.config/chess-learner/stockfish-pool.env
+ReadOnly=true
+Tmpfs=/tmp:rw,size=16m,mode=1777
+DropCapability=ALL
+NoNewPrivileges=true
+# Ceilings for the whole service (2 engines x 1 thread, 16 MB hash each).
+# --cpus needs the cpu cgroup controller delegated to this user; see
+# deploy/check-host.sh. Without it, POOL_SIZE x THREADS still caps CPU.
+PodmanArgs=--memory=640m --memory-swap=640m --pids-limit=64 --cpus=1.5
+HealthCmd=/srv/stockfish-pool/bin/healthcheck
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+HealthStartPeriod=20s
+HealthOnFailure=kill
+
+[Service]
+Restart=always
+RestartSec=5
+TimeoutStartSec=120
+
+[Install]
+WantedBy=default.target

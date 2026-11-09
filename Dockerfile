@@ -1,6 +1,11 @@
 # syntax = docker/dockerfile:1
 
-# docker build -t chess-learner .
+# Two images can be built from this file:
+#
+#   docker build -t chess-learner .                  # "standalone" (default): includes Stockfish
+#   docker build --target app -t chess-learner:app . # no Stockfish; set ENGINE_URL to use the
+#                                                    # stockfish-pool service (see deploy/)
+#
 # docker run -d -p 3000:3000 --name chess-learner chess-learner
 
 # Make sure RUBY_VERSION matches the Ruby version in .ruby-version
@@ -46,34 +51,45 @@ RUN npm ci && \
     npm cache clean --force && \
     rm -rf node_modules
 
-# Build Stockfish
+# Stockfish, for the standalone image only (--target app skips this stage).
+# x86-64-avx2 needs a CPU with AVX2 (check: grep -c avx2 /proc/cpuinfo);
+# otherwise pass --build-arg STOCKFISH_ARCH=x86-64-sse41-popcnt.
+FROM build AS stockfish
+ARG STOCKFISH_ARCH=x86-64-avx2
 COPY Stockfish Stockfish
 RUN cd Stockfish/src && \
     make clean && \
-    make -j2 build ARCH=x86-64-avx2 && \
+    make -j"$(nproc)" build ARCH="${STOCKFISH_ARCH}" && \
     strip stockfish && \
-    mv stockfish /app/bin/ && \
-    cd / && rm -rf Stockfish
+    mv stockfish /app/bin/
 
-# Final stage
-FROM base
+# The web app without an engine. Code is owned by root and only readable by
+# the app user, so a compromised app cannot rewrite itself; the app writes only
+# to PGN_DIR (/app/games, normally a volume) and /tmp.
+FROM base AS app
 
-# Copy only necessary artifacts from build stage
 COPY --from=build "${BUNDLE_PATH}" "${BUNDLE_PATH}"
-COPY --from=build /app/bin/stockfish /app/bin/stockfish
 COPY . /app
 COPY --from=build /app/public/3rdparty-assets /app/public/3rdparty-assets
 COPY --from=build /app/public/scripts/3rdparty /app/public/scripts/3rdparty
-RUN rm -rf /app/Stockfish
-RUN mkdir -p /app/games
-
-# Set up non-root user
-RUN groupadd --system --gid 1000 appgroup && \
+# The engine service's server code is not part of this image; its client gem is.
+RUN rm -rf /app/Stockfish /app/stockfish-pool/lib /app/stockfish-pool/test /app/stockfish-pool/config \
+           /app/stockfish-pool/config.ru /app/test /app/coverage /app/sandbox && \
+    groupadd --system --gid 1000 appgroup && \
     useradd appuser --uid 1000 --gid 1000 --create-home --shell /bin/bash && \
-    chown -R appuser:appgroup /app
+    mkdir -p /app/games && chown appuser:appgroup /app/games && \
+    chmod -R a+rX,go-w /app
 USER appuser
 
 ENV PGN_DIR=/app/games
-# Start the server by default, this can be overwritten at runtime
 EXPOSE 3000
 CMD ["bundle", "exec", "puma", "--port=3000"]
+
+# Default image: the app plus a local Stockfish, for single-user local use
+# (docker-compose.yml, podman-start.sh). Everyone who can reach it may upload
+# and save, as before, and cookies work over plain http. Setting
+# OWNER_PASSWORD_HASH still switches on the owner login.
+FROM app AS standalone
+COPY --from=stockfish /app/bin/stockfish /app/bin/stockfish
+ENV OWNER_ACCESS="open" \
+    COOKIE_SECURE="false"
