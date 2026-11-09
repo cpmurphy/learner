@@ -4,7 +4,10 @@ source 'https://rubygems.org'
 
 gem 'json' # Standard JSON library, Sinatra often includes it
 gem 'pgn2'
-gem 'puma', '>= 5.0'    # A recommended server for Sinatra
+gem 'puma', '>= 5.0' # A recommended server for Sinatra
+# pgn2 requires racc/parser without declaring it; since Ruby 3.4 racc is a bundled
+# (not default) gem, so production bundles without dev gems need it listed.
+gem 'racc'
 gem 'rack-attack'       # Per-IP rate limits for the public site
 gem 'sinatra', '>= 3.2' # Using a recent stable version
 # Client for the engine service in stockfish-pool/ (used when ENGINE_URL is set)

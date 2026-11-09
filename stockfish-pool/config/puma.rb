@@ -8,3 +8,7 @@ threads threads_count, threads_count
 workers 0
 port Integer(ENV.fetch('PORT', 4000))
 environment ENV.fetch('APP_ENV', 'production')
+
+# Exit 0 after a graceful SIGTERM stop (the default re-raises the signal and the
+# process exits 1), so systemd records a planned stop or restart as clean.
+raise_exception_on_sigterm false

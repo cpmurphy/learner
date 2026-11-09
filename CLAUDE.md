@@ -64,6 +64,13 @@ The app can run publicly (see README "Running It Publicly"):
 - **Analysis cache:** `lib/annotation_cache.rb` keeps whole-game analysis per library file (keyed by path, size and mtime) and hands each session a `Marshal` copy.
 - Rack::Protection (including `HttpOrigin`, the CSRF defence for owner routes) is on only in production, as before; `test/app_owner_test.rb` enables it to test cross-site requests behind proxy headers.
 
+### Deployment (deploy/)
+
+`deploy/` holds the public deployment: Quadlet units for rootless Podman (`deploy/quadlet/`), env-file templates, a Caddy site block, `build-images.sh` and `check-host.sh`. Its guide is `deploy/README.md`.
+- **Images:** the `Dockerfile` has two targets. `app` has no Stockfish and is used with `ENGINE_URL`; `standalone` is the default and includes Stockfish. `stockfish-pool/Containerfile` is built from the repository root.
+- **TRUSTED_PROXIES:** rootless Podman delivers connections to a published port from the container's *own* address. That's why the app has a fixed IP on `sf-web` (10.89.10.2) and `TRUSTED_PROXIES` names it.
+- **racc:** `pgn2` needs `racc`, which must stay in the Gemfile; production bundles without development gems otherwise fail to boot.
+
 ### Engine service (stockfish-pool/)
 
 `stockfish-pool/` is a self-contained HTTP/JSON service (own Gemfile, tests and `.rubocop.yml`) that runs a fixed, sandboxable pool of Stockfish engines. `stockfish-pool/client/` is its client gem, which the app uses as a path gem. Run its tests with `cd stockfish-pool && bundle exec rake test`. CI lints it with the root config (`bin/rubocop` forces it), so test exclusions for `stockfish-pool/test` live in the root `.rubocop.yml` too.

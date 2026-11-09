@@ -1,0 +1,9 @@
+# Network for the web app's published port. The app has a fixed address on it
+# (10.89.10.2, see chess-learner.container) because rootless Podman delivers
+# connections to a published port from the container's own address: that is
+# the "proxy" address TRUSTED_PROXIES must name. If 10.89.10.0/24 is already in
+# use, change the subnet here, the address there and TRUSTED_PROXIES together.
+[Network]
+NetworkName=sf-web
+Subnet=10.89.10.0/24
+Gateway=10.89.10.1

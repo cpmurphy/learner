@@ -1,0 +1,14 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Container health check: exits 0 while the service reports at least one
+# running engine worker (/healthz answers 200), 1 otherwise.
+require 'net/http'
+
+begin
+  port = Integer(ENV.fetch('PORT', 4000))
+  response = Net::HTTP.start('127.0.0.1', port, open_timeout: 2, read_timeout: 3) { |http| http.get('/healthz') }
+  exit(response.is_a?(Net::HTTPOK) ? 0 : 1)
+rescue StandardError
+  exit 1
+end
