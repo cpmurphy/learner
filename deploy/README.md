@@ -15,6 +15,35 @@ internet ──TLS──> Caddy (host) ──> 127.0.0.1:9292 ──> chess-lear
   - Its cpu, memory and pids are capped.
 - **Rate limits, quotas and the owner login** are described in the main README ("Running It Publicly") and `stockfish-pool/README.md`.
 
+## Deploying from your workstation (bin/deploy.sh)
+
+The quickest route builds on your machine and installs on the server over ssh:
+
+```bash
+cp deploy/deploy_env.sh.example deploy_env.sh   # once; set host, user, PUBLIC_URL
+bin/deploy.sh
+```
+
+It refuses to run with uncommitted changes, then:
+1. Runs the tests and lint (`SKIP_TESTS=1` skips them).
+2. Builds both images for the server's CPU (`STOCKFISH_ARCH`).
+3. Uploads them with `deploy/`.
+4. Runs `deploy/remote-install.sh` on the server, which:
+   - checks the host on the first install;
+   - creates the env files with generated secrets the first time (it never changes existing ones);
+   - installs the units, restarts both services and waits until they're healthy.
+5. Checks `PUBLIC_URL` through Caddy, and fails if the app logged a `TRUSTED_PROXIES` warning.
+
+The server still needs the one-time `sudo` steps from step 1 below: linger and cgroup delegation. The first deploy tells you if they're missing. You also need to set `OWNER_PASSWORD_HASH` yourself (step 3).
+
+Two more modes:
+- `bin/deploy.sh --rollback` returns the server to the last good release. Rolling back twice in a row undoes the rollback.
+- `bin/deploy.sh --build-only` produces the image archive without touching the server.
+
+The steps below are the same work done by hand on the server.
+
+## Deploying by hand
+
 Everything below runs as the user that will own the containers. Use a dedicated user if you can, logged in directly over ssh: `su` and `sudo -u` don't start the systemd user session these steps need.
 
 ## 1. Check the host

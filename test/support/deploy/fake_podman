@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Fake podman for test/remote_install_test.rb. Images live in
+# $FAKE_PODMAN_STATE/images/<name> holding an image id; every call is logged.
+set -u
+state=${FAKE_PODMAN_STATE:?}
+mkdir -p "$state/images"
+echo "podman $*" >> "$state/calls"
+key() { printf '%s' "$1" | tr '/:' '__'; }
+
+case "${1:-} ${2:-}" in
+  "image exists") [ -f "$state/images/$(key "$3")" ]; exit ;;
+  "image inspect") f="$state/images/$(key "${*: -1}")"; [ -f "$f" ] && cat "$f"; exit ;;
+  "image prune") exit 0 ;;
+  "healthcheck run") [ ! -f "$state/unhealthy-$3" ]; exit ;;
+esac
+case "${1:-}" in
+  tag) src="$state/images/$(key "$2")"; [ -f "$src" ] || exit 125; cp "$src" "$state/images/$(key "$3")" ;;
+  load) id=$(cat "$state/next-release")
+        for image in localhost/chess-learner:app localhost/stockfish-pool:latest; do
+          echo "$id-${image##*/}" > "$state/images/$(key "$image")"
+        done ;;
+  logs) echo "fake log line" ;;
+esac

@@ -1,0 +1,13 @@
+# Copy to deploy_env.sh in the repository root (it is gitignored) for bin/deploy.sh.
+DEPLOY_USER=apps
+DEPLOY_HOST=example.org
+# The release (images archive + deploy/) is uploaded to $DEPLOY_DIR/$FRONTEND_NAME-release
+DEPLOY_DIR=/home/apps/www
+# Service, container and Quadlet unit names (must match deploy/quadlet/*.container)
+FRONTEND_NAME=chess-learner
+BACKEND_NAME=stockfish-pool
+# Optional: checked through the reverse proxy after each deploy
+PUBLIC_URL=https://learner.example.org
+# Stockfish build for the SERVER's CPU: x86-64-avx2, or x86-64-sse41-popcnt
+# for CPUs without AVX2 (check on the server: grep -c avx2 /proc/cpuinfo)
+STOCKFISH_ARCH=x86-64-avx2

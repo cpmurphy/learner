@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Fake `systemctl --user` for test/remote_install_test.rb.
+echo "systemctl $*" >> "${FAKE_PODMAN_STATE:?}/calls"
