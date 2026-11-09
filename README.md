@@ -73,15 +73,34 @@ Do it soon after the game so your memory is still fresh. When you reach a move w
 
 Given all the mistakes that can be made it takes a long time to fix all of them. But if you notice patterns that can really help.
 
-## Security Warning
+## Running It Publicly
 
-⚠️ **Important**: This application is designed for local use and is not hardened for public internet exposure. Do not run this tool on a server that is directly accessible from the internet without proper security measures (firewall rules, authentication, HTTPS, etc.). The application does not include authentication or rate limiting and may be vulnerable to various attacks if exposed publicly.
+By default the tool behaves as a single-user local app: whoever opens it can upload games and save to the library. For a public site, set `APP_ENV=production` and configure the settings below.
 
-For local development and personal use on your own machine, it's safe. If you need to deploy it, ensure you:
-- Run it behind a reverse proxy with authentication
-- Use HTTPS
-- Restrict access with firewall rules
-- Review and implement additional security measures as needed
+**What's in place:**
+- **Owner-only writes.** Visitors can browse the library, play through games and try moves; variations they find stay in their own session. Saving to library files and uploading new games need the owner login (`/login`).
+- **Rate limits per client:** an IPv6 client counts as one client across its /64.
+  - page and API requests: 600 per 5 minutes
+  - move checks: 30 a minute and 300 an hour
+  - game loads: 20 a minute
+  - login attempts: 5 a minute and 20 an hour
+  - uploads: 10 an hour
+  - Over a limit, a request gets `429` with `Retry-After`.
+- **Bounded sessions.** Sessions are held in memory, capped in number and expired when idle, so floods of new visitors can't exhaust memory.
+- **Shared analysis cache.** Loading a library file that has no critical-moment annotations runs Stockfish once; later visitors reuse the result.
+- **Engine service.** With `ENGINE_URL` set, analysis runs in the separate, sandboxed `stockfish-pool` service, with its own per-visitor quota and global CPU budget (see `stockfish-pool/README.md`).
+
+| Variable | Purpose |
+|---|---|
+| `OWNER_PASSWORD_HASH` | Enables the owner login. Generate the value with `bin/owner-password`. In production, leaving it unset means nobody can write to the library. |
+| `TRUSTED_PROXIES` | Comma-separated addresses or CIDR ranges allowed to report the client address via `X-Forwarded-For` (default: loopback only). Set it to your reverse proxy's address as the app sees it. If it's wrong, the app logs a warning and every visitor shares one rate limit. |
+| `SESSION_SECRET` | Optional; keeps session cookies valid across restarts (sessions themselves are in memory and still reset). |
+| `MAX_SESSIONS` | Most sessions kept in memory (default 500; least recently used are dropped). |
+| `COOKIE_SECURE` | Session cookies are `Secure` in production; set to `false` only when serving plain HTTP. |
+| `ENGINE_URL`, `ENGINE_TOKEN`, `ENGINE_SUBJECT_SECRET` | Use the `stockfish-pool` engine service (see `CLAUDE.md`). |
+| `RATE_LIMITS` | `off` disables rate limiting (the test suite does this). |
+
+Always serve it over HTTPS behind a reverse proxy (for example Caddy), with the app's port reachable only from the proxy.
 
 ## Development
 

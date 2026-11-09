@@ -5,6 +5,7 @@ source 'https://rubygems.org'
 gem 'json' # Standard JSON library, Sinatra often includes it
 gem 'pgn2'
 gem 'puma', '>= 5.0'    # A recommended server for Sinatra
+gem 'rack-attack'       # Per-IP rate limits for the public site
 gem 'sinatra', '>= 3.2' # Using a recent stable version
 # Client for the engine service in stockfish-pool/ (used when ENGINE_URL is set)
 gem 'stockfish_pool_client', path: 'stockfish-pool/client'

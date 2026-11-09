@@ -54,6 +54,16 @@ npm run test_once
 npm run coverage
 ```
 
+### Public-site hardening
+
+The app can run publicly (see README "Running It Publicly"):
+- **Owner-only writes:** `LearnerApp::OWNER_ROUTES` (`/game/save`, `/api/upload_pgn`, `/api/analyze_and_save`) return 403 unless `owner?`. With `OWNER_PASSWORD_HASH` set, the owner logs in at `/login` (scrypt via `lib/owner_password.rb`, hashes made by `bin/owner-password`). Without it, development and test treat everyone as the owner and production allows no writes. The frontend asks `GET /api/session` which controls to show (`public/scripts/session_info.js`).
+- **Rate limits:** `lib/rate_limits.rb` (Rack::Attack with the in-memory `lib/memory_rate_store.rb`), keyed by `ClientNetwork.key` (IPv6 by /64). `test/test_helper.rb` sets `RATE_LIMITS=off`; tests that exercise limits set `Rack::Attack.enabled = true` and reset it.
+- **Client address:** `lib/client_network.rb` makes `request.ip` believe `X-Forwarded-For` only from `TRUSTED_PROXIES` (default loopback), instead of Rack's default of every private address.
+- **Sessions:** `lib/bounded_session_pool.rb` replaces `Rack::Session::Pool`, which stores an entry for every unknown cookie and never expires any.
+- **Analysis cache:** `lib/annotation_cache.rb` keeps whole-game analysis per library file (keyed by path, size and mtime) and hands each session a `Marshal` copy.
+- Rack::Protection (including `HttpOrigin`, the CSRF defence for owner routes) is on only in production, as before; `test/app_owner_test.rb` enables it to test cross-site requests behind proxy headers.
+
 ### Engine service (stockfish-pool/)
 
 `stockfish-pool/` is a self-contained HTTP/JSON service (own Gemfile, tests and `.rubocop.yml`) that runs a fixed, sandboxable pool of Stockfish engines. `stockfish-pool/client/` is its client gem, which the app uses as a path gem. Run its tests with `cd stockfish-pool && bundle exec rake test`. CI lints it with the root config (`bin/rubocop` forces it), so test exclusions for `stockfish-pool/test` live in the root `.rubocop.yml` too.
