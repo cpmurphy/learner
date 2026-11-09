@@ -98,6 +98,7 @@ By default the tool behaves as a single-user local app: whoever opens it can upl
 | `MAX_SESSIONS` | Most sessions kept in memory (default 500; least recently used are dropped). |
 | `COOKIE_SECURE` | Session cookies are `Secure` in production; set to `false` only when serving plain HTTP. |
 | `ENGINE_URL`, `ENGINE_TOKEN`, `ENGINE_SUBJECT_SECRET` | Use the `stockfish-pool` engine service (see `CLAUDE.md`). |
+| `ENGINE_BATCH_BUSY_WAIT_S` | How long whole-game analysis waits out a busy engine service before giving up (default 90 seconds); hint checks never wait. |
 | `OWNER_ACCESS` | `open` lets everyone write when `OWNER_PASSWORD_HASH` is unset (the single-user default of the standalone container image). Never set it on a public site. |
 | `RATE_LIMITS` | `off` disables rate limiting (the test suite does this). |
 

@@ -14,6 +14,7 @@ module StockfishPool
 
     attr_reader :engine_command, :pool_size, :reserved_interactive, :threads, :hash_mb, :lanes,
                 :global_engine_sec_per_min, :subject_engine_sec_per_min, :subject_burst_sec,
+                :subject_batch_engine_sec_per_min, :subject_batch_burst_sec,
                 :tokens, :stop_grace_ms, :kill_grace_ms, :max_moves, :health_interval_s
 
     def self.from_env(env = ENV)
@@ -52,8 +53,12 @@ module StockfishPool
 
     def read_budget_settings
       @global_engine_sec_per_min = int('GLOBAL_ENGINE_SEC_PER_MIN', 90, 1..100_000)
+      # Per-subject quotas, one per lane. Interactive requests are short; a
+      # whole-game analysis (batch) needs about a minute of engine time.
       @subject_engine_sec_per_min = int('SUBJECT_ENGINE_SEC_PER_MIN', 20, 1..100_000)
       @subject_burst_sec = int('SUBJECT_BURST_SEC', 10, 1..100_000)
+      @subject_batch_engine_sec_per_min = int('SUBJECT_BATCH_ENGINE_SEC_PER_MIN', 60, 1..100_000)
+      @subject_batch_burst_sec = int('SUBJECT_BATCH_BURST_SEC', 120, 1..100_000)
     end
 
     def interactive_limits

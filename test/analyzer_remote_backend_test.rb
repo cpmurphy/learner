@@ -17,9 +17,15 @@ class AnalyzerRemoteBackendTest < Minitest::Test
       @calls = []
     end
 
+    # +failures+: errors to raise, one per call, before answering normally.
+    def failures
+      @failures ||= []
+    end
+
     def analyze(**params)
       @calls << params
       raise error if error
+      raise failures.shift unless failures.empty?
 
       Client::Result.new(bestmove: lines.first&.move, lines: lines, engine: 'Fake', lane: params[:lane],
                          applied: {}, ms: 1)
@@ -107,5 +113,40 @@ class AnalyzerRemoteBackendTest < Minitest::Test
 
     assert_raises(Analyzer::InvalidInputError) { analyzer(client).best_moves("#{START_FEN}\nquit") }
     assert_empty client.calls
+  end
+
+  def backend(client, lane:, wait: 90)
+    sleeps = []
+    backend = Analyzer::RemoteBackend.new(client: client, lane: lane, batch_busy_wait_s: wait,
+                                          sleeper: ->(seconds) { sleeps << seconds })
+    [Analyzer.new(backend: backend), sleeps]
+  end
+
+  def test_batch_analysis_waits_out_a_busy_service
+    client = FakeClient.new([line('e2e4', centipawns: 30)])
+    client.failures.push(Client::QuotaExceeded.new('quota', retry_after: 4), Client::Busy.new('busy', retry_after: 30))
+    analyzer, sleeps = backend(client, lane: :batch)
+
+    assert_equal 'e2e4', analyzer.evaluate_best_move(START_FEN)[:move]
+    assert_equal [4.0, 15.0], sleeps, 'honours Retry-After, at most 15 s per wait'
+    assert_equal 3, client.calls.size
+  end
+
+  def test_batch_waiting_allowance_covers_the_whole_analysis
+    client = FakeClient.new([line('e2e4', centipawns: 30)])
+    5.times { client.failures << Client::Busy.new('busy', retry_after: 10) }
+    analyzer, sleeps = backend(client, lane: :batch, wait: 25)
+
+    assert_raises(Analyzer::BusyError) { analyzer.evaluate_best_move(START_FEN) }
+    assert_equal [10.0, 10.0], sleeps
+  end
+
+  def test_interactive_requests_never_wait
+    client = FakeClient.new([line('e2e4', centipawns: 30)])
+    client.failures << Client::Busy.new('busy', retry_after: 2)
+    analyzer, sleeps = backend(client, lane: :interactive)
+
+    assert_raises(Analyzer::BusyError) { analyzer.evaluate_best_move(START_FEN) }
+    assert_empty sleeps
   end
 end

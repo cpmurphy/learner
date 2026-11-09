@@ -9,10 +9,19 @@ class Analyzer
   # scores from the side to move's point of view and mates mapped by
   # AnalysisParser.mate_score).
   class RemoteBackend
-    def initialize(client:, lane: :interactive, subject: nil)
+    # Batch work (whole-game analysis) waits out a busy service, honouring its
+    # Retry-After, for up to this many seconds in total before giving up.
+    # Interactive requests never wait: the visitor gets a 429 straight away.
+    DEFAULT_BATCH_BUSY_WAIT_S = 90
+    MAX_SINGLE_WAIT_S = 15
+
+    def initialize(client:, lane: :interactive, subject: nil, batch_busy_wait_s: DEFAULT_BATCH_BUSY_WAIT_S,
+                   sleeper: ->(seconds) { sleep(seconds) })
       @client = client
       @lane = lane
       @subject = subject
+      @busy_wait_left = lane == :batch ? batch_busy_wait_s : 0
+      @sleeper = sleeper
     end
 
     def best_moves(fen, multipv:, depth:)
@@ -31,11 +40,23 @@ class Analyzer
     def search(**params)
       @client.analyze(lane: @lane, subject: @subject, **params)
     rescue StockfishPool::Client::Busy, StockfishPool::Client::QuotaExceeded => e
+      retry if waited_out?(e.retry_after)
       raise Analyzer::BusyError.new(e.message, retry_after: e.retry_after)
     rescue StockfishPool::Client::InvalidRequest => e
       raise Analyzer::InvalidInputError, e.message
     rescue StockfishPool::Client::Error => e
       raise Analyzer::EngineError, "Engine service error: #{e.message}"
+    end
+
+    # Sleeps before a retry while this backend's waiting allowance lasts (it
+    # covers the whole analysis, not each search). Returns false when spent.
+    def waited_out?(retry_after)
+      wait = (retry_after || 1).to_f.clamp(0.5, MAX_SINGLE_WAIT_S)
+      return false if wait > @busy_wait_left
+
+      @busy_wait_left -= wait
+      @sleeper.call(wait)
+      true
     end
 
     def to_analysis(result)

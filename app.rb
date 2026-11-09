@@ -96,6 +96,7 @@ class LearnerApp < Sinatra::Base
     end
 
     def engine_busy_response(error)
+      warn "Engine busy for #{request.request_method} #{request.path}: #{error.message}"
       headers 'Retry-After' => error.retry_after.to_s if error.retry_after
       json_response({ error: 'The analysis engine is busy. Please try again shortly.' }, 429)
     end

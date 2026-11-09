@@ -98,7 +98,8 @@ Everything is set through environment variables. The defaults are sized for a
 | `POOL_SIZE` / `RESERVED_INTERACTIVE` | `2` / `1` | Reserved is capped at `POOL_SIZE - 1` |
 | `THREADS` / `HASH_MB` | `1` / `16` | Per engine. `POOL_SIZE × THREADS` is the real CPU ceiling |
 | `GLOBAL_ENGINE_SEC_PER_MIN` | `90` | Engine-seconds per sliding minute, across all callers |
-| `SUBJECT_ENGINE_SEC_PER_MIN` / `SUBJECT_BURST_SEC` | `20` / `10` | Per-subject token bucket |
+| `SUBJECT_ENGINE_SEC_PER_MIN` / `SUBJECT_BURST_SEC` | `20` / `10` | Per-subject token bucket for the interactive lane |
+| `SUBJECT_BATCH_ENGINE_SEC_PER_MIN` / `SUBJECT_BATCH_BURST_SEC` | `60` / `120` | Separate per-subject bucket for the batch lane: one whole-game analysis needs up to about a minute of engine time |
 | `INTERACTIVE_DEFAULT_DEPTH` / `_MAX_DEPTH` | `16` / `18` | |
 | `INTERACTIVE_MAX_MOVETIME_MS` / `_MAX_NODES` / `_MAX_MULTIPV` | `2000` / `2000000` / `3` | |
 | `INTERACTIVE_QUEUE_MAX` / `_QUEUE_WAIT_S` | `8` / `5` | |
