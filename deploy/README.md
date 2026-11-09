@@ -119,7 +119,7 @@ Add `deploy/caddy/chess-learner.caddy` (with your hostname) to your Caddyfile, t
 ## 6. Verify
 
 ```bash
-curl -s http://127.0.0.1:9292/api/session            # {"owner":false,"login_enabled":true}
+curl -s http://127.0.0.1:9292/api/session            # {"owner":false,"login_enabled":true,"analysis":false}
 podman healthcheck run stockfish-pool && echo engine healthy
 podman healthcheck run chess-learner && echo app healthy
 journalctl --user -u chess-learner -n 50 | grep -i TRUSTED_PROXIES

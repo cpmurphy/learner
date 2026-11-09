@@ -11,10 +11,12 @@ require_relative 'lib/app_helpers' # Require the new helpers
 require_relative 'lib/analyzer'
 require_relative 'lib/pgn_reader'
 require_relative 'lib/annotation_cache'
+require_relative 'lib/analysis_slots'
 require_relative 'lib/bounded_session_pool'
 require_relative 'lib/client_network'
 require_relative 'lib/env_setting'
 require_relative 'lib/owner_password'
+require_relative 'lib/game_legality'
 require_relative 'lib/rate_limits'
 
 class LearnerApp < Sinatra::Base
@@ -35,12 +37,25 @@ class LearnerApp < Sinatra::Base
   Rack::Attack.enabled = ENV['RATE_LIMITS'] != 'off'
   use Rack::Attack
 
-  # Writing to the library (saving games, uploading) is for the owner only.
-  # With OWNER_PASSWORD_HASH set, the owner logs in at /login. Without it,
-  # everyone is the owner (the old single-user behaviour) in development and
-  # test, or anywhere OWNER_ACCESS=open (the standalone container image);
-  # otherwise production allows no writes at all.
-  OWNER_ROUTES = ['/game/save', '/api/upload_pgn', '/api/analyze_and_save'].freeze
+  # The library in PGN_DIR (listing, opening, saving and adding games) is the
+  # owner's alone. With OWNER_PASSWORD_HASH set, the owner logs in at /login.
+  # Without it, everyone is the owner (the old single-user behaviour) in
+  # development and test, or anywhere OWNER_ACCESS=open (the standalone
+  # container image); otherwise production has no owner, and the library is
+  # closed to everyone.
+  #
+  # Anyone may analyze a game of their own with POST /api/analyze; the result
+  # lives only in their session (in memory, gone when it expires) and is never
+  # written to disk or shared with other visitors.
+  OWNER_ROUTES = ['/api/pgn_files', '/api/load_game', '/game/save', '/api/upload_pgn',
+                  '/api/analyze_and_save'].freeze
+
+  # Limits on a game pasted for analysis. A long game is a lot of engine work.
+  MAX_ANALYSIS_PGN_BYTES = 64 * 1024
+  MAX_ANALYSIS_PLIES = 300
+
+  # Visitors' whole-game analyses that may run at once (see AnalysisSlots).
+  ANALYSIS_SLOTS = AnalysisSlots.new(EnvSetting.integer('MAX_CONCURRENT_ANALYSES', 2))
 
   # Key for hashing client IPs into engine-service quota subjects. Set it to keep
   # subjects stable across restarts; a random per-process key works otherwise.
@@ -71,6 +86,11 @@ class LearnerApp < Sinatra::Base
 
     def game_loaded?
       !session[:game].nil? && session[:game].respond_to?(:positions) && !session[:game].positions.empty?
+    end
+
+    # Whether the session holds a game the visitor analyzed (not a library game).
+    def analysis_loaded?
+      session[:analysis] == true && game_loaded?
     end
 
     def current_board_fen
@@ -277,7 +297,7 @@ class LearnerApp < Sinatra::Base
 
   # Tells the frontend which controls to show.
   get '/api/session' do
-    json_response({ owner: owner?, login_enabled: owner_login_enabled? })
+    json_response({ owner: owner?, login_enabled: owner_login_enabled?, analysis: analysis_loaded? })
   end
 
   get '/login' do
@@ -385,14 +405,18 @@ class LearnerApp < Sinatra::Base
 
   # Called only with a fully prepared game, so a failure earlier (for example a
   # busy engine) leaves the previously loaded game in place.
+  # +file_path+ is nil for a visitor's own analysis, which belongs to no file.
   def initialize_game_session(game, file_path)
     session[:game] = game
     session[:pgn_file_path] = file_path
+    session[:analysis] = file_path.nil?
     session[:current_move_index] = 0
   end
 
   def clear_game_session
     session[:game] = nil
+    session[:pgn_file_path] = nil
+    session[:analysis] = false
     session[:current_move_index] = 0
   end
 
@@ -440,6 +464,88 @@ class LearnerApp < Sinatra::Base
   def build_load_game_response(pgn_meta)
     response_data = build_load_game_response_data(pgn_meta)
     json_response(response_data)
+  end
+
+  # Analyze a visitor's own game. The game is kept only in their session: it is
+  # not written to PGN_DIR, not cached for other visitors, and not logged.
+  post '/api/analyze' do
+    game = read_game_for_analysis
+    ran, = ANALYSIS_SLOTS.run { process_critical_moments_for_game(game) }
+    unless ran
+      headers 'Retry-After' => '30'
+      return json_response({ error: 'Too many games are being analyzed right now. Please try again shortly.' }, 429)
+    end
+
+    initialize_game_session(game, nil)
+    json_response({ success: true, game_url: '/game?id=analysis' })
+  rescue Analyzer::BusyError => e
+    engine_busy_response(e)
+  rescue Analyzer::InvalidInputError
+    json_response({ error: 'The engine cannot analyze a position in this game.' }, 400)
+  rescue StandardError => e
+    warn "ERROR: Analysis failed (#{e.class})" # not the message: it may quote the visitor's game
+    json_response({ error: 'Analysis failed. Please try again later.' }, 500)
+  end
+
+  # The visitor's analyzed game, in the same shape as /api/load_game.
+  get '/api/analysis' do
+    return json_response({ error: 'No analyzed game in this session. Paste a game to analyze it.' }, 404) unless
+      analysis_loaded?
+
+    json_response(build_load_game_response_data({ name: 'your game' }))
+  end
+
+  # Reads, parses and checks the pasted game; halts with 4xx on bad input.
+  def read_game_for_analysis
+    pgn_content = read_analysis_pgn_content
+    games = begin
+      PGNReader.new.read(pgn_content)
+    rescue StandardError => e
+      halt json_response({ error: "Could not read the PGN: #{e.message[0, 200]}" }, 400)
+    end
+    halt json_response({ error: 'No game found in the PGN.' }, 400) if games.empty?
+
+    check_game_for_analysis(games.first)
+  end
+
+  def check_game_for_analysis(game)
+    halt json_response({ error: 'The game has no moves.' }, 400) if game.moves.empty?
+    if game.moves.size > MAX_ANALYSIS_PLIES
+      halt json_response({ error: "The game is too long to analyze (limit: #{MAX_ANALYSIS_PLIES / 2} moves)." }, 400)
+    end
+    problem = GameLegality.problem(game)
+    halt json_response({ error: problem }, 400) if problem
+    game
+  end
+
+  # The pgn_content of a JSON body.
+  def read_analysis_pgn_content
+    pgn_content = parse_analysis_json(read_bounded_json_body)['pgn_content']
+    halt json_response({ error: 'No PGN provided.' }, 400) unless pgn_content.is_a?(String) && !pgn_content.strip.empty?
+    halt_pgn_too_large if pgn_content.bytesize > MAX_ANALYSIS_PGN_BYTES
+    pgn_content
+  end
+
+  # Reads no more of the body than a PGN of the maximum size needs.
+  def read_bounded_json_body
+    halt json_response({ error: 'Send JSON with pgn_content.' }, 415) unless json_request?
+
+    body_limit = MAX_ANALYSIS_PGN_BYTES + 1024 # room for the JSON around it
+    halt_pgn_too_large if request.content_length.to_i > body_limit
+    body = request.body.read(body_limit + 1).to_s
+    halt_pgn_too_large if body.bytesize > body_limit
+    body
+  end
+
+  def halt_pgn_too_large
+    halt json_response({ error: "The PGN is too large (limit: #{MAX_ANALYSIS_PGN_BYTES / 1024} KB)." }, 413)
+  end
+
+  def parse_analysis_json(body)
+    parsed = JSON.parse(body)
+    parsed.is_a?(Hash) ? parsed : {}
+  rescue JSON::ParserError
+    halt json_response({ error: 'Invalid JSON in request body' }, 400)
   end
 
   def build_load_game_response_data(pgn_meta)

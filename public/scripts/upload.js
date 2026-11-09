@@ -2,9 +2,11 @@
 
 /**
  * Initialize upload functionality
- * @param {Function} onUploadComplete - Callback when upload completes successfully
+ * @param {Function} onUploadComplete - Callback when a game is saved to the library
+ * @param {{saveToLibrary: boolean}} options - The owner's analyses are saved to the
+ *   library; anyone else's live only in their session and open straight away.
  */
-export function initializeUpload(onUploadComplete) {
+export function initializeUpload(onUploadComplete, { saveToLibrary = false } = {}) {
     const textInput = document.getElementById('pgn-text-input');
     const uploadButton = document.getElementById('upload-analyze-button');
     const uploadStatus = document.getElementById('upload-status');
@@ -24,10 +26,14 @@ export function initializeUpload(onUploadComplete) {
         clearStatus();
 
         try {
-            await uploadAndAnalyzePGN(pgnContent, {
-                onProgress: updateProgress,
-                onStatusChange: updateStatus
-            });
+            const callbacks = { onProgress: updateProgress, onStatusChange: updateStatus };
+            if (!saveToLibrary) {
+                const result = await analyzeInSession(pgnContent, callbacks);
+                window.location.assign(result.game_url);
+                return;
+            }
+
+            await uploadAndAnalyzePGN(pgnContent, callbacks);
 
             // Success - call the completion callback
             if (onUploadComplete) {
@@ -47,12 +53,15 @@ export function initializeUpload(onUploadComplete) {
         progressText.textContent = message;
     }
 
-    function updateStatus(message, type = 'info') {
-        // Use innerHTML if message contains HTML, otherwise use textContent
-        if (message && message.includes('<')) {
-            uploadStatus.innerHTML = message;
-        } else {
-            uploadStatus.textContent = message;
+    // Messages are text; +link+ ({href, text}) optionally follows them.
+    function updateStatus(message, type = 'info', link = null) {
+        uploadStatus.textContent = message;
+        if (link) {
+            const anchor = document.createElement('a');
+            anchor.href = link.href;
+            anchor.className = 'upload-status-link';
+            anchor.textContent = link.text;
+            uploadStatus.append(' ', anchor);
         }
         uploadStatus.className = 'upload-status ' + type;
     }
@@ -67,86 +76,90 @@ export function initializeUpload(onUploadComplete) {
 }
 
 /**
- * Upload and analyze PGN text
+ * Analyze PGN text without saving it: the server keeps the game in this
+ * visitor's session only.
  * @param {string} pgnContent - The PGN text content
  * @param {Object} callbacks - Callbacks for progress and status updates
- * @returns {Promise<Object>} - Result of the upload
+ * @returns {Promise<{game_url: string}>}
  */
-async function uploadAndAnalyzePGN(pgnContent, callbacks = {}) {
+async function analyzeInSession(pgnContent, callbacks = {}) {
+    const result = await postForAnalysis('/api/analyze', { pgn_content: pgnContent }, callbacks);
+    if (callbacks.onStatusChange) callbacks.onStatusChange('Analysis complete. Opening the game…', 'success');
+    return result;
+}
+
+/**
+ * POST a game for analysis while showing progress.
+ * @returns {Promise<Object>} - The server's JSON answer
+ */
+async function postForAnalysis(url, body, callbacks) {
     const { onProgress, onStatusChange } = callbacks;
+    const stopAnimation = startProgressAnimation(onProgress);
+    if (onStatusChange) onStatusChange('Analyzing game', 'info');
 
-    // Extract a filename from the PGN content or generate one
-    const filename = generateFilename(pgnContent);
+    let response;
+    try {
+        response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+    } finally {
+        stopAnimation();
+    }
 
-    // Start progress animation that asymptotically approaches 98% over 10 seconds
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(data.error || `Analysis failed (HTTP ${response.status})`);
+    }
+    if (onProgress) onProgress(100, 'Complete!');
+    return data;
+}
+
+/**
+ * Animate the progress bar towards 98% until the returned function is called.
+ * @param {Function|undefined} onProgress
+ * @returns {Function} stops the animation
+ */
+function startProgressAnimation(onProgress) {
     const startTime = Date.now();
     const duration = 10000; // 10 seconds
     const targetPercent = 98;
     let animationActive = true;
 
-    const updateProgressAnimation = () => {
+    const step = () => {
         if (!animationActive) return;
-        
-        const elapsed = Date.now() - startTime;
-        // Asymptotic function: approaches targetPercent as elapsed approaches duration
-        // Using exponential approach: percent = target * (1 - e^(-t/duration))
-        const t = Math.min(elapsed / duration, 1); // Clamp to 1
-        const percent = targetPercent * (1 - Math.exp(-3 * t)); // -3 gives good curve shape
-        
-        // Ensure we don't exceed targetPercent
-        const clampedPercent = Math.min(percent, targetPercent);
-        
-        if (onProgress) {
-            onProgress(clampedPercent, 'Analysis may take a while...');
-        }
-        
-        // Continue animation if we haven't reached the target
-        if (clampedPercent < targetPercent) {
-            requestAnimationFrame(updateProgressAnimation);
-        }
+        const t = Math.min((Date.now() - startTime) / duration, 1);
+        const percent = Math.min(targetPercent * (1 - Math.exp(-3 * t)), targetPercent);
+        if (onProgress) onProgress(percent, 'Analysis may take a while...');
+        if (percent < targetPercent) requestAnimationFrame(step);
     };
 
-    // Update status: analyzing
-    if (onStatusChange) onStatusChange('Analyzing game', 'info');
-    if (onProgress) onProgress(2, 'Analysis may take a while...'); // Start at 2%
+    if (onProgress) onProgress(2, 'Analysis may take a while...');
+    requestAnimationFrame(step);
+    return () => { animationActive = false; };
+}
 
-    // Start the progress animation
-    requestAnimationFrame(updateProgressAnimation);
+/**
+ * Upload and analyze PGN text, saving it to the owner's library
+ * @param {string} pgnContent - The PGN text content
+ * @param {Object} callbacks - Callbacks for progress and status updates
+ * @returns {Promise<Object>} - Result of the upload
+ */
+async function uploadAndAnalyzePGN(pgnContent, callbacks = {}) {
+    const { onStatusChange } = callbacks;
 
-    // Send to server for analysis
-    const response = await fetch('/api/analyze_and_save', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            pgn_content: pgnContent,
-            filename: filename
-        })
-    });
+    // Extract a filename from the PGN content or generate one
+    const filename = generateFilename(pgnContent);
+    const result = await postForAnalysis('/api/analyze_and_save', { pgn_content: pgnContent, filename }, callbacks);
 
-    // Stop the animation when response arrives
-    animationActive = false;
-
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Upload failed');
-    }
-
-    const result = await response.json();
-
-    // Update status: complete
-    if (onProgress) onProgress(100, 'Complete!');
     if (onStatusChange) {
-        let statusMessage;
         if (result.file_id) {
-            // Provide a link to view the completed analysis
-            statusMessage = `Success! Game analyzed and saved. <a href="/game?id=${encodeURIComponent(result.file_id)}" class="upload-status-link">View completed analysis →</a>`;
+            onStatusChange('Success! Game analyzed and saved.', 'success',
+                { href: `/game?id=${encodeURIComponent(result.file_id)}`, text: 'View completed analysis →' });
         } else {
-            // Fallback to filename if ID is not available
-            statusMessage = `Success! Game analyzed and saved as ${result.filename}`;
+            onStatusChange(`Success! Game analyzed and saved as ${result.filename}`, 'success');
         }
-        onStatusChange(statusMessage, 'success');
     }
 
     return result;

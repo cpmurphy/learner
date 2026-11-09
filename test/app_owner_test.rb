@@ -53,7 +53,7 @@ class AppOwnerTest < Minitest::Test
 
       assert_equal 403, last_response.status, path
     end
-    assert_equal({ 'owner' => false, 'login_enabled' => true }, session_info)
+    assert_equal({ 'owner' => false, 'login_enabled' => true, 'analysis' => false }, session_info)
   end
 
   def test_wrong_password_is_refused
@@ -91,7 +91,7 @@ class AppOwnerTest < Minitest::Test
     @app_class = PRODUCTION_WITHOUT_LOGIN
     log_in
 
-    assert_equal({ 'owner' => false, 'login_enabled' => false }, session_info)
+    assert_equal({ 'owner' => false, 'login_enabled' => false, 'analysis' => false }, session_info)
     post '/game/save'
 
     assert_equal 403, last_response.status
@@ -100,19 +100,19 @@ class AppOwnerTest < Minitest::Test
   def test_open_owner_access_keeps_single_user_mode_in_production
     @app_class = PRODUCTION_OPEN
 
-    assert_equal({ 'owner' => true, 'login_enabled' => false }, session_info)
+    assert_equal({ 'owner' => true, 'login_enabled' => false, 'analysis' => false }, session_info)
   end
 
   def test_a_password_overrides_open_owner_access
     @app_class = PRODUCTION_OPEN_WITH_LOGIN
 
-    assert_equal({ 'owner' => false, 'login_enabled' => true }, session_info)
+    assert_equal({ 'owner' => false, 'login_enabled' => true, 'analysis' => false }, session_info)
   end
 
   def test_development_without_a_password_keeps_single_user_mode
     @app_class = LearnerApp
 
-    assert_equal({ 'owner' => true, 'login_enabled' => false }, session_info)
+    assert_equal({ 'owner' => true, 'login_enabled' => false, 'analysis' => false }, session_info)
   end
 
   def test_cross_site_post_loses_the_owner_session_behind_caddy

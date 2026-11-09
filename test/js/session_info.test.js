@@ -3,20 +3,24 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { fetchSessionInfo, ownerControls, renderAccountControl } from '../../public/scripts/session_info.js';
 
 describe('ownerControls', () => {
-    it('shows upload and logout to a logged-in owner', () => {
-        expect(ownerControls({ owner: true, login_enabled: true })).toEqual({ showUpload: true, account: 'logout' });
+    it('shows the library and logout to a logged-in owner', () => {
+        expect(ownerControls({ owner: true, login_enabled: true }))
+            .toEqual({ showLibrary: true, saveToLibrary: true, account: 'logout' });
     });
 
-    it('shows only the login link to visitors when login is enabled', () => {
-        expect(ownerControls({ owner: false, login_enabled: true })).toEqual({ showUpload: false, account: 'login' });
+    it('hides the library from visitors, who see the login link when login is enabled', () => {
+        expect(ownerControls({ owner: false, login_enabled: true }))
+            .toEqual({ showLibrary: false, saveToLibrary: false, account: 'login' });
     });
 
-    it('shows upload without account controls in open (development) mode', () => {
-        expect(ownerControls({ owner: true, login_enabled: false })).toEqual({ showUpload: true, account: null });
+    it('shows the library without account controls in open (development) mode', () => {
+        expect(ownerControls({ owner: true, login_enabled: false }))
+            .toEqual({ showLibrary: true, saveToLibrary: true, account: null });
     });
 
-    it('shows nothing when writes are disabled', () => {
-        expect(ownerControls({ owner: false, login_enabled: false })).toEqual({ showUpload: false, account: null });
+    it('hides the library when there is no owner', () => {
+        expect(ownerControls({ owner: false, login_enabled: false }))
+            .toEqual({ showLibrary: false, saveToLibrary: false, account: null });
     });
 });
 
@@ -24,16 +28,16 @@ describe('fetchSessionInfo', () => {
     afterEach(() => vi.unstubAllGlobals());
 
     it('returns the server answer', async () => {
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ owner: true, login_enabled: true }) }));
-        expect(await fetchSessionInfo()).toEqual({ owner: true, login_enabled: true });
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ owner: true, login_enabled: true, analysis: true }) }));
+        expect(await fetchSessionInfo()).toEqual({ owner: true, login_enabled: true, analysis: true });
     });
 
     it('treats errors and odd values as an anonymous visitor', async () => {
         vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
-        expect(await fetchSessionInfo()).toEqual({ owner: false, login_enabled: false });
+        expect(await fetchSessionInfo()).toEqual({ owner: false, login_enabled: false, analysis: false });
 
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ owner: 'yes' }) }));
-        expect(await fetchSessionInfo()).toEqual({ owner: false, login_enabled: false });
+        expect(await fetchSessionInfo()).toEqual({ owner: false, login_enabled: false, analysis: false });
     });
 });
 

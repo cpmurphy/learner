@@ -22,7 +22,10 @@ module RateLimits
     'load-game' => [20, 60, ->(req) { req.post? && req.path == '/api/load_game' }],
     'login' => [5, 60, ->(req) { req.post? && req.path == '/login' }],
     'login-hourly' => [20, 3600, ->(req) { req.post? && req.path == '/login' }],
-    'uploads' => [10, 3600, ->(req) { req.post? && %w[/api/upload_pgn /api/analyze_and_save].include?(req.path) }]
+    # Whole-game analysis is the most expensive thing a visitor can ask for.
+    'uploads' => [10, 3600, lambda { |req|
+      req.post? && %w[/api/analyze /api/upload_pgn /api/analyze_and_save].include?(req.path)
+    }]
   }.freeze
 
   module_function

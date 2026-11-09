@@ -10,10 +10,16 @@
     <h1>Chess Learner</h1>
     <div id="account-control" class="account-control"></div>
 
-    <!-- Shown only to the site owner (see session_info.js) -->
-    <div id="upload-section" class="upload-section" hidden>
-        <h2>Analyze a New Game</h2>
-        <p class="upload-instructions">Paste PGN below and click the button to analyze it.</p>
+    <p id="analysis-resume" class="info-message" hidden>
+        <a href="/game?id=analysis">Continue with the game you analyzed →</a>
+    </p>
+
+    <div id="upload-section" class="upload-section">
+        <h2>Analyze a Game</h2>
+        <!-- The owner's version of this text is in library.js -->
+        <p id="upload-instructions" class="upload-instructions">Paste a game in PGN format and click the button
+            to find its critical moments. Your game is kept only for this browser session: it is not saved,
+            and nobody else can see it.</p>
         <textarea id="pgn-text-input" placeholder="Paste PGN here...
 
 Example:
@@ -37,7 +43,8 @@ Example:
         </div>
     </div>
 
-    <div class="game-library">
+    <!-- Shown only to the site owner (see session_info.js) -->
+    <div id="game-library" class="game-library" hidden>
         <h2>Previously Analyzed Games</h2>
         <div id="game-list-loading" class="info-message">Loading games...</div>
         <div id="game-list-error" class="error-message" style="display: none;"></div>
