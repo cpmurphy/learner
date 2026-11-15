@@ -86,9 +86,9 @@ EXPOSE 3000
 CMD ["bundle", "exec", "puma", "--port=3000"]
 
 # Default image: the app plus a local Stockfish, for single-user local use
-# (docker-compose.yml, podman-start.sh). Everyone who can reach it may upload
-# and save, as before, and cookies work over plain http. Setting
-# OWNER_PASSWORD_HASH still switches on the owner login.
+# (quadlet/chess-learner-local.container, QUICKSTART.md, docker-compose.yml).
+# Everyone who can reach it may upload and save, as before, and cookies work
+# over plain http. Setting OWNER_PASSWORD_HASH still switches on the owner login.
 FROM app AS standalone
 COPY --from=stockfish /app/bin/stockfish /app/bin/stockfish
 ENV OWNER_ACCESS="open" \

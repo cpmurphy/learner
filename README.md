@@ -30,21 +30,24 @@ The tool is intended for beginning or intermediate players. Unlike the "game rev
 
 ## Installation Options
 
-### Docker
+### Podman (recommended)
 
-If you have Docker installed, this is the simplest option:
+The simplest option is to run it in a container with [Podman](https://podman.io). The image includes Stockfish, so you don't need Ruby, Node.js or a chess engine on your machine:
 
 ```bash
-docker-compose up
+podman build -t localhost/chess-learner:standalone .
 ```
 
-Then open http://localhost:9292 in your browser. Your games are automatically saved in the `games` folder.
+- **Linux:** install `quadlet/chess-learner-local.container` so systemd runs it as a user service.
+- **Mac and Windows:** start it with `podman run`, from the command line or from Podman Desktop.
 
-Don't have Docker?  See the [Quickstart Guide](QUICKSTART.md).
+The [Quickstart Guide](QUICKSTART.md) has the steps for each platform. Once it's running, open http://localhost:9292.
+
+`docker-compose.yml` still works if you prefer Docker: run `docker compose up`.
 
 ### Alternative: Native Installation
 
-For detailed installation instructions including native installation (without Docker), see [INSTALL.md](INSTALL.md).
+For detailed installation instructions including native installation (without a container), see [INSTALL.md](INSTALL.md).
 
 ## Usage
 

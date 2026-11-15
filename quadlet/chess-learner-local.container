@@ -1,0 +1,41 @@
+# Chess Learner on your own machine, run by systemd through Podman Quadlet.
+# Single user, Stockfish included, no login: see QUICKSTART.md.
+# (The public deployment, with a separate engine service, is in deploy/quadlet.)
+#
+#   podman build -t localhost/chess-learner:standalone .
+#   mkdir -p ~/chess-learner/games ~/.config/containers/systemd
+#   cp quadlet/chess-learner-local.container ~/.config/containers/systemd/
+#   systemctl --user daemon-reload
+#   systemctl --user start chess-learner-local
+
+[Unit]
+Description=Chess Learner (local, single user)
+
+[Container]
+Image=localhost/chess-learner:standalone
+ContainerName=chess-learner-local
+# Reachable only from this machine: anyone who can reach it may upload and save.
+PublishPort=127.0.0.1:9292:3000
+# Your games. Maps your host user onto the image's appuser (uid 1000), so
+# files the app writes belong to you on the host.
+Volume=%h/chess-learner/games:/app/games:Z
+UserNS=keep-id:uid=1000,gid=1000
+Environment=HOME=/tmp
+ReadOnly=true
+Tmpfs=/tmp:rw,size=64m,mode=1777
+DropCapability=ALL
+NoNewPrivileges=true
+HealthCmd=/app/bin/healthcheck
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+HealthStartPeriod=20s
+
+[Service]
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=120
+
+[Install]
+# Starts when you log in.
+WantedBy=default.target

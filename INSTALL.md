@@ -2,148 +2,64 @@
 
 Choose the installation method that works best for you:
 
-## Option 1: Docker/Podman
+## Option 1: Podman (recommended)
 
-This is anyone who want to get it up and running without worrying about installing
-lots of dependencies.
+This is for anyone who wants it up and running without installing lots of
+dependencies.
 
-### What is Docker/Podman?
-Docker (or Podman on Linux) packages the entire application with all its dependencies. You don't need to install Ruby, Node.js, or Stockfish separately - everything runs in an isolated container.
+### What is Podman?
 
-**Using Podman?** Podman is a Docker-compatible alternative that's popular on Linux. All Docker instructions work with Podman using `podman-compose` or the `podman-start.sh` script.
+[Podman](https://podman.io) runs the application in a container: a packaged
+copy of the application together with everything it needs. You don't need to
+install Ruby, Node.js or Stockfish yourself.
 
-### Prerequisites
-- **Docker Desktop** for [Windows](https://docs.docker.com/desktop/install/windows-install/) or [Mac](https://docs.docker.com/desktop/install/mac-install/)
-- **Docker Engine** for [Linux](https://docs.docker.com/engine/install/)
+- **Linux:** Podman runs containers directly. Chess Learner comes with a
+  [Quadlet](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html)
+  unit, `quadlet/chess-learner-local.container`, so systemd starts the
+  container when you log in and restarts it if it crashes.
+- **Mac and Windows:** containers are Linux programs, so Podman runs them in a
+  small Linux virtual machine, the *Podman machine*.
+  [Podman Desktop](https://podman-desktop.io) sets it up for you (on Windows,
+  with WSL 2). You start the container once with `podman run`, then manage it
+  from Podman Desktop or with `podman start` and `podman stop`.
 
 ### Installation Steps
 
-#### Windows
-1. Download and install [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/)
-2. Open PowerShell or Command Prompt
-3. Navigate to the chess learner directory:
-   ```powershell
-   cd path\to\chess\learner
-   ```
-4. Start the application:
-   ```powershell
-   docker-compose up
-   ```
-5. Open your browser to http://localhost:9292
-
-To stop: Press `Ctrl+C` in the terminal
-
-To restart later: Run `docker-compose up` again
-
-#### Mac
-1. Download and install [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/)
-2. Open Terminal
-3. Navigate to the chess learner directory:
-   ```bash
-   cd path/to/chess/learner
-   ```
-4. Start the application:
-   ```bash
-   docker-compose up
-   ```
-5. Open your browser to http://localhost:9292
-
-To stop: Press `Cmd+C` in the terminal
-
-To restart later: Run `docker-compose up` again
-
-#### Linux
-
-**Option A: Using Podman**
-
-Podman is a Docker-compatible alternative that doesn't require root privileges and is available in most Linux distributions.
-
-1. Install Podman:
-   ```bash
-   sudo apt-get install podman         # Ubuntu/Debian
-   # or
-   sudo dnf install podman             # Fedora
-   # or
-   sudo pacman -S podman               # Arch
-   ```
-
-2. Navigate to the chess learner directory:
-   ```bash
-   cd path/to/chess/learner
-   ```
-
-3. Start the application:
-   ```bash
-   ./podman-start.sh
-   ```
-
-4. Open your browser to http://localhost:9292
-
-To stop: `podman stop chess-learner`
-
-To restart later: Run `./podman-start.sh` again
-
-**Option B: Using Docker**
-
-1. Install Docker Engine following your distro's instructions:
-   - [Ubuntu/Debian](https://docs.docker.com/engine/install/ubuntu/)
-   - [Fedora](https://docs.docker.com/engine/install/fedora/)
-   - [Arch](https://wiki.archlinux.org/title/Docker)
-
-2. Install Docker Compose:
-   ```bash
-   sudo apt-get install docker-compose  # Ubuntu/Debian
-   # or
-   sudo dnf install docker-compose      # Fedora
-   # or
-   sudo pacman -S docker-compose        # Arch
-   ```
-
-3. Add your user to the docker group (to avoid needing sudo):
-   ```bash
-   sudo usermod -aG docker $USER
-   newgrp docker  # Activate the group change
-   ```
-
-4. Navigate to the chess learner directory:
-   ```bash
-   cd path/to/chess/learner
-   ```
-
-5. Start the application:
-   ```bash
-   docker-compose up
-   ```
-
-6. Open your browser to http://localhost:9292
-
-To stop: Press `Ctrl+C` in the terminal
-
-To restart later: Run `docker-compose up` again
+The [Quickstart Guide](QUICKSTART.md) has the steps for each platform: getting
+the code, installing Podman, building the image and running it.
 
 ### Your Games
-Analyzed games are automatically saved in the `games` directory in the chess learner folder. They persist even when you stop and restart the application.
 
-### Running in the Background
-To run the application in the background (so you can close the terminal):
+- **Linux (Quadlet):** games are saved in `~/chess-learner/games`.
+- **Mac and Windows:** games are saved in the `games` folder inside the chess
+  learner folder.
+
+Either way they're on your computer, not inside the container, so they're kept
+when you stop, update or remove the container. PGN files you put there appear
+in the library.
+
+### Using Docker Instead
+
+`docker-compose.yml` still works with Docker Desktop or Docker Engine:
 
 ```bash
-docker-compose up -d
+docker compose up        # or docker compose up -d to run in the background
+docker compose down      # to stop it
 ```
 
-To stop it later:
-```bash
-docker-compose down
-```
+Your games are saved in the `games` folder.
 
 ---
 
 ## Option 2: Native Installation (For Developers)
 
-This is for developers who want to modify the code or prefer native installation.
+This is for developers who want to modify the code, or anyone who prefers not to use a container.
 
 ### Prerequisites
-- Ruby 3.2.3 or higher
+- Ruby 3.4. CI and the container image use the version in `.ruby-version`
+  (currently 3.4.12). Distribution packages are often older; if yours is, a
+  version manager such as [rbenv](https://github.com/rbenv/rbenv) or
+  [mise](https://mise.jdx.dev) can install the version in `.ruby-version`.
 - Node.js and npm
 - Stockfish chess engine
 - Bundler gem
@@ -325,24 +241,38 @@ Then run: `./start.sh`
 
 ## Troubleshooting
 
-### Docker Issues
+### Container Issues
 
-**"Cannot connect to Docker daemon"** (Linux)
-- Make sure Docker is running: `sudo systemctl start docker`
-- Add your user to docker group: `sudo usermod -aG docker $USER`
-- Log out and back in
+**"Cannot connect to Podman"** (Mac and Windows)
+- The Podman machine isn't running. Open Podman Desktop, or run
+  `podman machine start`.
 
-**"Permission denied" with docker-compose and Podman**
-- Use `podman-compose` instead: `pip3 install --user podman-compose`, then run `podman-compose up`
-- Or use the provided script: `./podman-start.sh`
-- Or use podman directly (see INSTALL.md Linux section)
+**The build fails while checking out or compiling Stockfish**
+- The Stockfish submodule is missing. Run `git submodule update --init Stockfish`.
+
+**"Illegal instruction" in the logs**
+- Stockfish was built for a different CPU. Build the image again with the
+  `STOCKFISH_ARCH` build argument for your computer (see
+  [QUICKSTART.md](QUICKSTART.md), step 3).
 
 **"Port 9292 already in use"**
-- Another application is using port 9292
-- Change the port in docker-compose.yml: `"8080:3000"` (changes to port 8080)
+- Another application is using port 9292. Choose another port, such as 8080:
+  - Linux (Quadlet): set `PublishPort=127.0.0.1:8080:3000` in
+    `~/.config/containers/systemd/chess-learner-local.container`, then run
+    `systemctl --user daemon-reload` and
+    `systemctl --user restart chess-learner-local`.
+  - Mac and Windows: remove the container with `podman rm -f chess-learner`
+    and run it again with `-p 127.0.0.1:8080:3000`.
+- Then open http://localhost:8080.
 
-**"No space left on device"** (Docker)
-- Clean up old Docker images: `docker system prune -a`
+**The service won't start** (Linux)
+- See why with `systemctl --user status chess-learner-local` and
+  `journalctl --user -u chess-learner-local`.
+- If it can't find the image, build it (QUICKSTART.md, step 3). The unit uses
+  `localhost/chess-learner:standalone`.
+
+**"No space left on device"**
+- Remove old images and stopped containers: `podman system prune`.
 
 ### Native Installation Issues
 
@@ -369,7 +299,7 @@ Then run: `./start.sh`
 
 - Check [README.md](README.md) for usage instructions
 - Report issues on GitHub
-- For Docker issues, see [Docker documentation](https://docs.docker.com/)
+- For Podman issues, see the [Podman documentation](https://docs.podman.io/)
 
 ## Next Steps
 
