@@ -37,30 +37,40 @@ module ChessRules
     (rank * 8) + file if file.between?(0, 7) && rank.between?(0, 7)
   end
 
-  # The board, side to move, castling rights and en passant square of a FEN
-  # whose shape UciInputValidator has already checked. #after returns a new
-  # Position; nothing changes one in place.
+  # A position read from a FEN whose shape UciInputValidator has already
+  # checked: the board, side to move, castling rights, en passant square and
+  # move clocks. #after returns a new Position; nothing changes one in place.
   class Position
     CORNER_RIGHTS = { 0 => 'Q', 7 => 'K', 56 => 'q', 63 => 'k' }.freeze
     KING_RIGHTS = { 'K' => 'KQ', 'k' => 'kq' }.freeze
 
-    attr_reader :side, :castling, :en_passant
+    attr_reader :side, :castling, :en_passant, :halfmove, :fullmove
 
     def self.from_fen(fen)
-      placement, side, castling, en_passant = fen.split
+      placement, side, castling, en_passant, halfmove, fullmove = fen.split
       squares = []
       placement.split('/').reverse_each do |row|
         row.each_char { |char| char.match?(/\d/) ? squares.concat([nil] * char.to_i) : squares << char }
       end
-      new(squares, side, castling.delete('-'), en_passant == '-' ? nil : ChessRules.square(en_passant))
+      new(squares, side, castling.delete('-'), en_passant == '-' ? nil : ChessRules.square(en_passant),
+          halfmove.to_i, fullmove.to_i)
     end
 
-    def initialize(squares, side, castling, en_passant)
+    # rubocop:disable Metrics/ParameterLists
+    def initialize(squares, side, castling, en_passant, halfmove = 0, fullmove = 1)
+      # rubocop:enable Metrics/ParameterLists
       @squares = squares.freeze
       @side = side
       @castling = castling
       @en_passant = en_passant
+      @halfmove = halfmove
+      @fullmove = fullmove
       freeze
+    end
+
+    def to_fen
+      en_passant = @en_passant ? ChessRules.square_name(@en_passant) : '-'
+      [placement, @side, @castling.empty? ? '-' : @castling, en_passant, @halfmove, @fullmove].join(' ')
     end
 
     def [](square)
@@ -120,10 +130,11 @@ module ChessRules
       [ChessRules.offset(from, -1, forward), ChessRules.offset(from, 1, forward)].compact
     end
 
-    # The position after a move, which must be pseudo-legal (see Rules::Moves).
+    # The position after a move, which must be pseudo-legal (see Moves).
     def after(from, to, promotion = nil)
       Position.new(squares_after(from, to, promotion), opponent, castling_after(from, to),
-                   double_push?(from, to) ? (from + to) / 2 : nil)
+                   double_push?(from, to) ? (from + to) / 2 : nil,
+                   halfmove_after(from, to), @side == 'b' ? @fullmove + 1 : @fullmove)
     end
 
     private
@@ -145,6 +156,11 @@ module ChessRules
       squares[rook_from] = nil
     end
 
+    # Pawn moves and captures (en passant included, as it is a pawn move) reset the clock.
+    def halfmove_after(from, to)
+      @squares[from].downcase == 'p' || @squares[to] ? 0 : @halfmove + 1
+    end
+
     def promoted(type)
       @side == 'w' ? type.upcase : type
     end
@@ -163,13 +179,13 @@ module ChessRules
     end
 
     def reaches?(from, target, directions)
-      directions.any? do |file_step, rank_step|
-        square = ChessRules.offset(from, file_step, rank_step)
-        while square && square != target && @squares[square].nil?
-          square = ChessRules.offset(square, file_step, rank_step)
-        end
-        square == target
-      end
+      directions.any? { |file_step, rank_step| ray_reaches?(from, target, file_step, rank_step) }
+    end
+
+    def ray_reaches?(from, target, file_step, rank_step)
+      square = ChessRules.offset(from, file_step, rank_step)
+      square = ChessRules.offset(square, file_step, rank_step) while square && square != target && @squares[square].nil?
+      square == target
     end
   end
 end

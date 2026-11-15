@@ -79,7 +79,7 @@ class TestVariationBuilder < Minitest::Test
     analysis_data = {
       best_move_analysis: {
         move: 'g1f3',
-        variation: %w[b8c6 f1c4]
+        variation: %w[b8c6 e2e4]
       },
       best_score: 50,
       played_score: -100,

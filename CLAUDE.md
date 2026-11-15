@@ -51,6 +51,7 @@ The app can run publicly (see README "Running It Publicly"):
 
 `deploy/CLAUDE.md` and `stockfish-pool/CLAUDE.md` hold the guidance for those directories.
 - **racc:** `pgn2` needs `racc`, which must stay in the Gemfile; production bundles without development gems otherwise fail to boot.
+- **Chess rules:** `lib/chess_rules/` (`ChessRules`) is the source for stockfish-pool's `StockfishPool::Rules`. Edit `position.rb`, `moves.rb` and `position_check.rb` there and run `bin/sync-chess-rules`; never edit the pool's copies (CI runs `bin/sync-chess-rules --check`). `san.rb` is app-only.
 - **stockfish-pool lint:** CI lints `stockfish-pool/` with the root config (`bin/rubocop` forces it), so test exclusions for `stockfish-pool/test` live in the root `.rubocop.yml` too.
 
 ### Stockfish Engine

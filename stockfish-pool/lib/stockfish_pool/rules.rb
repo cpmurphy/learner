@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
-# The main app keeps a copy of these rules as ChessRules (lib/chess_rules).
-# Change both copies together until they are extracted into one gem.
+# position.rb, moves.rb and position_check.rb here are generated from the main
+# app's ChessRules (lib/chess_rules) by bin/sync-chess-rules: edit those and
+# run the script, rather than editing these.
 
 require_relative 'rules/position'
 require_relative 'rules/moves'

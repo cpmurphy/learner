@@ -3,7 +3,8 @@
 require_relative 'position'
 
 module ChessRules
-  # Decides whether a UCI move (already shaped like one) is legal.
+  # Decides whether a UCI move (already shaped like one) is legal, and lists
+  # the legal moves of a position.
   module Moves
     # King from and to => [castling right, rook square, squares that must be
     # empty, squares the king stands on or crosses, which must not be attacked].
@@ -14,7 +15,46 @@ module ChessRules
       [60, 58] => ['q', 56, [57, 58, 59], [60, 59, 58]]
     }.freeze
 
+    PROMOTIONS = %w[q r b n].freeze
+
     module_function
+
+    # Every legal move in +position+, in UCI.
+    def legal_moves(position)
+      pseudo_legal_moves(position).select { |uci| legal?(position, uci) }
+    end
+
+    # Moves that follow the pieces' movement rules (castling included) but may
+    # leave the mover's king in check.
+    def pseudo_legal_moves(position)
+      (0..63).select { |square| own_piece?(position, square) }.flat_map do |from|
+        targets(position, from).flat_map do |to|
+          promotions(position, from, to).filter_map do |promotion|
+            uci(from, to, promotion) if reachable?(position, from, to, promotion)
+          end
+        end
+      end
+    end
+
+    # Squares a piece could move to, before checking its movement rules.
+    def targets(position, from)
+      candidates = position[from].downcase == 'p' ? pawn_targets(position, from) : (0..63).to_a
+      candidates.select { |to| to != from && enterable?(position, to) }
+    end
+
+    def pawn_targets(position, from)
+      forward = position.side == 'w' ? 1 : -1
+      one = ChessRules.offset(from, 0, forward)
+      [one, one && ChessRules.offset(one, 0, forward), *position.pawn_attacks(from, position.side)].compact
+    end
+
+    def promotions(position, from, to)
+      position[from].downcase == 'p' && [0, 7].include?(to / 8) ? PROMOTIONS : [nil]
+    end
+
+    def uci(from, to, promotion = nil)
+      "#{ChessRules.square_name(from)}#{ChessRules.square_name(to)}#{promotion}"
+    end
 
     def legal?(position, uci)
       from = ChessRules.square(uci[0, 2])

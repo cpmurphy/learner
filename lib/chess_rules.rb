@@ -1,12 +1,14 @@
 # frozen_string_literal: true
 
-# A copy of stockfish-pool's StockfishPool::Rules (stockfish-pool/lib/stockfish_pool/rules),
-# kept separate so the pool can leave this repository. Change both copies
-# together until they are extracted into one gem.
+# The app's copy of the chess rules stockfish-pool also uses (as
+# StockfishPool::Rules), kept separate so the pool can leave this repository.
+# Edit the files here, then run bin/sync-chess-rules to update the pool's copy;
+# CI checks they match. san.rb is app-only.
 
 require_relative 'chess_rules/position'
 require_relative 'chess_rules/moves'
 require_relative 'chess_rules/position_check'
+require_relative 'chess_rules/san'
 
 module ChessRules
   # The position or a move is not legal chess.
