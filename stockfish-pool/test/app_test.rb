@@ -53,6 +53,24 @@ class AppTest < Minitest::Test
     assert_equal 'invalid_request', body['error']
   end
 
+  # Stockfish would silently skip an illegal move, or may crash on an illegal
+  # position, so neither reaches a worker.
+  def test_rejects_illegal_moves_and_positions_with_422
+    searches_before = FakeWorker.registry.sum { |worker| worker.searches.size }
+    [
+      [{ fen: START_FEN, moves: %w[e2e4 e2e4] }, 'Illegal move e2e4 (moves[1])'],
+      [{ fen: '4k3/1P6/8/8/8/8/8/4K3 w - - 0 1', moves: %w[b7b8] }, 'Illegal move b7b8 (moves[0])'],
+      [{ fen: '8/8/8/3kK3/8/8/8/8 w - - 0 1' }, 'Illegal position: the side not to move is in check'],
+      [{ fen: '4k3/8/8/8/8/8/8/4K3 w KQkq - 0 1' }, /\AIllegal position: castling right K/]
+    ].each do |body, message|
+      response = analyze(body)
+
+      assert_equal 422, last_response.status, body.to_s
+      assert_match message.is_a?(Regexp) ? message : /\A#{Regexp.escape(message)}\z/, response['message']
+    end
+    assert_equal(searches_before, FakeWorker.registry.sum { |worker| worker.searches.size })
+  end
+
   def test_rejects_bad_json_and_large_bodies
     analyze('{not json')
 

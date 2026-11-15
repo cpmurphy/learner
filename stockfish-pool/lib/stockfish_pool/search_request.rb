@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative 'input_validator'
+require_relative 'rules'
 
 module StockfishPool
   class InvalidRequest < StandardError; end
@@ -27,9 +28,12 @@ module StockfishPool
 
       lane = parse_lane(params['lane'])
       limits = @config.lane(lane)
+      fen = parse_fen(params['fen'])
+      moves = parse_moves(params['moves'])
+      check_legality(fen, moves)
       SearchRequest.new(
-        fen: parse_fen(params['fen']),
-        moves: parse_moves(params['moves']),
+        fen: fen,
+        moves: moves,
         lane: lane,
         subject: parse_subject(params['subject']),
         **clamped_limits(params, limits)
@@ -66,6 +70,14 @@ module StockfishPool
       raise InvalidRequest, 'Invalid UCI move' unless moves.all? { |move| InputValidator.valid_uci_move?(move) }
 
       moves.map { |move| move.dup.freeze }.freeze
+    end
+
+    # Stockfish may crash on an illegal position, and it silently stops
+    # reading moves at the first illegal one, so neither may reach it.
+    def check_legality(fen, moves)
+      Rules.check!(fen, moves)
+    rescue Rules::IllegalInput => e
+      raise InvalidRequest, e.message
     end
 
     def parse_subject(subject)
