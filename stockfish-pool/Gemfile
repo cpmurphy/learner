@@ -8,6 +8,7 @@ gem 'sinatra', '>= 4.0'
 
 group :development, :test do
   gem 'minitest'
+  gem 'prop_check'
   gem 'rack-test'
   gem 'rake'
   gem 'rubocop', require: false

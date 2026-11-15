@@ -2,6 +2,7 @@
 
 require_relative 'stockfish_pool/config'
 require_relative 'stockfish_pool/input_validator'
+require_relative 'stockfish_pool/rules'
 require_relative 'stockfish_pool/search_request'
 require_relative 'stockfish_pool/info_parser'
 require_relative 'stockfish_pool/uci_process'

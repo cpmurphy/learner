@@ -44,7 +44,15 @@ All `/v1` endpoints need `Authorization: Bearer <token>` and
 }
 ```
 
-Only `fen` is required. `moves` are UCI moves played from `fen`. `lane`
+Only `fen` is required. `moves` are UCI moves played from `fen`.
+The position and every move must be legal chess, or the request is refused
+with `422` and a message saying what is wrong (Stockfish may crash on an
+illegal position, and it silently skips illegal moves). Legal means: no pawns
+on the first or last rank, no more material than a game can produce, the side
+not to move not in check, at most two pieces giving check, castling rights only
+with the king and rook on their starting squares, and an en passant square
+only just behind a pawn that could have made a double step. A promotion must
+name its piece (`e7e8q`). `lane`
 defaults to `interactive`. Limits that are omitted use the lane defaults, and
 limits that are too high are clamped to the lane's maximum. `subject` is
 `[A-Za-z0-9_-]{1,64}` and turns on the per-subject quota.
@@ -73,7 +81,7 @@ Scores are from the side to move's point of view, as UCI reports them:
 | 401 | `unauthorized` | Missing or wrong token |
 | 413 | `payload_too_large` | Body over 16 KB |
 | 415 | `unsupported_media_type` | Content-Type isn't `application/json` |
-| 422 | `invalid_request` | Bad FEN, move, lane, limit or subject |
+| 422 | `invalid_request` | Bad FEN, move, lane, limit or subject, an illegal position, or an illegal move |
 | 429 | `busy` / `quota_exceeded` | Queue full, wait timed out, global budget or subject quota used up. See `Retry-After` |
 | 503 | `engine_unavailable` | No worker can serve the lane, or the engine failed mid-search. Safe to retry |
 
@@ -121,5 +129,13 @@ API_TOKENS=dev-token-0123456789abcdefgh bundle exec puma -C config/puma.rb
 ```
 
 Run a single Puma process: the pool lives in that process.
+
+`test/stockfish_property_test.rb` holds property tests (prop_check) that send
+generated positions to real Stockfish over HTTP. The positions come from
+`test/support/edge_case_generators.rb`: promotions on every file to every
+piece, en passant on every file (including captures a pin makes illegal),
+checkmates and stalemates, each with the move before and the move after.
+`test/support/chess_model.rb` is the rules oracle the tests check answers
+against. `PROP_RUNS` (default 25) and `PROP_DEPTH` (default 8) tune the runs.
 
 The container image and Quadlet units come in a later change.
