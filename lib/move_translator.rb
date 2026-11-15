@@ -52,7 +52,7 @@ class MoveTranslator
       @clock.update_clocks(@board.current_player, piece, capture)
       from = find_source_square(piece, capture, to, file_hint, rank_hint)
       result = handle_regular_move(from, to, piece, capture, promotion)
-      @board.update_castling_status(piece, from)
+      @board.update_castling_status(piece, from, to)
     when /^--$/
       # passing move
       result = { moves: [] }

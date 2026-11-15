@@ -42,9 +42,9 @@ class AnalyzerTest < Minitest::Test
 
   def test_evaluate_move_returns_move_with_score_and_notation
     @mock_engine.expect :multipv, nil, [1]
-    @mock_engine.expect :execute, nil, ["position fen #{START_FEN} moves h6h3"]
+    @mock_engine.expect :execute, nil, ["position fen #{START_FEN} moves g1f3"]
     @mock_engine.expect :execute, standard_analysis, ["go depth #{Analyzer::DEFAULT_DEPTH} nodes #{Analyzer::MAX_NODES}"]
-    result = @analyzer.evaluate_move(START_FEN, 'h6h3')
+    result = @analyzer.evaluate_move(START_FEN, 'g1f3')
 
     assert_includes result.keys, :score
     assert_includes result.keys, :move
@@ -98,6 +98,18 @@ class AnalyzerTest < Minitest::Test
     assert_raises(Analyzer::InvalidInputError) { @analyzer.best_moves(injected) }
     assert_raises(Analyzer::InvalidInputError) { @analyzer.evaluate_move(injected, 'e2e4') }
     assert_raises(Analyzer::InvalidInputError) { @analyzer.evaluate_move(START_FEN, "e2e4\nquit") }
+    @mock_engine.verify
+  end
+
+  # Stockfish may crash on an illegal position and silently skips an illegal move.
+  def test_rejects_illegal_positions_and_moves_without_touching_engine
+    error = assert_raises(Analyzer::InvalidInputError) { @analyzer.best_moves('8/8/8/3kK3/8/8/8/8 w - - 0 1') }
+
+    assert_equal 'Illegal position: the side not to move is in check', error.message
+    error = assert_raises(Analyzer::InvalidInputError) { @analyzer.evaluate_move(START_FEN, 'e2e5') }
+
+    assert_equal 'Illegal move e2e5 (moves[0])', error.message
+    assert_raises(Analyzer::InvalidInputError) { @analyzer.evaluate_move('4k3/1P6/8/8/8/8/8/4K3 w - - 0 1', 'b7b8') }
     @mock_engine.verify
   end
 

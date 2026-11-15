@@ -81,8 +81,8 @@ module Translator
       @castling.valid_castling?(from, to)
     end
 
-    def update_castling_status(piece, from)
-      @castling.update_castling_status(piece, from)
+    def update_castling_status(piece, from, to)
+      @castling.update_castling_status(piece, from, to)
     end
 
     def remove_all_castling_rights

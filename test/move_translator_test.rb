@@ -183,6 +183,27 @@ class MoveTranslatorTest < Minitest::Test
     assert_equal('rnb2rk1/ppppn1pp/4p1p1/8/7q/b3PK2/PPPPQPPP/RNB3NR w - - 4 7', @translator.board_as_fen)
   end
 
+  def test_capturing_a_rook_on_its_starting_square_loses_that_castling_right
+    @translator.translate_moves(%w[g3 b6 Bg2 e6])
+    @translator.translate_move('Bxa8')
+
+    assert_equal('Bnbqkbnr/p1pp1ppp/1p2p3/8/8/6P1/PPPPPP1P/RNBQK1NR b KQk - 0 3', @translator.board_as_fen)
+  end
+
+  def test_capturing_a_rook_while_promoting_loses_that_castling_right
+    @translator.load_game_from_fen('r3k2r/8/8/8/8/8/1p6/R3K2R b KQkq - 0 1')
+    @translator.translate_move('bxa1=Q')
+
+    assert_equal('r3k2r/8/8/8/8/8/8/q3K2R w Kkq - 0 2', @translator.board_as_fen)
+  end
+
+  def test_moving_one_rook_keeps_the_other_sides_right
+    @translator.load_game_from_fen('r3k2r/8/8/8/8/8/8/R3K2R w K - 0 1')
+    @translator.translate_move('Ra2')
+
+    assert_equal('r3k2r/8/8/8/8/8/R7/4K2R b K - 1 1', @translator.board_as_fen)
+  end
+
   def test_when_black_promotes
     @translator.translate_moves(%w[b4 a5 c3 axb4 Nf3 bxc3 g3 c2 Bg2])
     result = @translator.translate_move('cxb1=Q')

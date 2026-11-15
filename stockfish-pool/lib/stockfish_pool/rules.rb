@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# The main app keeps a copy of these rules as ChessRules (lib/chess_rules).
+# Change both copies together until they are extracted into one gem.
+
 require_relative 'rules/position'
 require_relative 'rules/moves'
 require_relative 'rules/position_check'

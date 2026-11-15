@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative 'uci_input_validator'
+require_relative 'chess_rules'
 require_relative 'env_setting'
 require 'timeout'
 
@@ -55,13 +56,12 @@ class Analyzer
   end
 
   def best_moves(fen, multipv = DEFAULT_MULTIPV)
-    UciInputValidator.validate_fen!(fen)
+    check_input!(fen)
     with_backend('Analysis') { |backend| backend.best_moves(fen, multipv: multipv, depth: @depth) }
   end
 
   def evaluate_move(fen, move)
-    UciInputValidator.validate_fen!(fen)
-    UciInputValidator.validate_uci_move!(move) if move
+    check_input!(fen, move)
     with_backend('Move evaluation') do |backend|
       backend.evaluate_move(fen, move, depth: @depth, nodes: @max_nodes)
     end[0]
@@ -114,6 +114,17 @@ class Analyzer
   end
 
   private
+
+  # Shape first, so nothing malformed is parsed or sent; then legality, because
+  # Stockfish may crash on an illegal position and silently skips an illegal
+  # move (analysing the position before it instead).
+  def check_input!(fen, move = nil)
+    UciInputValidator.validate_fen!(fen)
+    UciInputValidator.validate_uci_move!(move) if move
+    ChessRules.check!(fen, move ? [move] : [])
+  rescue ChessRules::IllegalInput => e
+    raise InvalidInputError, e.message
+  end
 
   def with_backend(action)
     initialize_backend unless @backend
