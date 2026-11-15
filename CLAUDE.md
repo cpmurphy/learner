@@ -18,12 +18,6 @@ The application consists of a Ruby/Sinatra backend serving a REST API and a vani
 ### Ruby Backend
 
 ```bash
-# Install dependencies
-bundle install
-
-# Run tests
-bundle exec rake test
-
 # Run a single test file
 bundle exec ruby -Ilib:test test/game_editor_test.rb
 
@@ -38,20 +32,8 @@ bundle exec rubocop
 ### JavaScript Frontend
 
 ```bash
-# Install dependencies
-npm install
-
-# Copy third-party assets (cm-chessboard, chess.js)
+# Copy third-party assets (cm-chessboard, chess.js) after npm install
 npm run copy-all
-
-# Run JavaScript tests
-npm test
-
-# Run tests once (non-watch mode)
-npm run test_once
-
-# Run tests with coverage
-npm run coverage
 ```
 
 ### Public-site hardening
@@ -65,105 +47,17 @@ The app can run publicly (see README "Running It Publicly"):
 - **Analysis cache:** `lib/annotation_cache.rb` keeps whole-game analysis per library file (keyed by path, size and mtime) and hands each session a `Marshal` copy.
 - Rack::Protection (including `HttpOrigin`, the CSRF defence for owner routes) is on only in production, as before; `test/app_owner_test.rb` enables it to test cross-site requests behind proxy headers.
 
-### Deployment (deploy/)
+### Deployment and the engine service
 
-`deploy/` holds the public deployment: Quadlet units for rootless Podman (`deploy/quadlet/`), env-file templates, a Caddy site block, `build-images.sh`, `check-host.sh` and `remote-install.sh`. Its guide is `deploy/README.md`.
-- `bin/deploy.sh` deploys from a workstation: it builds the images, ships them with `deploy/` over ssh, and runs `deploy/remote-install.sh` on the server, with rollback via `:good`/`:previous` image tags. Its settings are in the gitignored `deploy_env.sh` (template: `deploy/deploy_env.sh.example`).
-- `test/remote_install_test.rb` exercises `remote-install.sh` against the fake `podman`/`systemctl` in `test/support/deploy/`.
-- **Images:** the `Dockerfile` has two targets. `app` has no Stockfish and is used with `ENGINE_URL`; `standalone` is the default and includes Stockfish. `stockfish-pool/Containerfile` is built from the repository root.
-- **TRUSTED_PROXIES:** rootless Podman delivers connections to a published port from the container's *own* address. That's why the app has a fixed IP on `sf-web` (10.89.10.2) and `TRUSTED_PROXIES` names it.
+`deploy/CLAUDE.md` and `stockfish-pool/CLAUDE.md` hold the guidance for those directories.
 - **racc:** `pgn2` needs `racc`, which must stay in the Gemfile; production bundles without development gems otherwise fail to boot.
-
-### Engine service (stockfish-pool/)
-
-`stockfish-pool/` is a self-contained HTTP/JSON service (own Gemfile, tests and `.rubocop.yml`) that runs a fixed, sandboxable pool of Stockfish engines. `stockfish-pool/client/` is its client gem, which the app uses as a path gem. Run its tests with `cd stockfish-pool && bundle exec rake test`. CI lints it with the root config (`bin/rubocop` forces it), so test exclusions for `stockfish-pool/test` live in the root `.rubocop.yml` too.
+- **stockfish-pool lint:** CI lints `stockfish-pool/` with the root config (`bin/rubocop` forces it), so test exclusions for `stockfish-pool/test` live in the root `.rubocop.yml` too.
 
 ### Stockfish Engine
 
 The Stockfish directory contains a git submodule for the Stockfish chess engine. This is built separately and not modified as part of this project. The application uses an internal `StockfishEngine` class (lib/stockfish_engine.rb) to communicate with the Stockfish binary via UCI protocol, rather than using the `stockfish` gem. This approach provides better compatibility with Stockfish 17+ and avoids frozen string literal issues.
 
-## Architecture
-
-### Backend Structure (Ruby/Sinatra)
-
-**app.rb** - Main Sinatra application
-- Manages PGN file discovery from `PGN_DIR` environment variable
-- Provides REST API endpoints for game navigation and file upload
-- Stores game state in session (current game, move index)
-- Automatically analyzes games without $201 annotations using Stockfish
-
-Key API endpoints:
-- `GET /api/pgn_files` - List available PGN files in PGN_DIR
-- `POST /api/upload_pgn` - Upload and validate a PGN file (doesn't save yet)
-- `POST /api/analyze_and_save` - Annotate a PGN with Stockfish and save to PGN_DIR
-  - Accepts either file upload or JSON with `pgn_content` and `filename`
-  - Automatically adds blunder annotations ($201) and variations
-  - Generates unique filename with timestamp to prevent collisions
-  - Sanitizes filenames and ensures files stay within PGN_DIR boundary
-  - Returns success with saved filename and path
-
-**lib/game_editor.rb** - Game annotation and modification
-- `add_blunder_annotations(game)` - Analyzes a game with Stockfish to find blunders (moves losing >1.4 pawns), adds $201 annotations, and adds variations showing the best move
-- `shift_critical_annotations(game)` - Moves $201 annotations to the correct move (the PGN parser may associate them with the previous move)
-- When a blunder is detected, creates a variation with the best move in SAN format and adds a comment explaining the advantage
-
-**lib/analyzer.rb** - Stockfish engine wrapper
-- Uses a pluggable backend: `LocalBackend` (lib/analyzer/local_backend.rb) runs Stockfish in-process; `RemoteBackend` (lib/analyzer/remote_backend.rb) calls the `stockfish-pool` service when `ENGINE_URL` (plus `ENGINE_TOKEN`) is set. Both return the same result hashes
-- Options `lane:` (`:interactive`/`:batch`) and `subject:` (hashed client IP) only matter for the remote backend; `Analyzer::BusyError` (with `retry_after`) means the service is at capacity
-- `best_moves(fen, multipv)` - Returns the top N moves for a position
-- `evaluate_move(fen, move)` - Evaluates a specific move from a position
-- `good_enough_move?(fen, user_move_uci, good_move_uci)` - Determines if a user's alternative move is acceptable (>250cp advantage OR >80% as good as the suggested move)
-- Contains `AnalysisParser` class that parses Stockfish UCI output
-
-**lib/stockfish_engine.rb** - Internal UCI engine implementation
-- Replaces the stockfish gem with a lightweight internal implementation
-- Directly communicates with Stockfish via UCI (Universal Chess Interface) protocol
-- `execute(command)` - Sends UCI commands and returns output
-- `analyze(fen, depth:)` - Analyzes a position and returns full engine output
-- `multipv(value)` - Sets the MultiPV option for multiple variations
-- Compatible with Stockfish 17+ without requiring gem patches
-
-**lib/move_translator.rb** - Converts between PGN notation and UCI format
-- Maintains internal board state and validates moves
-- `translate_move(pgn_move)` - Converts SAN notation (e.g., "Nf3", "exd5") to UCI format (e.g., "g1f3", "e4d5")
-- `board_as_fen` - Generates FEN representation of current board state
-- `load_game_from_fen(fen)` - Initializes board from FEN string
-
-**lib/translator/** - Supporting modules for move translation
-- **board.rb** - Board state, piece positions, castling rights, en passant tracking
-- **move_validator.rb** - Validates if a move is legal given the current board state
-- **castling.rb** - Castling rights management
-- **attack_detector.rb** - Check and attack detection
-- **clock.rb** - Halfmove clock and fullmove number tracking
-
-**lib/app_helpers.rb** - Helper methods for the Sinatra application
-- `find_critical_moment_position_index` - Finds the next $201-annotated move for a given side
-- `get_last_move_info` - Returns detailed info about the move that led to the current position
-
-**lib/pgn_writer.rb** - PGN serialization
-- `write(game)` - Serializes a PGN::Game object to PGN format string
-- Handles tags, moves, annotations ($201, etc.), comments, and variations
-- Wraps movetext at 80 characters per PGN standard
-- Used for saving annotated games back to disk
-
-**lib/uci_to_san_converter.rb** - UCI to SAN move conversion
-- `convert(fen, uci_move)` - Converts UCI format moves (e.g., "e2e4") to SAN format (e.g., "e4")
-- Handles pawn moves, piece moves, captures, castling, promotions, and disambiguation
-- Used by GameEditor to convert Stockfish UCI output to PGN-compatible SAN notation for variations
-
-### Frontend Structure (JavaScript)
-
-The frontend is vanilla JavaScript (no framework) located in `public/`:
-- **index.html** - Main HTML file
-- **scripts/** - JavaScript modules
-- **styles/** - CSS files
-- **3rdparty-assets/** - Third-party library assets (cm-chessboard, chess.js)
-
-The UI uses:
-- `cm-chessboard` npm package for board rendering
-- `chess.js` npm package for move validation on the client side
-
-### Key Concepts
+## Key Concepts
 
 **Position Index vs Move Index:**
 - The `session[:current_move_index]` represents the position index (0 = starting position)
@@ -175,36 +69,9 @@ The UI uses:
 - Critical moments are blunders or important positions marked with the $201 NAG (Numeric Annotation Glyph)
 - These are either annotated manually in SCID or automatically detected by the `GameEditor`
 - When a critical moment is found, variations in the PGN provide the suggested better move
-- The shift_critical_annotations method ensures $201 is on the correct move
-
-**Move Translation Flow:**
-1. PGN moves are in Standard Algebraic Notation (SAN): "Nf3", "e4", "O-O"
-2. MoveTranslator converts SAN to UCI format: "g1f3", "e2e4", "e1g1"
-3. UCI format is used for Stockfish analysis
-4. The translator maintains board state to disambiguate moves
-
-**Blunder Detection:**
-- A blunder is detected when the evaluation drops by more than 140 centipawns (1.4 pawns)
-- For White: blunder when best_score - played_score > 140
-- For Black: blunder when played_score - best_score > 140 (scores are from White's perspective)
-
-## Testing Patterns
-
-**Ruby Tests (Minitest):**
-- Test files end with `_test.rb`
-- Tests inherit from `Minitest::Test`
-- Use `test/test_helper.rb` for SimpleCov setup
-- Tests use Minitest's assertion methods: `assert_equal`, `assert`, `refute`, etc.
-
-**JavaScript Tests (Vitest):**
-- Vitest is configured for browser-like testing with jsdom
-- Tests can be run in watch mode or once
+- The PGN parser may attach $201 to the previous move; `shift_critical_annotations` moves it to the correct one
 
 ## Important Notes
 
-- The Stockfish directory is a git submodule and should not be modified
-- The application uses an internal StockfishEngine class (lib/stockfish_engine.rb) instead of the stockfish gem for better Stockfish 17+ compatibility
-- The application requires the `PGN_DIR` environment variable to load games
 - Sessions store the entire parsed game object, so they can be large
-- The frontend expects UCI move format for communication with Stockfish
 - When writing tests for move translation, ensure board state is properly maintained across multiple moves
