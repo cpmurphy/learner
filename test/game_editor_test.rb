@@ -735,4 +735,37 @@ class TestGameEditor < Minitest::Test
 
     mock_analyzer.verify
   end
+
+  # A backend that records every move the analyzer sends it, so the real
+  # Analyzer (with its input checks) runs without an engine.
+  class RecordingBackend
+    attr_reader :moves
+
+    def initialize
+      @moves = []
+    end
+
+    def best_moves(_fen, **)
+      [{ score: 0, move: 'a1a1', variation: [] }]
+    end
+
+    def evaluate_move(_fen, move, **)
+      @moves << move
+      [{ score: 0, move: 'a1a1', variation: [] }]
+    end
+
+    def close; end
+  end
+
+  # The translator used to write White promotions in upper case (b7a8Q),
+  # which the analyzer refuses, so annotating such a game failed.
+  def test_annotates_a_game_in_which_white_promotes
+    game = PGN.parse("[Result \"*\"]\n\n1. e4 d5 2. exd5 c6 3. dxc6 Qd7 4. cxb7 Kd8 5. bxa8=Q *\n").first
+    backend = RecordingBackend.new
+    Analyzer.stub :new, Analyzer.new(backend: backend) do
+      @editor.add_blunder_annotations(game)
+    end
+
+    assert_equal 'b7a8q', backend.moves.last
+  end
 end

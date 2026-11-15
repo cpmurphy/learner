@@ -38,9 +38,19 @@ class GameLegalityTest < Minitest::Test
   end
 
   def test_rejects_castling_through_or_out_of_check
-    assert_match(/castle out of or through check/, problem('1. g3 b6 2. Bg2 Ba6 3. Nf3 e6 4. e4 c6 5. O-O'))
+    assert_match(/castle out of, through or into check/, problem('1. g3 b6 2. Bg2 Ba6 3. Nf3 e6 4. e4 c6 5. O-O'))
     # Qe4+ checks along the e-file; g1 and f1 are safe, so only the check matters.
-    assert_match(/castle out of or through check/, problem('1. e4 d5 2. exd5 Qxd5 3. Nf3 Nf6 4. Bc4 Qe4+ 5. O-O'))
+    assert_match(/castle out of, through or into check/, problem('1. e4 d5 2. exd5 Qxd5 3. Nf3 Nf6 4. Bc4 Qe4+ 5. O-O'))
+  end
+
+  def test_rejects_castling_after_the_king_has_moved
+    assert_equal 'Move 6. O-O is not legal: castling is no longer allowed.',
+                 problem('1. e4 e5 2. Ke2 Ke7 3. Ke1 Ke8 4. Nf3 Nf6 5. Bc4 Bc5 6. O-O')
+  end
+
+  def test_rejects_castling_after_the_rook_was_captured
+    assert_equal 'Move 4... O-O is not legal: castling is no longer allowed.',
+                 problem('1. b3 g5 2. Bb2 Bg7 3. Bxg7 Nf6 4. Bxh8 O-O')
   end
 
   def test_rejects_null_moves
@@ -49,6 +59,7 @@ class GameLegalityTest < Minitest::Test
 
   def test_rejects_a_pawn_reaching_the_last_rank_without_promoting
     assert_match(/not legal/, problem('1. e4 d5 2. exd5 c6 3. dxc6 Qd7 4. cxb7 Kd8 5. b8'))
+    assert_nil problem('1. e4 d5 2. exd5 c6 3. dxc6 Qd7 4. cxb7 Kd8 5. bxa8=N')
   end
 
   def test_rejects_a_set_up_starting_position

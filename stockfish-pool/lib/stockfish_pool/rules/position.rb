@@ -68,6 +68,13 @@ module StockfishPool
         @squares[square]
       end
 
+      # The piece-placement field of a FEN for this board.
+      def placement
+        @squares.each_slice(8).reverse_each.map do |rank|
+          rank.map { |piece| piece || '1' }.join.gsub(/1+/) { |run| run.length.to_s }
+        end.join('/')
+      end
+
       def opponent
         Rules.opponent(@side)
       end
