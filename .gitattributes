@@ -1,0 +1,7 @@
+# Check out text files with LF line endings on every platform, Windows
+# included: the container build copies this tree into a Linux image, where
+# scripts with CRLF endings fail ("/usr/bin/env: 'ruby\r'").
+* text=auto eol=lf
+
+# Windows batch files are the exception.
+*.bat text eol=crlf
