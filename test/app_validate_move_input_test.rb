@@ -41,6 +41,33 @@ class AppValidateMoveInputTest < Minitest::Test
     assert_equal 400, last_response.status
   end
 
+  def test_rejects_illegal_moves_before_starting_an_engine
+    {
+      { fen: START_FEN, user_move_uci: 'e2e5', good_move_uci: 'd2d4' } => 'Illegal move e2e5 (moves[0])',
+      { fen: START_FEN, user_move_uci: 'e2e4', good_move_uci: 'e1g1' } => 'Illegal move e1g1 (moves[0])',
+      { fen: '4k3/1P6/8/8/8/8/8/4K3 w - - 0 1', user_move_uci: 'b7b8', good_move_uci: 'b7b8q' } =>
+        'Illegal move b7b8 (moves[0])'
+    }.each do |body, message|
+      post_validate(body)
+
+      assert_equal 400, last_response.status, body.to_s
+      assert_equal message, JSON.parse(last_response.body)['error']
+    end
+  end
+
+  def test_rejects_illegal_positions_before_starting_an_engine
+    {
+      '8/8/8/3kK3/8/8/8/8 w - - 0 1' => 'Illegal position: the side not to move is in check',
+      '4k3/8/8/8/8/8/8/4K3 w KQkq - 0 1' =>
+        'Illegal position: castling right K needs the king and rook on their starting squares'
+    }.each do |fen, message|
+      post_validate(fen: fen, user_move_uci: 'e1e2', good_move_uci: 'e1d1')
+
+      assert_equal 400, last_response.status, fen
+      assert_equal message, JSON.parse(last_response.body)['error']
+    end
+  end
+
   private
 
   def post_validate(body)

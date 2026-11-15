@@ -9,6 +9,7 @@ require 'securerandom'
 require_relative 'lib/game_editor'
 require_relative 'lib/app_helpers' # Require the new helpers
 require_relative 'lib/analyzer'
+require_relative 'lib/chess_rules'
 require_relative 'lib/pgn_reader'
 require_relative 'lib/annotation_cache'
 require_relative 'lib/analysis_slots'
@@ -767,7 +768,20 @@ class LearnerApp < Sinatra::Base
       return json_response({ error: 'Invalid fen or move format' }, 400)
     end
 
+    illegal = illegal_critical_move_input(fen, user_move_uci, good_move_uci)
+    return json_response({ error: illegal }, 400) if illegal
+
     validate_and_get_continuation(fen, user_move_uci, good_move_uci)
+  end
+
+  # The FEN and both moves come from the browser. Check them before any engine
+  # starts: Stockfish may crash on an illegal position and silently skips an
+  # illegal move. Returns the problem, or nil when all three are legal.
+  def illegal_critical_move_input(fen, user_move_uci, good_move_uci)
+    [user_move_uci, good_move_uci].each { |move| ChessRules.check!(fen, [move]) }
+    nil
+  rescue ChessRules::IllegalInput => e
+    e.message
   end
 
   def validate_and_get_continuation(fen, user_move_uci, good_move_uci)
@@ -784,6 +798,8 @@ class LearnerApp < Sinatra::Base
       json_response(response)
     rescue Analyzer::BusyError => e
       engine_busy_response(e)
+    rescue Analyzer::InvalidInputError => e
+      json_response({ error: e.message }, 400)
     rescue Analyzer::EngineError => e
       json_response({ error: "Analysis engine error: #{e.message}" }, 500)
     ensure

@@ -3,6 +3,9 @@
 module Translator
   # Manages castling rights and validation
   class Castling
+    # The castling right each rook's starting square carries.
+    CORNER_RIGHTS = { 'h1' => 'K', 'a1' => 'Q', 'h8' => 'k', 'a8' => 'q' }.freeze
+
     def initialize(board)
       @board = board
     end
@@ -26,13 +29,13 @@ module Translator
       true
     end
 
-    def update_castling_status(piece, from)
-      case piece.upcase
-      when 'K'
-        remove_all_castling_rights
-      when 'R'
-        remove_castling_rights_for_rook_move(from)
-      end
+    # Called before the move, while the board's current player is the mover.
+    # A king move loses the mover's rights. Any move from or to a rook's
+    # starting square loses that square's right: either the rook has left it or
+    # it has just been captured there.
+    def update_castling_status(piece, from, to)
+      remove_all_castling_rights if piece.upcase == 'K'
+      [from, to].each { |square| remove_castling_right(CORNER_RIGHTS[square]) }
     end
 
     def remove_all_castling_rights
@@ -71,21 +74,11 @@ module Translator
       path.none? { |square| @board[square] }
     end
 
-    def remove_castling_rights_for_rook_move(from)
-      castling_effect = {
-        'h1' => { side: :white, keep: 'Q', rights: @board.white_castle_moves_allowed },
-        'a1' => { side: :white, keep: 'K', rights: @board.white_castle_moves_allowed },
-        'h8' => { side: :black, keep: 'q', rights: @board.black_castle_moves_allowed },
-        'a8' => { side: :black, keep: 'k', rights: @board.black_castle_moves_allowed }
-      }[from]
+    def remove_castling_right(right)
+      return unless right
 
-      return unless castling_effect && castling_effect[:rights]
-
-      if castling_effect[:side] == :white
-        @board.white_castle_moves_allowed = castling_effect[:rights].length > 1 ? castling_effect[:keep] : ''
-      else
-        @board.black_castle_moves_allowed = castling_effect[:rights].length > 1 ? castling_effect[:keep] : ''
-      end
+      @board.white_castle_moves_allowed = @board.white_castle_moves_allowed.delete(right)
+      @board.black_castle_moves_allowed = @board.black_castle_moves_allowed.delete(right)
     end
   end
 end
