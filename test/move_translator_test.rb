@@ -83,21 +83,13 @@ class MoveTranslatorTest < Minitest::Test
   end
 
   def test_promotion_to_queen
-    board = Translator::Board.new
-    @translator = MoveTranslator.new(board)
-    board.squares['a7'] = 'P'
-    board.squares['a8'] = nil
-    board.current_player = :white
+    @translator.load_game_from_fen('4k3/P7/8/8/8/8/8/4K3 w - - 0 1')
 
     assert_equal('a7a8q', @translator.translate_move('a8=Q'))
   end
 
   def test_promotion_to_knight
-    board = Translator::Board.new
-    @translator = MoveTranslator.new(board)
-    board.squares['a7'] = 'P'
-    board.squares['a8'] = nil
-    board.current_player = :white
+    @translator.load_game_from_fen('4k3/P7/8/8/8/8/8/4K3 w - - 0 1')
 
     assert_equal('a7a8n', @translator.translate_move('a8=N'))
   end

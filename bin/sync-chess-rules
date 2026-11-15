@@ -1,0 +1,54 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Keeps stockfish-pool's copy of the chess rules in step with the app's.
+#
+# The app's ChessRules (lib/chess_rules/) is the copy to edit. This writes
+# stockfish-pool's StockfishPool::Rules (stockfish-pool/lib/stockfish_pool/rules/)
+# from it: the same code, nested one module deeper, with Rules. for ChessRules.
+# Only the files both copies share are synced; lib/chess_rules/san.rb is app-only,
+# and each copy keeps its own entry file (lib/chess_rules.rb, rules.rb).
+#
+#   bin/sync-chess-rules          rewrite the pool's copy
+#   bin/sync-chess-rules --check  exit 1 if the pool's copy is out of date (for CI)
+
+ROOT = File.expand_path('..', __dir__)
+APP_DIR = File.join(ROOT, 'lib/chess_rules')
+POOL_DIR = File.join(ROOT, 'stockfish-pool/lib/stockfish_pool/rules')
+SHARED_FILES = %w[position.rb moves.rb position_check.rb].freeze
+
+# Comments that name each copy's own input validator.
+WORDING = {
+  'position.rb' => [['whose shape UciInputValidator has already', 'whose shape InputValidator has already']],
+  'position_check.rb' => [['already guaranteed by the FEN shape check (UciInputValidator).',
+                           'already guaranteed by InputValidator.']]
+}.freeze
+
+def pool_source(app_source, name)
+  text = WORDING.fetch(name, []).reduce(app_source) { |acc, (app, pool)| acc.gsub(app, pool) }
+  head, body = text.split("module ChessRules\n", 2)
+  raise "#{name}: no 'module ChessRules' line" unless body
+
+  # A comment right above the module moves inside StockfishPool, above Rules.
+  comment = head[/(?:^#(?: .*)?\n)+\z/] || ''
+  head = head.delete_suffix(comment)
+  nested = body.lines.map { |line| line.strip.empty? ? line : "  #{line}" }.join.gsub(/\bChessRules\./, 'Rules.')
+  inner_comment = comment.lines.map { |line| "  #{line}" }.join
+  "#{head}module StockfishPool\n#{inner_comment}  module Rules\n#{nested.chomp}\nend\n"
+end
+
+check = ARGV.include?('--check')
+changed = SHARED_FILES.select do |name|
+  expected = pool_source(File.read(File.join(APP_DIR, name)), name)
+  pool_path = File.join(POOL_DIR, name)
+  next false if File.exist?(pool_path) && File.read(pool_path) == expected
+
+  File.write(pool_path, expected) unless check
+  true
+end
+
+if check && changed.any?
+  warn "stockfish-pool's chess rules are out of date: #{changed.join(', ')}. Run bin/sync-chess-rules."
+  exit 1
+end
+puts(changed.empty? ? 'Already in sync.' : "Updated #{changed.join(', ')}.") unless check

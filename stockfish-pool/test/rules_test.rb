@@ -41,6 +41,23 @@ class RulesTest < Minitest::Test
     end
   end
 
+  # The generated move list must be exactly the moves #legal? accepts.
+  def test_legal_moves_lists_every_legal_move
+    [KIWIPETE, 'rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8', 'n1n5/PPPk4/8/8/8/8/4Kppp/5N1N b - - 0 1'].each do |fen|
+      assert_equal legal_moves(position(fen)).sort, Rules::Moves.legal_moves(position(fen)).sort, fen
+    end
+  end
+
+  def test_fen_round_trips_and_clocks_advance
+    assert_equal KIWIPETE, position(KIWIPETE).to_fen
+    after_knight = position(TestSupport::START_FEN).after(Rules.square('g1'), Rules.square('f3'))
+
+    assert_equal 'rnbqkbnr/pppppppp/8/8/8/5N2/PPPPPPPP/RNBQKB1R b KQkq - 1 1', after_knight.to_fen
+    after_pawn = after_knight.after(Rules.square('e7'), Rules.square('e5'))
+
+    assert_equal 'rnbqkbnr/pppp1ppp/8/4p3/8/5N2/PPPPPPPP/RNBQKB1R w KQkq e6 0 2', after_pawn.to_fen
+  end
+
   def test_placement_matches_the_fen
     [TestSupport::START_FEN, KIWIPETE, '8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1'].each do |fen|
       assert_equal fen.split.first, position(fen).placement

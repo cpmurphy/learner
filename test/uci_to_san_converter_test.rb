@@ -48,8 +48,8 @@ class UciToSanConverterTest < Minitest::Test
   end
 
   def test_convert_kingside_castling
-    # Position where white can castle kingside
-    fen = 'rnbqkbnr/pppppppp/8/8/8/5N2/PPPPPPPP/RNBQKB1R w KQkq - 0 1'
+    # Position where white can castle kingside (f1 and g1 are empty)
+    fen = 'rnbqkbnr/pppppppp/8/8/8/5NP1/PPPPPPBP/RNBQK2R w KQkq - 0 1'
     san = @converter.convert(fen, 'e1g1')
 
     assert_equal 'O-O', san
@@ -63,13 +63,12 @@ class UciToSanConverterTest < Minitest::Test
     assert_equal 'O-O-O', san
   end
 
-  def test_convert_pawn_promotion
-    # White pawn on e7 promoting (8th rank is empty at e8)
+  def test_convert_illegal_move_returns_nil
+    # The e7 pawn is blocked by the king on e8
     fen = 'rnbqkbnr/ppppPppp/8/8/8/8/PPPP1PPP/RNBQKBNR w KQkq - 0 1'
-    # NOTE: this FEN actually has pieces on the 8th rank, so promotion is a capture
-    san = @converter.convert(fen, 'e7e8q')
 
-    assert_equal 'exe8=Q', san
+    assert_nil @converter.convert(fen, 'e7e8q')
+    assert_nil @converter.convert(@starting_fen, 'f1c4')
   end
 
   def test_convert_pawn_promotion_non_capture
@@ -110,9 +109,10 @@ class UciToSanConverterTest < Minitest::Test
   end
 
   def test_convert_rook_move
-    fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+    # The a-pawn has moved, so the rook can reach a3
+    fen = 'rnbqkbnr/pppppppp/8/8/P7/8/1PPPPPPP/RNBQKBNR w KQkq - 0 1'
     san = @converter.convert(fen, 'a1a3')
-    # This is technically illegal in the starting position, but tests the conversion logic
+
     assert_equal 'Ra3', san
   end
 
