@@ -1,19 +1,18 @@
 # frozen_string_literal: true
 
+require_relative 'chess_rules'
 require_relative 'move_translator'
+require_relative 'uci_input_validator'
 
 # Checks that a game pasted by an anonymous visitor is a legal game from the
 # standard starting position, before any of its positions reach the engine.
 #
-# The pgn gem builds positions without checking legality, and
-# UciInputValidator only checks a FEN's shape, so a crafted game could hand
-# Stockfish an impossible position (say, the side not to move in check), which
-# it does not support. This replays the game on MoveTranslator's board and
-# requires, after every move, that:
-# - the move was one the piece can make (MoveTranslator raises otherwise);
-# - the side that moved is not left in check;
-# - no pawn stands on the first or eighth rank;
-# - the pgn gem's position (what the engine will see) matches the replay.
+# The pgn gem builds positions without checking legality, so a crafted game
+# could hand Stockfish an impossible position, which it does not support.
+# MoveTranslator turns each SAN move into UCI (it has the board to work out
+# which piece moves); ChessRules then decides whether that move is legal.
+# After every move the pgn gem's position, which is what the engine will see,
+# must be a legal position with the board ChessRules expects.
 module GameLegality
   STANDARD_START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
@@ -23,10 +22,11 @@ module GameLegality
   def problem(game)
     return 'The game must start from the standard starting position.' unless standard_start?(game)
 
-    board = Translator::Board.new
-    translator = MoveTranslator.new(board)
+    translator = MoveTranslator.new
+    position = ChessRules::Position.from_fen(STANDARD_START)
     game.moves.each_with_index do |move, index|
-      problem = move_problem(translator, board, move.notation, game.positions[index + 1])
+      position, problem = play(translator, position, move.notation)
+      problem ||= position_problem(position, game.positions[index + 1])
       return "Move #{move_label(index, move.notation)} is not legal: #{problem}." if problem
     end
     nil
@@ -36,61 +36,66 @@ module GameLegality
     game.positions.first&.to_fen.to_s == STANDARD_START
   end
 
-  # The squares a castling king starts on and crosses; neither may be attacked.
-  CASTLING_SQUARES = {
-    [:white, false] => %w[e1 f1], [:white, true] => %w[e1 d1],
-    [:black, false] => %w[e8 f8], [:black, true] => %w[e8 d8]
-  }.freeze
+  # Returns [position after the move, nil] or [nil, the problem].
+  def play(translator, position, notation)
+    return [nil, 'null moves are not supported'] if notation == '--'
 
-  def move_problem(translator, board, notation, position)
-    problem = before_move_problem(board, notation) || play(translator, notation)
-    return problem if problem
-    return 'it leaves the king in check' if mover_in_check?(board)
+    uci = translator_uci(translator, notation)
+    return [nil, 'that piece cannot move there'] unless uci
 
-    position_problem(translator.board_as_fen.split.first, position)
+    from, to, promotion = squares(uci)
+    return [nil, illegal_reason(position, from, to, promotion)] unless ChessRules::Moves.legal?(position, uci)
+
+    [position.after(from, to, promotion), nil]
   end
 
-  def before_move_problem(board, notation)
-    return 'null moves are not supported' if notation == '--'
-
-    'the king cannot castle out of or through check' if castles_through_check?(board, notation)
-  end
-
-  def play(translator, notation)
-    translator.translate_move(notation)
-    nil
+  # The move in UCI, or nil when no piece can make it.
+  def translator_uci(translator, notation)
+    uci = translator.translate_move(notation)
+    uci if UciInputValidator.valid_uci_move?(uci)
   rescue StandardError
+    nil
+  end
+
+  def squares(uci)
+    [ChessRules.square(uci[0, 2]), ChessRules.square(uci[2, 2]), uci[4]]
+  end
+
+  # Why ChessRules refused a move the translator could play.
+  def illegal_reason(position, from, to, promotion)
+    castle = ChessRules::Moves::CASTLES[[from, to]]
+    return castling_reason(position, castle) if castle && position[from]&.downcase == 'k'
+    return 'it leaves the king in check' if ChessRules::Moves.reachable?(position, from, to, promotion)
+    return 'a pawn reaching the last rank must promote' if unpromoted_pawn?(position, from, to, promotion)
+
     'that piece cannot move there'
   end
 
-  def position_problem(placement, position)
-    return 'a pawn cannot stand on the first or last rank' if pawn_on_back_rank?(placement)
-    return 'it could not be replayed' unless position && position.to_fen.to_s.split.first == placement
-
-    nil
+  def castling_reason(position, castle)
+    right, rook, empty, = castle
+    if ChessRules::Moves.castling_right?(position, right, rook) && empty.none? { |square| position[square] }
+      'the king cannot castle out of, through or into check'
+    else
+      'castling is no longer allowed'
+    end
   end
 
-  # After a move the board's current player is the opponent; the move was
-  # illegal if the opponent now attacks the mover's king (or it has none).
-  def mover_in_check?(board)
-    board.switch_player
-    king = board.find_king
-    king.nil? || board.opponent_attacks_square?(king)
-  ensure
-    board.switch_player
+  def unpromoted_pawn?(position, from, to, promotion)
+    position[from]&.downcase == 'p' && promotion.nil? && [0, 7].include?(to / 8)
   end
 
-  # Called before the move, so the board's current player is the one castling.
-  def castles_through_check?(board, notation)
-    return false unless notation.match?(/\AO-O(-O)?[+#]?\z/)
+  # The pgn gem's position after the move must be one the engine can be given,
+  # with the board the move produced.
+  def position_problem(expected, actual)
+    return 'it could not be replayed' unless actual
 
-    squares = CASTLING_SQUARES.fetch([board.current_player, notation.start_with?('O-O-O')])
-    squares.any? { |square| board.opponent_attacks_square?(square) }
-  end
+    fen = actual.to_fen.to_s
+    return 'it could not be replayed' unless UciInputValidator.valid_fen?(fen)
 
-  def pawn_on_back_rank?(placement)
-    ranks = placement.split('/')
-    [ranks.first, ranks.last].any? { |rank| rank.to_s.match?(/[pP]/) }
+    ChessRules.check!(fen, [])
+    'it could not be replayed' unless fen.split.first == expected.placement
+  rescue ChessRules::IllegalInput => e
+    "it leads to an illegal position (#{e.message.delete_prefix('Illegal position: ')})"
   end
 
   def move_label(index, notation)

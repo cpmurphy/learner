@@ -17,7 +17,7 @@ require_relative 'translator/clock'
 # Examples:
 #   translator.translate_move("e4")     #=> "e2e4"
 #   translator.translate_move("exd5")   #=> "e4d5"
-#   translator.translate_move("a8=Q")   #=> "a7a8Q"
+#   translator.translate_move("a8=Q")   #=> "a7a8q"
 #   translator.translate_move("O-O")    #=> "e1g1"
 #   translator.translate_move("--")     #=> "--"
 #
@@ -72,7 +72,8 @@ class MoveTranslator
     return game_move[:moves][0] if game_move[:moves][0] =~ /^O-O(-O)?[+#]?$/
 
     uci = game_move[:moves][0].sub('-', '') # Remove the dash from the move
-    uci += game_move[:add][0] if game_move[:add] # Add the promotion piece if it exists
+    # UCI writes the promotion piece in lower case for both colours.
+    uci += game_move[:add][0].downcase if game_move[:add]
     uci
   end
 

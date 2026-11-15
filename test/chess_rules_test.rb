@@ -43,6 +43,12 @@ class ChessRulesTest < Minitest::Test
     end
   end
 
+  def test_placement_matches_the_fen
+    [START_FEN, KIWIPETE, '8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1'].each do |fen|
+      assert_equal fen.split.first, position(fen).placement
+    end
+  end
+
   def test_accepts_legal_positions_and_moves
     assert_nil Rules.check!(START_FEN, %w[e2e4 e7e5 g1f3 b8c6 f1c4 g8f6 e1g1])
     assert_nil Rules.check!('4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 2', %w[e5d6])

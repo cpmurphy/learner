@@ -89,7 +89,7 @@ class MoveTranslatorTest < Minitest::Test
     board.squares['a8'] = nil
     board.current_player = :white
 
-    assert_equal('a7a8Q', @translator.translate_move('a8=Q'))
+    assert_equal('a7a8q', @translator.translate_move('a8=Q'))
   end
 
   def test_promotion_to_knight
@@ -99,7 +99,7 @@ class MoveTranslatorTest < Minitest::Test
     board.squares['a8'] = nil
     board.current_player = :white
 
-    assert_equal('a7a8N', @translator.translate_move('a8=N'))
+    assert_equal('a7a8n', @translator.translate_move('a8=N'))
   end
 
   def test_start_position_to_fen
