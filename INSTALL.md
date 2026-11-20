@@ -57,7 +57,7 @@ This is for developers who want to modify the code, or anyone who prefers not to
 
 ### Prerequisites
 - Ruby 3.4. CI and the container image use the version in `.ruby-version`
-  (currently 3.4.12). Distribution packages are often older; if yours is, a
+  (currently 3.4.13). Distribution packages are often older; if yours is, a
   version manager such as [rbenv](https://github.com/rbenv/rbenv) or
   [mise](https://mise.jdx.dev) can install the version in `.ruby-version`.
 - Node.js and npm
