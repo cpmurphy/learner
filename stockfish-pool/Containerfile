@@ -9,7 +9,7 @@
 # filesystem, all capabilities dropped and memory/pids/cpu limits; see
 # deploy/quadlet/stockfish-pool.container.
 
-ARG RUBY_VERSION=3.4.12
+ARG RUBY_VERSION=3.4.13
 FROM docker.io/library/ruby:$RUBY_VERSION-slim AS base
 
 WORKDIR /srv/stockfish-pool
