@@ -2,7 +2,6 @@
 
 require 'base64'
 require 'openssl'
-require 'rack/utils'
 
 # Hashes and verifies the owner's password with scrypt (from Ruby's OpenSSL,
 # so no native gem is needed). The encoded form, stored in OWNER_PASSWORD_HASH, is
@@ -34,7 +33,7 @@ module OwnerPassword
 
     expected = Base64.strict_decode64(digest)
     actual = derive(password.to_s, Base64.strict_decode64(salt), Integer(n), Integer(r), Integer(p))
-    Rack::Utils.secure_compare(actual, expected)
+    OpenSSL.secure_compare(actual, expected)
   rescue ArgumentError, OpenSSL::KDF::KDFError
     false
   end
