@@ -72,6 +72,9 @@ class LearnerApp < Sinatra::Base
            'single-user install; set OWNER_PASSWORD_HASH for a public site.'
     end
     set :public_folder, File.join(File.dirname(__FILE__), 'public')
+    # Browsers ask before reusing the page assets, so a deploy shows up at once
+    # (an unchanged file costs a 304). Without it Safari reuses them unasked.
+    set :static_cache_control, [:no_cache]
     set :bind, '0.0.0.0'
   end
 
@@ -323,10 +326,12 @@ class LearnerApp < Sinatra::Base
 
   # Serve index.html for the root path
   get '/' do
+    cache_control :no_cache
     send_file File.join(settings.public_folder, 'index.html')
   end
 
   get '/game' do
+    cache_control :no_cache
     send_file File.join(settings.public_folder, 'game.html')
   end
 
