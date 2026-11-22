@@ -20,7 +20,7 @@ gem 'sinatra', '>= 3.2' # Using a recent stable version
 gem 'stockfish_pool_client',
     git: 'https://github.com/cpmurphy/stockfish-pool.git',
     glob: 'client/*.gemspec',
-    tag: 'v0.1.0'
+    tag: 'v0.1.1'
 
 group :development, :test do
   gem 'debug', '>= 1.0.0'

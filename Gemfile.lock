@@ -1,7 +1,7 @@
 GIT
   remote: https://github.com/cpmurphy/stockfish-pool.git
-  revision: f4cb9fe682ece1ef79726a271cbeca23027961bc
-  tag: v0.1.0
+  revision: 46db7a68b9766d6a161903092a636712ef51f2ab
+  tag: v0.1.1
   glob: client/*.gemspec
   specs:
     stockfish_pool_client (0.1.0)
