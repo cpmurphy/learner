@@ -28,20 +28,35 @@ fi
 
 cache_dir=${POOL_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/stockfish-pool}
 dest="$cache_dir/$ref"
-lock="$cache_dir/$ref.lock"
+lock_dir="$cache_dir/$ref.lock.d"
 mkdir -p "$cache_dir"
 
-if [ ! -d "$dest/.git" ]; then
-  (
-    flock 9
-    if [ ! -d "$dest/.git" ]; then
-      tmp=$(mktemp -d "$cache_dir/tmp.XXXXXX")
-      git clone --branch "$ref" --depth 1 "$repo_url" "$tmp"
-      git -C "$tmp" submodule update --init --depth 1 Stockfish
-      rm -rf "$dest"
-      mv "$tmp" "$dest"
+# Portable lock (mkdir is atomic; flock is missing on macOS).
+release_lock() { rmdir "$lock_dir" 2>/dev/null || true; }
+acquire_lock() {
+  local tries=0
+  while ! mkdir "$lock_dir" 2>/dev/null; do
+    tries=$((tries + 1))
+    if [ "$tries" -gt 120 ]; then
+      echo "timed out waiting for pool checkout lock at $lock_dir" >&2
+      exit 1
     fi
-  ) 9>"$lock"
+    sleep 0.5
+  done
+  trap release_lock EXIT
+}
+
+if [ ! -d "$dest/.git" ]; then
+  acquire_lock
+  if [ ! -d "$dest/.git" ]; then
+    tmp=$(mktemp -d "$cache_dir/tmp.XXXXXX")
+    git clone --branch "$ref" --depth 1 "$repo_url" "$tmp"
+    git -C "$tmp" submodule update --init --depth 1 Stockfish
+    rm -rf "$dest"
+    mv "$tmp" "$dest"
+  fi
+  release_lock
+  trap - EXIT
 fi
 
 printf '%s\n' "$dest"
