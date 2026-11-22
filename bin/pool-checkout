@@ -20,7 +20,9 @@ sibling=$(cd "$root/.." && pwd)/stockfish-pool
 if [ -d "$sibling/.git" ]; then
   wanted=$(git -C "$sibling" rev-parse "$ref^{commit}" 2>/dev/null || true)
   head=$(git -C "$sibling" rev-parse HEAD 2>/dev/null || true)
-  if [ -n "$wanted" ] && [ "$wanted" = "$head" ]; then
+  # Require a clean tree so uncommitted sibling edits cannot ship as POOL_REF.
+  if [ -n "$wanted" ] && [ "$wanted" = "$head" ] && \
+     [ -z "$(git -C "$sibling" status --porcelain)" ]; then
     printf '%s\n' "$sibling"
     exit 0
   fi
