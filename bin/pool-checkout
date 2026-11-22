@@ -52,10 +52,13 @@ if [ ! -d "$dest/.git" ]; then
   acquire_lock
   if [ ! -d "$dest/.git" ]; then
     tmp=$(mktemp -d "$cache_dir/tmp.XXXXXX")
+    # Drop the temp clone on failure; clear this after mv so we don't delete $dest.
+    trap 'rm -rf "$tmp"; release_lock' EXIT
     git clone --branch "$ref" --depth 1 "$repo_url" "$tmp"
     git -C "$tmp" submodule update --init --depth 1 Stockfish
     rm -rf "$dest"
     mv "$tmp" "$dest"
+    trap release_lock EXIT
   fi
   release_lock
   trap - EXIT
