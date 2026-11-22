@@ -67,20 +67,27 @@ RUN cd Stockfish/src && \
     strip stockfish && \
     mv stockfish /app/bin/
 
+# The app source, pruned in a throwaway stage. Deleting files in a layer of the
+# final image would not shrink it (the earlier COPY layer still holds them), and
+# chmod -R there would store every file a second time. Stockfish stays in the
+# build context because the stockfish stage needs it.
+FROM base AS source
+COPY . /src
+RUN rm -rf /src/Stockfish /src/test /src/coverage /src/sandbox && \
+    chmod -R a+rX,go-w /src
+
 # The web app without an engine. Code is owned by root and only readable by
 # the app user, so a compromised app cannot rewrite itself; the app writes only
 # to PGN_DIR (/app/games, normally a volume) and /tmp.
 FROM base AS app
 
 COPY --from=build "${BUNDLE_PATH}" "${BUNDLE_PATH}"
-COPY . /app
+COPY --from=source /src /app
 COPY --from=build /app/public/3rdparty-assets /app/public/3rdparty-assets
 COPY --from=build /app/public/scripts/3rdparty /app/public/scripts/3rdparty
-RUN rm -rf /app/Stockfish /app/test /app/coverage /app/sandbox && \
-    groupadd --system --gid 1000 appgroup && \
+RUN groupadd --system --gid 1000 appgroup && \
     useradd appuser --uid 1000 --gid 1000 --create-home --shell /bin/bash && \
-    mkdir -p /app/games && chown appuser:appgroup /app/games && \
-    chmod -R a+rX,go-w /app
+    mkdir -p /app/games && chown appuser:appgroup /app/games
 USER appuser
 
 ENV PGN_DIR=/app/games
