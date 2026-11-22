@@ -9,11 +9,11 @@ internet ──TLS──> Caddy (host) ──> 127.0.0.1:9292 ──> chess-lear
 ```
 
 - **chess-learner** (`localhost/chess-learner:app`): the web app, without Stockfish. It's published on `127.0.0.1:9292` only, its root filesystem is read-only, it has no capabilities, and it runs with memory and pids limits. It writes only to the library volume.
-- **stockfish-pool** (`localhost/stockfish-pool:latest`): the engine service.
+- **stockfish-pool** (`localhost/stockfish-pool:latest`): the engine service, built from the [stockfish-pool](https://github.com/cpmurphy/stockfish-pool) tag in `POOL_REF` (must match the Gemfile client tag).
   - It's on an internal network only, with no published ports and no route to the internet.
   - Its root filesystem is read-only, it has no capabilities, and it runs as a non-root user inside a separate user namespace.
   - Its cpu, memory and pids are capped.
-- **Rate limits, quotas and the owner login** are described in the main README ("Running It Publicly") and `stockfish-pool/README.md`.
+- **Rate limits, quotas and the owner login** are described in the main README ("Running It Publicly") and the [stockfish-pool README](https://github.com/cpmurphy/stockfish-pool).
 
 ## Deploying from your workstation (bin/deploy.sh)
 

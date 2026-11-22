@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Resolves a local checkout of stockfish-pool at the tag/ref in POOL_REF.
+# Prints the absolute path. Used by deploy/build-images.sh and bin/sync-chess-rules.
+#
+# Override with POOL_SRC=/path/to/stockfish-pool to skip cloning.
+# Override the remote with POOL_REPO_URL=...
+set -euo pipefail
+
+root=$(cd "$(dirname "$0")/.." && pwd)
+ref=$(tr -d '[:space:]' <"$root/POOL_REF")
+: "${ref:?POOL_REF is empty}"
+repo_url=${POOL_REPO_URL:-https://github.com/cpmurphy/stockfish-pool.git}
+
+if [ -n "${POOL_SRC:-}" ]; then
+  printf '%s\n' "$(cd "$POOL_SRC" && pwd)"
+  exit 0
+fi
+
+sibling=$(cd "$root/.." && pwd)/stockfish-pool
+if [ -d "$sibling/.git" ]; then
+  wanted=$(git -C "$sibling" rev-parse "$ref^{commit}" 2>/dev/null || true)
+  head=$(git -C "$sibling" rev-parse HEAD 2>/dev/null || true)
+  if [ -n "$wanted" ] && [ "$wanted" = "$head" ]; then
+    printf '%s\n' "$sibling"
+    exit 0
+  fi
+fi
+
+cache_dir=${POOL_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/stockfish-pool}
+dest="$cache_dir/$ref"
+lock="$cache_dir/$ref.lock"
+mkdir -p "$cache_dir"
+
+if [ ! -d "$dest/.git" ]; then
+  (
+    flock 9
+    if [ ! -d "$dest/.git" ]; then
+      tmp=$(mktemp -d "$cache_dir/tmp.XXXXXX")
+      git clone --branch "$ref" --depth 1 "$repo_url" "$tmp"
+      git -C "$tmp" submodule update --init --depth 1 Stockfish
+      rm -rf "$dest"
+      mv "$tmp" "$dest"
+    fi
+  ) 9>"$lock"
+fi
+
+printf '%s\n' "$dest"
