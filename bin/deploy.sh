@@ -55,6 +55,7 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
   echo "Uncommitted changes to tracked files; commit or stash them first." >&2
   exit 1
 fi
+bin/check-pool-ref
 revision=$(git rev-parse --short HEAD)
 echo "Deploying commit $revision ($(git log -1 --format=%s))"
 

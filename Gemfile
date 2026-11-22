@@ -11,7 +11,7 @@ gem 'racc'
 gem 'rack-attack'       # Per-IP rate limits for the public site
 gem 'sinatra', '>= 3.2' # Using a recent stable version
 # Client for the stockfish-pool engine service (used when ENGINE_URL is set).
-# Keep this tag equal to POOL_REF. For local client work:
+# Keep this tag equal to POOL_REF (bin/check-pool-ref enforces it). For local client work:
 #   bundle config local.stockfish_pool_client /path/to/stockfish-pool/client
 gem 'stockfish_pool_client',
     git: 'https://github.com/cpmurphy/stockfish-pool.git',
