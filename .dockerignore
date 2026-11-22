@@ -1,3 +1,7 @@
+# Git metadata (the repo's and the Stockfish submodule's pointer to it)
+.git
+Stockfish/.git
+
 # flyctl launch added from .gitignore
 .aider*
 deploy_env.sh
@@ -17,8 +21,8 @@ games
 
 # flyctl launch added from Stockfish/.gitignore
 # Files from build
-*.o
-*.s
+**/*.o
+**/*.s
 .depend
 
 # Built binary
