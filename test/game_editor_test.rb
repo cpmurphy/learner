@@ -49,6 +49,13 @@ class TestGameEditor < Minitest::Test
       # Return a score that makes this a blunder: every 3rd move gets -200, others get 150
       played_score = (i % 3).zero? ? -200 : 150
       mock_analyzer.expect :evaluate_move, { score: played_score }, [fen, uci_move]
+
+      # A blunder's line that ends on a capture or a check is extended: the
+      # engine is asked for its line from the end of it.
+      # (evaluate_move scores for the side to move after it, so 150 is the blunder.)
+      next unless played_score == 150 && forcing_end?(game.moves[i + variation.size], translator.board_as_fen)
+
+      mock_analyzer.expect :evaluate_best_move, { score: 0, move: nil, variation: [] }, [translator.board_as_fen]
     end
 
     mock_analyzer.expect :close, nil
@@ -767,5 +774,16 @@ class TestGameEditor < Minitest::Test
     end
 
     assert_equal 'b7a8q', backend.moves.last
+  end
+
+  private
+
+  # Whether a line ending with +last_move+ at +fen+ ends on a capture or a
+  # check with the game still going.
+  def forcing_end?(last_move, fen)
+    position = ChessRules::Position.from_fen(fen)
+    return false if ChessRules::Moves.legal_moves(position).empty?
+
+    last_move.notation.include?('x') || position.in_check?(position.side)
   end
 end
