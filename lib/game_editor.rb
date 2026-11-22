@@ -44,7 +44,8 @@ class GameEditor
     store_centipawn_loss(move, analysis_data[:centipawn_loss])
 
     annotate_critical_moment(game, move_index)
-    @variation_builder.add_best_move_variation(move, fen, analysis_data)
+    @variation_builder.add_best_move_variation(move, fen, analysis_data,
+                                               continuation: ->(line_fen) { analyzer.evaluate_best_move(line_fen) })
   end
 
   def store_centipawn_loss(move, centipawn_loss)
