@@ -21,6 +21,9 @@ jobs:
       - name: Lint code for consistent style
         run: bin/rubocop
 
+      - name: Check stockfish-pool pins agree (POOL_REF, Gemfile, Gemfile.lock)
+        run: bin/check-pool-ref
+
       - name: Check chess rules stay in sync with stockfish-pool
         run: bin/sync-chess-rules --check
 

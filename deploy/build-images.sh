@@ -19,6 +19,7 @@ if [ -z "${STOCKFISH_ARCH:-}" ] && ! grep -qw avx2 /proc/cpuinfo; then
   exit 1
 fi
 
+bin/check-pool-ref
 pool=$(bin/pool-checkout)
 ref=$(tr -d '[:space:]' <POOL_REF)
 echo "Building stockfish-pool from $pool ($ref)"

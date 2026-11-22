@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Fails unless the stockfish-pool pins agree: POOL_REF (the pool image and
+# chess-rules source), the Gemfile's stockfish_pool_client tag, and the tag
+# locked in Gemfile.lock. Run by CI, bin/deploy.sh, deploy/build-images.sh and
+# the pre-commit hook.
+#
+#   bin/check-pool-ref          check the working tree
+#   bin/check-pool-ref --index  check the staged versions (for pre-commit)
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+case "${1:-}" in
+  "") read_file() { cat "$1"; } ;;
+  --index) read_file() { git show ":$1"; } ;;
+  *) echo "usage: bin/check-pool-ref [--index]" >&2; exit 2 ;;
+esac
+
+pool_ref=$(read_file POOL_REF | tr -d '[:space:]')
+
+# The tag: option inside the `gem 'stockfish_pool_client', ...` declaration.
+gemfile_tag=$(read_file Gemfile | awk '
+  /^[[:space:]]*gem[[:space:]]+["'\'']stockfish_pool_client["'\'']/ { in_gem = 1 }
+  in_gem && match($0, /tag:[[:space:]]*["'\''][^"'\'']+["'\'']/) {
+    s = substr($0, RSTART, RLENGTH); sub(/^tag:[[:space:]]*["'\'']/, "", s); sub(/["'\'']$/, "", s)
+    print s; exit
+  }
+  in_gem && !/,[[:space:]]*$/ { exit }
+')
+
+# The tag: line of the GIT section whose remote is stockfish-pool.
+lock_tag=$(read_file Gemfile.lock | awk '
+  /^GIT$/ { in_git = 1; pool = 0; next }
+  /^[^[:space:]]/ { in_git = 0 }
+  in_git && /^  remote:.*stockfish-pool/ { pool = 1 }
+  in_git && pool && /^  tag:/ { print $2; exit }
+')
+
+fail=0
+[ -n "$pool_ref" ] || { echo "POOL_REF is empty" >&2; fail=1; }
+[ -n "$gemfile_tag" ] || { echo "No tag: found for stockfish_pool_client in Gemfile" >&2; fail=1; }
+[ -n "$lock_tag" ] || { echo "No stockfish-pool tag: found in Gemfile.lock" >&2; fail=1; }
+
+if [ "$fail" = 0 ] && { [ "$pool_ref" != "$gemfile_tag" ] || [ "$pool_ref" != "$lock_tag" ]; }; then
+  echo "stockfish-pool pins disagree:" >&2
+  echo "  POOL_REF:      $pool_ref" >&2
+  echo "  Gemfile tag:   $gemfile_tag" >&2
+  echo "  Gemfile.lock:  $lock_tag" >&2
+  echo "Set all three to the same tag (run 'bundle install' after editing the Gemfile)." >&2
+  fail=1
+fi
+
+[ "$fail" = 0 ] || exit 1
+echo "stockfish-pool pins agree: $pool_ref"
