@@ -35,9 +35,15 @@ RUN apt-get update -qq && \
     apt-get install --no-install-recommends -y build-essential git wget pkg-config libclang-dev nodejs npm && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
-# Install gems (stockfish_pool_client comes from the git tag in the Gemfile)
+# Install gems (stockfish_pool_client comes from the git tag in the Gemfile).
+# Bundler clones the whole stockfish-pool repo; keep only client/ so the
+# engine service code is not shipped in the app image.
 COPY Gemfile Gemfile.lock ./
 RUN bundle install && \
+    for dir in "${BUNDLE_PATH}"/ruby/*/bundler/gems/stockfish-pool-*; do \
+      [ -d "$dir" ] || continue; \
+      find "$dir" -mindepth 1 -maxdepth 1 ! -name client -exec rm -rf {} +; \
+    done && \
     rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git
 
 # Copy browser dependencies into public/ so the final image can serve them as static assets.
