@@ -35,10 +35,8 @@ RUN apt-get update -qq && \
     apt-get install --no-install-recommends -y build-essential git wget pkg-config libclang-dev nodejs npm && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
-# Install gems
+# Install gems (stockfish_pool_client comes from the git tag in the Gemfile)
 COPY Gemfile Gemfile.lock ./
-# Path gem referenced by the Gemfile; it must be present before bundle install.
-COPY stockfish-pool/client stockfish-pool/client
 RUN bundle install && \
     rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git
 
@@ -72,9 +70,7 @@ COPY --from=build "${BUNDLE_PATH}" "${BUNDLE_PATH}"
 COPY . /app
 COPY --from=build /app/public/3rdparty-assets /app/public/3rdparty-assets
 COPY --from=build /app/public/scripts/3rdparty /app/public/scripts/3rdparty
-# The engine service's server code is not part of this image; its client gem is.
-RUN rm -rf /app/Stockfish /app/stockfish-pool/lib /app/stockfish-pool/test /app/stockfish-pool/config \
-           /app/stockfish-pool/config.ru /app/test /app/coverage /app/sandbox && \
+RUN rm -rf /app/Stockfish /app/test /app/coverage /app/sandbox && \
     groupadd --system --gid 1000 appgroup && \
     useradd appuser --uid 1000 --gid 1000 --create-home --shell /bin/bash && \
     mkdir -p /app/games && chown appuser:appgroup /app/games && \

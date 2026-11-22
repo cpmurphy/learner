@@ -92,7 +92,7 @@ By default the tool behaves as a single-user local app: whoever opens it can upl
   - Over a limit, a request gets `429` with `Retry-After`.
 - **Bounded sessions.** Sessions are held in memory, capped in number and expired when idle, so floods of new visitors can't exhaust memory.
 - **Analysis cache.** Opening a library file that has no critical-moment annotations runs Stockfish once; reopening it reuses the result. Visitors' own analyses are never cached.
-- **Engine service.** With `ENGINE_URL` set, analysis runs in the separate, sandboxed `stockfish-pool` service, with its own per-visitor quota and global CPU budget (see `stockfish-pool/README.md`).
+- **Engine service.** With `ENGINE_URL` set, analysis runs in the separate, sandboxed [stockfish-pool](https://github.com/cpmurphy/stockfish-pool) service, with its own per-visitor quota and global CPU budget. Pin the client/service with `POOL_REF` (must match the Gemfile git tag).
 
 | Variable | Purpose |
 |---|---|

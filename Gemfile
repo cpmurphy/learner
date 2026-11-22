@@ -10,8 +10,13 @@ gem 'puma', '>= 5.0' # A recommended server for Sinatra
 gem 'racc'
 gem 'rack-attack'       # Per-IP rate limits for the public site
 gem 'sinatra', '>= 3.2' # Using a recent stable version
-# Client for the engine service in stockfish-pool/ (used when ENGINE_URL is set)
-gem 'stockfish_pool_client', path: 'stockfish-pool/client'
+# Client for the stockfish-pool engine service (used when ENGINE_URL is set).
+# Keep this tag equal to POOL_REF. For local client work:
+#   bundle config local.stockfish_pool_client /path/to/stockfish-pool/client
+gem 'stockfish_pool_client',
+    git: 'https://github.com/cpmurphy/stockfish-pool.git',
+    glob: 'client/*.gemspec',
+    tag: 'v0.1.0'
 
 group :development, :test do
   gem 'debug', '>= 1.0.0'

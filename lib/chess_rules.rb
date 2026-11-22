@@ -1,9 +1,8 @@
 # frozen_string_literal: true
 
-# The app's copy of the chess rules stockfish-pool also uses (as
-# StockfishPool::Rules), kept separate so the pool can leave this repository.
-# Edit the files here, then run bin/sync-chess-rules to update the pool's copy;
-# CI checks they match. san.rb is app-only.
+# App copy of stockfish-pool's StockfishPool::Rules. The pool repo is the
+# source of truth; refresh with bin/sync-chess-rules (CI runs --check).
+# san.rb is app-only.
 
 require_relative 'chess_rules/position'
 require_relative 'chess_rules/moves'
