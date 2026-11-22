@@ -52,7 +52,7 @@ The app can run publicly (see README "Running It Publicly"):
 `deploy/CLAUDE.md` holds deployment guidance. The engine service lives in the
 separate [stockfish-pool](https://github.com/cpmurphy/stockfish-pool) repo.
 - **racc:** `pgn2` needs `racc`, which must stay in the Gemfile; production bundles without development gems otherwise fail to boot.
-- **stockfish-pool:** Client gem is pinned by git tag in the Gemfile; keep that tag equal to `POOL_REF` (`bin/check-pool-ref` enforces it in CI, deploy, image builds and the local pre-commit hook). `bin/deploy.sh` / `deploy/build-images.sh` build the pool image from that ref via `bin/pool-checkout`. For local client edits: `bundle config local.stockfish_pool_client /path/to/stockfish-pool/client`.
+- **stockfish-pool:** Client gem is pinned by git tag in the Gemfile; keep that tag equal to `POOL_REF` (`bin/check-pool-ref` enforces it in CI, deploy, image builds and the local pre-commit hook). `bin/deploy.sh` / `deploy/build-images.sh` build the pool image from that ref via `bin/pool-checkout`. For local client edits: `bundle config set local.stockfish_pool_client /path/to/stockfish-pool` (the repository root, not `client/`) plus `bundle config set disable_local_branch_check true`, because the Gemfile pins a tag, not a branch.
 - **Chess rules:** stockfish-pool owns `StockfishPool::Rules`. Refresh `lib/chess_rules/` with `bin/sync-chess-rules` (CI runs `--check`). `san.rb` is app-only.
 
 ### Stockfish Engine
