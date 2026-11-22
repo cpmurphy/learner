@@ -113,39 +113,7 @@ Always serve it over HTTPS behind a reverse proxy (for example Caddy), with the 
 
 ## Development
 
-### Running Tests
-
-The test suite is split into unit tests and integration tests. Unit tests don't require external dependencies, while integration tests require Stockfish to be installed and available.
-
-**Unit Tests** (default, no Stockfish required):
-```bash
-bundle exec rake test
-# Or run a specific test file:
-bundle exec ruby -Itest test/game_editor_test.rb
-```
-
-**Integration Tests** (requires Stockfish):
-```bash
-bundle exec rake integration
-# Or run a specific integration test file:
-bundle exec ruby -Itest test/integration/game_editor_integration_test.rb
-```
-
-**JavaScript tests:**
-```bash
-npm test
-# Or run once (non-watch mode):
-npm run test_once
-```
-
-**Note:** The default `rake test` task automatically excludes integration tests. Integration tests that require Stockfish are located in `test/integration/` and must be run separately.
-
-### Code Linting
-
-Ruby:
-```bash
-bundle exec rubocop
-```
+See [DEVELOPMENT.md](DEVELOPMENT.md) for running tests, linting, and updating the stockfish-pool pin.
 
 ## License
 
